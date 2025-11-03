@@ -1,0 +1,136 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análise de Sobreposição de Áreas</title>
+    <link rel="stylesheet" type="text/css" href="{% static 'homepage/css/style.css' %}">
+</head>
+<body>
+    <div class="container">
+        <h1>🗺️ Análise de Sobreposição de Áreas</h1>
+        
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="coordenadas_input">Coordenadas WKT do Polígono:</label>
+                <textarea 
+                    id="coordenadas_input" 
+                    name="coordenadas_input" 
+                    placeholder="Cole aqui as coordenadas WKT do seu polígono (ex: POLYGON((...))"
+                    required>{% if coordenadas_recebidas %}{{ coordenadas_recebidas }}{% endif %}</textarea>
+                <small>Formato esperado: WKT (Well-Known Text) - POLYGON ou MULTIPOLYGON</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="excluir_car">CAR a Excluir da Análise (Opcional):</label>
+                <input 
+                    type="text" 
+                    id="excluir_car" 
+                    name="excluir_car" 
+                    placeholder="Digite o número do CAR que deseja excluir da análise"
+                    value="{% if excluir_car %}{{ excluir_car }}{% endif %}">
+                <small>Se informado, este CAR não será incluído nos resultados de sobreposição</small>
+            </div>
+            
+            
+            <button type="submit">🔍 Analisar Sobreposições</button>
+        </form>
+
+        {% if erro %}
+        <div class="error-message">
+            <h3>❌ Erro:</h3>
+            <p>{{ erro }}</p>
+        </div>
+        {% endif %}
+
+        {% if resultado %}
+        <div class="areas-container">
+            <h2>📊 Resultados da Análise</h2>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number">{{ resultado.total_areas_com_sobreposicao }}</div>
+                    <div>Áreas com Sobreposição</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-number">{{ resultado.resumo_bases.imoveis }}</div>
+                    <div>Imóveis Analisados</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{{ resultado.resumo_bases.zoneamento }}</div>
+                    <div>Zoneamentos Analisados</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{{ resultado.resumo_bases.fitoecologias }}</div>
+                    <div>Fitoecologias Analisadas</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{{ resultado.resumo_bases.apas }}</div>
+                    <div>APAs Analisadas</div>
+                </div>
+                
+            </div>
+
+            {% if resultado.resultados_por_base %}
+                <h3>🎯 Resultados por Base de Dados:</h3>
+                {% for base_resultado in resultado.resultados_por_base %}
+                <div class="base-resultado">
+                    <h4>{{ base_resultado.nome_base }}</h4>
+                    {% if base_resultado.areas_encontradas %}
+                        <p><strong>Sobreposições encontradas: {{ base_resultado.total_areas_com_sobreposicao }}</strong></p>
+                        {% for area in base_resultado.areas_encontradas %}
+                        <div class="area-item">
+                            <div class="area-value">Área sobreposta: {{ area.area|floatformat:4 }} ha</div>
+                            <div class="area-info">{{ area.item_info }}</div>
+                            {% if area.status %}
+                            <div class="area-status">Status: {{ area.status }}</div>
+                            {% endif %}
+                            {% if area.unidade %}
+                            <div class="area-details">
+                                <strong>Detalhes da APA:</strong>
+                                
+                                    <strong>Unidade:</strong> {{ area.unidade }}
+                                    <strong>Domínios:</strong> {{ area.dominios }}
+                                    <strong>Classe:</strong> {{ area.classe }}
+                                    <strong>Fundo Legal:</strong> {{ area.fundo_legal }}
+                                
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p>✅ Nenhuma sobreposição encontrada nesta base de dados.</p>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            
+            {% else %}
+            <div class="area-item">
+                <p>✅ Nenhuma sobreposição encontrada com o polígono fornecido.</p>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <div class="info">
+            <p><strong>💡 Como usar:</strong></p>
+            <ul>
+                <li>Cole as coordenadas WKT do seu polígono no campo acima</li>
+                <li>Escolha entre busca simples (apenas imóveis) ou busca completa (todas as bases)</li>
+                <li>Clique em "Analisar Sobreposições" para verificar intersecções</li>
+                <li>Na busca completa, o sistema verificará:</li>
+                <ul>
+                    <li>🏠 Base de Dados Sicar</li>
+                    <li>🗺️ Base de Dados de Zoneamento</li>
+                    <li>🌿 Base de Dados de Fitoecologias</li>
+                    <li>🏞️ Base de Dados de APAs (Áreas de Proteção Ambiental)</li>
+                </ul>
+                <li>Os resultados mostrarão de qual base cada sobreposição foi encontrada</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
