@@ -1,5 +1,6 @@
 def _processar_base_dados_imoveis(polygon_wkt, dados_imoveis, nome_base, verificador):
     """Processa especificamente os dados dos imóveis que contêm tuplas (WKT, numero_car)"""
+    from shapely.wkt import loads
     if not dados_imoveis:
         return {
             'nome_base': nome_base,
@@ -23,11 +24,26 @@ def _processar_base_dados_imoveis(polygon_wkt, dados_imoveis, nome_base, verific
             if area_sobreposicao is None:
                 quantidade_nao_avaliados += 1
             elif area_sobreposicao > 0:
-                areas_encontradas.append({
-                    'area': area_sobreposicao,
-                    'item_info': f"{nome_base} - CAR: {numero_car}",
-                    'status': status
-                })
+                # Calcular a área total do CAR em hectares
+                try:
+                    geom_car = loads(multipolygon_wkt)
+                    area_car_hectares = verificador._converter_para_hectares_otimizada(geom_car)
+                except Exception:
+                    area_car_hectares = 0
+
+                # Regra: se sobreposição >= 98% da área do CAR, desconsiderar esse CAR
+                incluir_resultado = True
+                if area_car_hectares and area_car_hectares > 0:
+                    percentual_sobreposicao = area_sobreposicao / area_car_hectares
+                    if percentual_sobreposicao >= 0.98:
+                        incluir_resultado = False
+
+                if incluir_resultado:
+                    areas_encontradas.append({
+                        'area': area_sobreposicao,
+                        'item_info': f"{nome_base} - CAR: {numero_car}",
+                        'status': status
+                    })
         except Exception as e:
             quantidade_nao_avaliados += 1
             continue
