@@ -1,0 +1,44 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload de ZIP e CAR</title>
+    <link rel="stylesheet" type="text/css" href="{% static 'homepage/css/upload.css' %}">
+</head>
+<body>
+    <div class="container">
+        <h1>Upload de ZIP e CAR</h1>
+
+        <div class="upload-card">
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="zip_file">Arquivo ZIP</label>
+                    <input class="file-input" type="file" id="zip_file" name="zip_file" accept=".zip" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="car_input">Número do CAR</label>
+                    <input type="text" id="car_input" name="car_input" placeholder="Digite o número do CAR" value="{% if car_input %}{{ car_input }}{% endif %}">
+                </div>
+
+                <button type="submit">🚀 Enviar e Descompactar</button>
+            </form>
+
+            {% if sucesso %}
+                <div class="status-success">✅ {{ mensagem }}</div>
+            {% endif %}
+            {% if erro %}
+                <div class="status-error">❌ {{ erro }}</div>
+            {% endif %}
+
+            <div class="actions" style="margin-top: 16px;">
+                <a href="{% url 'homepage' %}">⬅️ Voltar para Home</a>
+            </div>
+        </div>
+    </div>
+    
+</body>
+</html>

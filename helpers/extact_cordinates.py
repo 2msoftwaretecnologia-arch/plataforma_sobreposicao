@@ -1,9 +1,10 @@
 import geopandas as gpd
 
-def extrair_cordenadas(arquivo_shp):
+def extrair_cordenadas(arquivo_shp = "exports/Area_do_Imovel.shp"):
     """
     Lê um shapefile e retorna o primeiro polígono no formato POLYGON ((...))
     """
+    
     if arquivo_shp is None:
         print("Erro: Arquivo shapefile não fornecido")
         return None
@@ -43,3 +44,4 @@ def extrair_cordenadas(arquivo_shp):
     except Exception as e:
         print(f"Erro ao ler o arquivo: {e}")
         return None
+

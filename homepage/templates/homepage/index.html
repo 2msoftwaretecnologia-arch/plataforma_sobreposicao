@@ -10,33 +10,10 @@
 <body>
     <div class="container">
         <h1>🗺️ Análise de Sobreposição de Áreas</h1>
+        <p style="margin-bottom: 20px;">
+            <a href="{% url 'upload_zip_car' %}" style="display:inline-block;padding:10px 16px;border-radius:8px;background:#e9ecef;color:#333;text-decoration:none;">📦 Ir para Upload de ZIP e CAR</a>
+        </p>
         
-        <form method="post">
-            {% csrf_token %}
-            <div class="form-group">
-                <label for="coordenadas_input">Coordenadas WKT do Polígono:</label>
-                <textarea 
-                    id="coordenadas_input" 
-                    name="coordenadas_input" 
-                    placeholder="Cole aqui as coordenadas WKT do seu polígono (ex: POLYGON((...))"
-                    required>{% if coordenadas_recebidas %}{{ coordenadas_recebidas }}{% endif %}</textarea>
-                <small>Formato esperado: WKT (Well-Known Text) - POLYGON ou MULTIPOLYGON</small>
-            </div>
-            
-            <div class="form-group">
-                <label for="excluir_car">CAR a Excluir da Análise (Opcional):</label>
-                <input 
-                    type="text" 
-                    id="excluir_car" 
-                    name="excluir_car" 
-                    placeholder="Digite o número do CAR que deseja excluir da análise"
-                    value="{% if excluir_car %}{{ excluir_car }}{% endif %}">
-                <small>Se informado, este CAR não será incluído nos resultados de sobreposição</small>
-            </div>
-            
-            
-            <button type="submit">🔍 Analisar Sobreposições</button>
-        </form>
 
         {% if erro %}
         <div class="error-message">
