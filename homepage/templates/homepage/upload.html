@@ -45,9 +45,11 @@
 
                 </div>
 
-                <div class="form-group" id="group_car">
-                    <label for="car_input">Número do CAR</label>
-                    <input type="text" id="car_input" name="car_input" placeholder="Digite o número do CAR" value="{% if car_input %}{{ car_input }}{% endif %}">
+                <div class="input-container" id="group_car">
+                    <input type="text" class="input" id="car_input" name="car_input" placeholder="Digite o número do CAR" value="{% if car_input %}{{ car_input }}{% endif %}">
+                    <label class="label" for="car_input">Número do CAR</label>
+                    <div class="top-line"></div>
+                    <div class="under-line"></div>
                 </div>
 
                 <button type="submit">🚀 Analisar</button>
