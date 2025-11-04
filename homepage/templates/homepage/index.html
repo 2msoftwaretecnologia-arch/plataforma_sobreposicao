@@ -31,6 +31,10 @@
                     <div class="stat-number">{{ resultado.total_areas_com_sobreposicao }}</div>
                     <div>Áreas com Sobreposição</div>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-number">{% if resultado.area_poligono_ha %}{{ resultado.area_poligono_ha|floatformat:4 }}{% else %}-{% endif %}</div>
+                    <div>Área do Polígono (ha)</div>
+                </div>
                 
                 <div class="stat-card">
                     <div class="stat-number">{{ resultado.resumo_bases.imoveis }}</div>
