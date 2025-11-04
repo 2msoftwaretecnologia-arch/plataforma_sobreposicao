@@ -12,21 +12,38 @@
         <h1>Upload de ZIP e CAR</h1>
 
         <div class="upload-card">
-            <form method="post" enctype="multipart/form-data">
+            <form method="post" enctype="multipart/form-data" id="upload_form">
                 {% csrf_token %}
                 <div class="form-group">
-                    <label for="zip_file">Arquivo ZIP</label>
-                    <input class="file-input" type="file" id="zip_file" name="zip_file" accept=".zip">
-                    <small style="display:block;color:#666;margin-top:6px;">Opcional: envie um ZIP com shapefile ou informe apenas o número do CAR abaixo.</small>
+                    <label>Modo de análise</label>
+                    <div style="display:flex;gap:14px;align-items:center;">
+                        <label style="display:flex;align-items:center;gap:6px;">
+                            <input type="radio" name="modo" id="modo_zip" value="zip">
+                            Enviar ZIP
+                        </label>
+                        <label style="display:flex;align-items:center;gap:6px;">
+                            <input type="radio" name="modo" id="modo_car" value="car">
+                            Informar número do CAR
+                        </label>
+                    </div>
+                    <small style="display:block;color:#666;margin-top:6px;">Escolha um modo. Você deve enviar um ZIP <strong>ou</strong> informar o número do CAR.</small>
                 </div>
 
-                <div class="form-group">
+                <div class="form-group" id="group_zip">
+                    <label for="zip_file">Arquivo ZIP</label>
+                    <input class="file-input" type="file" id="zip_file" name="zip_file" accept=".zip">
+                    <small style="display:block;color:#666;margin-top:6px;">Envie um ZIP contendo um shapefile válido.</small>
+                </div>
+
+                <div class="form-group" id="group_car">
                     <label for="car_input">Número do CAR</label>
                     <input type="text" id="car_input" name="car_input" placeholder="Digite o número do CAR" value="{% if car_input %}{{ car_input }}{% endif %}">
                 </div>
 
                 <button type="submit">🚀 Analisar</button>
             </form>
+
+            <div id="client_error" class="status-error" style="display:none;">❌ Por favor, envie um ZIP ou informe o número do CAR.</div>
 
             {% if sucesso %}
                 <div class="status-success">✅ {{ mensagem }}</div>
@@ -41,5 +58,60 @@
         </div>
     </div>
     
+    <script>
+        (function() {
+            const modoZip = document.getElementById('modo_zip');
+            const modoCar = document.getElementById('modo_car');
+            const groupZip = document.getElementById('group_zip');
+            const groupCar = document.getElementById('group_car');
+            const zipInput = document.getElementById('zip_file');
+            const carInput = document.getElementById('car_input');
+            const clientError = document.getElementById('client_error');
+            const form = document.getElementById('upload_form');
+
+            function applyMode() {
+                if (modoZip.checked) {
+                    groupZip.style.display = '';
+                    groupCar.style.display = 'none';
+                    carInput.required = false;
+                    zipInput.required = true;
+                } else if (modoCar.checked) {
+                    groupZip.style.display = 'none';
+                    groupCar.style.display = '';
+                    zipInput.required = false;
+                    carInput.required = true;
+                } else {
+                    groupZip.style.display = '';
+                    groupCar.style.display = '';
+                    zipInput.required = false;
+                    carInput.required = false;
+                }
+                clientError.style.display = 'none';
+            }
+
+            modoZip.addEventListener('change', applyMode);
+            modoCar.addEventListener('change', applyMode);
+
+            const carPrefilled = (carInput.value || '').trim().length > 0;
+            if (carPrefilled) {
+                modoCar.checked = true;
+            } else {
+                modoZip.checked = true;
+            }
+            applyMode();
+
+            form.addEventListener('submit', function(e) {
+                const zipSelectedEmpty = modoZip.checked && (!zipInput.files || zipInput.files.length === 0);
+                const carSelectedEmpty = modoCar.checked && (carInput.value.trim() === '');
+                const noneSelectedEmpty = !modoZip.checked && !modoCar.checked && (!zipInput.files || zipInput.files.length === 0) && (carInput.value.trim() === '');
+
+                if (zipSelectedEmpty || carSelectedEmpty || noneSelectedEmpty) {
+                    e.preventDefault();
+                    clientError.style.display = 'block';
+                    clientError.textContent = '❌ Por favor, envie um ZIP ou informe o número do CAR.';
+                }
+            });
+        })();
+    </script>
 </body>
 </html>
