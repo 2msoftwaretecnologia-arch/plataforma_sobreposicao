@@ -2,6 +2,7 @@ from django.shortcuts import render
 from django.conf import settings
 from core.actions_files import fazer_busca_completa
 from helpers.extact_cordinates import extrair_cordenadas
+from helpers.clean import limpar_uploads_dir
 import zipfile
 import os
 
@@ -117,5 +118,11 @@ def upload_zip_car(request):
         except Exception as e:
             context['erro'] = f'Erro ao processar o arquivo: {str(e)}'
             return render(request, 'homepage/upload.html', context)
+        finally:
+            # Garantir que a pasta uploads fique vazia após o uso
+            try:
+                limpar_uploads_dir(uploads_dir)
+            except Exception:
+                pass
 
     return render(request, 'homepage/upload.html')
