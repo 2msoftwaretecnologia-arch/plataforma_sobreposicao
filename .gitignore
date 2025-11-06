@@ -2,5 +2,7 @@ venv/
 shp/
 __pycache__/
 csvvv/
-Excel/.DS_Store
+Excel/
 venv/
+.DS_Store
+.DS_Store
