@@ -1,26 +1,4 @@
 from django.db import models
-<<<<<<< HEAD
-
-class SicarRecord(models.Model):
-    car_number = models.CharField(
-        max_length=43, 
-        unique=True,
-        verbose_name="Número do CAR",
-        db_column='numero_car'
-    )
-    status = models.CharField(max_length=50)
-    geo_coordinates = models.TextField(
-        verbose_name="Coordenadas Geográficas",
-        db_column='coordenadas_geograficas'
-    )
-    
-    class Meta:
-        db_table = 'tb_registro_sicar'
-        verbose_name = "Registro do SICAR"
-        verbose_name_plural = "Registros do SICAR"
-
-    def __str__(self):
-        return self.car_number
 
 
 class ZoningArea(models.Model):
@@ -68,6 +46,7 @@ class PhytoecologyArea(models.Model):
     def __str__(self):
         return self.phyto_name
 
+
 class EnvironmentalProtectionArea(models.Model):
     unit_name = models.CharField(
         max_length=100,
@@ -103,5 +82,3 @@ class EnvironmentalProtectionArea(models.Model):
         
     def __str__(self):
         return self.unit_name
-=======
->>>>>>> 462571a29eb4185157385ce2d2c3fee4477a4942
