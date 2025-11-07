@@ -6,3 +6,4 @@ Excel/
 venv/
 .DS_Store
 db.sqlite3
+meu_projeto/.env
