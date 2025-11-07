@@ -1,0 +1,169 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload de ZIP e CAR</title>
+    <link rel="stylesheet" type="text/css" href="{% static 'homepage/css/upload.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'homepage/css/loader.css' %}">
+</head>
+
+<body>
+    <!-- From Uiverse.io by AatreyuShau -->
+    <div class="ocean-backdrop">
+        <div class="island-backdrop"></div>
+    </div>
+
+    <svg height="0" width="0" aria-hidden="true" focusable="false">
+        <defs>
+            <filter id="handDrawnNoise">
+                <feTurbulence result="noise" numOctaves="5" baseFrequency="0.0065" type="fractalNoise"></feTurbulence>
+                <feDisplacementMap yChannelSelector="G" xChannelSelector="R" scale="900" in2="noise" in="SourceGraphic"></feDisplacementMap>
+            </filter>
+        </defs>
+    </svg>
+
+    <div class="container">
+        <h1>Upload de ZIP e CAR</h1>
+
+        <div class="upload-card">
+            <form method="post" enctype="multipart/form-data" id="upload_form">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label>Modo de análise</label>
+                    <div style="display:flex;gap:14px;align-items:center;">
+                        <!-- From Uiverse.io by bandirevanth -->
+                        <label class="rocker rocker-small">
+                            <input type="checkbox" id="modo_toggle" name="modo_toggle">
+                            <span class="switch-left">SHP</span>
+                            <span class="switch-right">CAR</span>
+                        </label>
+                    </div>
+
+                </div>
+
+                <div class="form-group" id="group_zip">
+                    <!-- From Uiverse.io by jamrockjones -->
+                    <div class="zip-widget">
+                        <div class="folder">
+                            <div class="front-side">
+                                <div class="tip"></div>
+                                <div class="cover"></div>
+                            </div>
+                            <div class="back-side cover"></div>
+                        </div>
+                        <label class="custom-file-upload" for="zip_file">
+                            <input type="file" id="zip_file" name="zip_file" accept=".zip,application/zip" />
+                            <span id="zip_label_text">Selecionar arquivo ZIP</span>
+                        </label>
+                    </div>
+
+                </div>
+
+                <div class="input-container" id="group_car">
+                    <input type="text" class="input" id="car_input" name="car_input"
+                        placeholder="Digite o número do CAR"
+                        value="{% if car_input %}{{ car_input }}{% endif %}">
+                    <label class="label" for="car_input">Número do CAR</label>
+                    <div class="top-line"></div>
+                    <div class="under-line"></div>
+                </div>
+
+                <!-- From Uiverse.io by adeladel522 -->
+                <button class="button" type="submit">
+                    Analisar
+                    <svg fill="currentColor" viewBox="0 0 24 24" class="icon">
+                        <path clip-rule="evenodd"
+                            d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zm4.28 10.28a.75.75 0 000-1.06l-3-3a.75.75 0 10-1.06 1.06l1.72 1.72H8.25a.75.75 0 000 1.5h5.69l-1.72 1.72a.75.75 0 101.06 1.06l3-3z"
+                            fill-rule="evenodd"></path>
+                    </svg>
+                </button>
+
+            </form>
+
+            <div id="client_error" class="status-error" style="display:none;">❌ Por favor, envie um ZIP ou
+                informe o número do CAR.</div>
+
+            {% if sucesso %}
+            <div class="status-success">✅ {{ mensagem }}</div>
+            {% endif %}
+            {% if erro %}
+            <div class="status-error">❌ {{ erro }}</div>
+            {% endif %}
+
+        </div>
+    </div>
+    {% include 'homepage/loader.html' %}
+    <script>
+        (function () {
+            const modoToggle = document.getElementById('modo_toggle');
+            const groupZip = document.getElementById('group_zip');
+            const groupCar = document.getElementById('group_car');
+            const zipInput = document.getElementById('zip_file');
+            const zipLabelText = document.getElementById('zip_label_text');
+            const carInput = document.getElementById('car_input');
+            const clientError = document.getElementById('client_error');
+            const form = document.getElementById('upload_form');
+            const loader = document.getElementById('page-loader');
+
+            function applyMode() {
+                // Considera: checked => ZIP, unchecked => CAR
+                if (modoToggle.checked) {
+                    groupZip.style.display = '';
+                    groupCar.style.display = 'none';
+                    carInput.required = false;
+                    zipInput.required = true;
+                } else {
+                    groupZip.style.display = 'none';
+                    groupCar.style.display = '';
+                    zipInput.required = false;
+                    carInput.required = true;
+                }
+                clientError.style.display = 'none';
+            }
+
+            modoToggle.addEventListener('change', applyMode);
+
+            const carPrefilled = (carInput.value || '').trim().length > 0;
+            if (carPrefilled) {
+                // Pré-preenche CAR => desmarca (usa CAR)
+                modoToggle.checked = false;
+            } else {
+                // Padrão => ZIP
+                modoToggle.checked = true;
+            }
+            applyMode();
+
+            // Atualiza o texto do rótulo com o nome do arquivo selecionado
+            zipInput.addEventListener('change', function () {
+                if (zipInput.files && zipInput.files.length > 0) {
+                    zipLabelText.textContent = zipInput.files[0].name;
+                    clientError.style.display = 'none';
+                } else {
+                    zipLabelText.textContent = 'Selecionar arquivo ZIP';
+                }
+            });
+
+            form.addEventListener('submit', function (e) {
+                const zipSelectedEmpty = modoToggle.checked && (!zipInput.files || zipInput.files.length === 0);
+                const carSelectedEmpty = !modoToggle.checked && (carInput.value.trim() === '');
+
+                if (zipSelectedEmpty || carSelectedEmpty) {
+                    e.preventDefault();
+                    clientError.style.display = 'block';
+                    clientError.textContent = '❌ Por favor, envie um ZIP ou informe o número do CAR.';
+                    return;
+                }
+
+                // Submissão válida => mostra loader até a próxima tela carregar
+                if (loader) {
+                    loader.classList.add('visible');
+                }
+            });
+        })();
+    </script>
+</body>
+
+</html>
