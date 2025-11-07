@@ -1,4 +1,5 @@
 {% load static %}
+{% load l10n %}
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -44,25 +45,8 @@
                     <div>Áreas com Sobreposição</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">{% if resultado.area_poligono_ha %}{{ resultado.area_poligono_ha|floatformat:4 }}{% else %}-{% endif %}</div>
-                    <div>Área do Polígono (ha)</div>
-                </div>
-                
-                <div class="stat-card">
-                    <div class="stat-number">{{ resultado.resumo_bases.imoveis }}</div>
-                    <div>Imóveis Analisados</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{{ resultado.resumo_bases.zoneamento }}</div>
-                    <div>Zoneamentos Analisados</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{{ resultado.resumo_bases.fitoecologias }}</div>
-                    <div>Fitoecologias Analisadas</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{{ resultado.resumo_bases.apas }}</div>
-                    <div>APAs Analisadas</div>
+                    <div class="stat-number">{% if resultado.tamanho_area %}{% localize on %}{{ resultado.tamanho_area|floatformat:4 }}{% endlocalize %}{% else %}-{% endif %}</div>
+                    <div>tamanho da Área (ha)</div>
                 </div>
                 
             </div>

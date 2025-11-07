@@ -27,15 +27,15 @@ def fazer_busca_completa(coordenadas, excluir_car=None):
     verificador = _get_verificador()
 
     # Cálculo da área total do polígono informado (em hectares)
-    area_poligono_ha = None
+    tamanho_area = None
     try:
         # Importar somente quando necessário para evitar dependência no carregamento do servidor
         from helpers.return_area_coordinates import calcular_area_ha
         if polygon_wkt and str(polygon_wkt).strip():
-            area_poligono_ha = calcular_area_ha(polygon_wkt)
+            tamanho_area = calcular_area_ha(polygon_wkt)
     except Exception:
         # Mantém None em caso de erro; a UI pode tratar como não disponível
-        area_poligono_ha = None
+        tamanho_area = None
     
     # Carregar dados de todas as bases
     print("Iniciando busca em todas as bases de dados...")
@@ -87,7 +87,7 @@ def fazer_busca_completa(coordenadas, excluir_car=None):
         'areas_encontradas': todas_areas_encontradas,
         'quantidade_nao_avaliados': total_nao_avaliados,
         'total_areas_com_sobreposicao': total_sobreposicoes,
-        'area_poligono_ha': area_poligono_ha,
+        'tamanho_area': tamanho_area,
         'resumo_bases': {
             'imoveis': len(dados_imoveis),
             'zoneamento': len(dados_zoneamento),
