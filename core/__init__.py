@@ -1,0 +1,1 @@
+from cores_log import log_print, color_print

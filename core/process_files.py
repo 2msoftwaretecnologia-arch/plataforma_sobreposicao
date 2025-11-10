@@ -1,7 +1,9 @@
+from cores_log import log_print, color_print
 def _processar_base_dados_imoveis(polygon_wkt, dados_imoveis, nome_base, verificador):
     """Processa especificamente os dados dos imóveis que contêm tuplas (WKT, numero_car)"""
     from shapely.wkt import loads
     if not dados_imoveis:
+        log_print(f"{nome_base}: nenhum registro de imóveis para processar.", level="WARNING", system="PROCESS_FILES")
         return {
             'nome_base': nome_base,
             'areas_encontradas': [],
@@ -46,8 +48,9 @@ def _processar_base_dados_imoveis(polygon_wkt, dados_imoveis, nome_base, verific
                     })
         except Exception as e:
             quantidade_nao_avaliados += 1
+            log_print(f"{nome_base}: erro ao avaliar item: {e}", level="DEBUG", system="PROCESS_FILES")
             continue
-    
+    log_print(f"{nome_base}: {len(areas_encontradas)} sobreposições, {quantidade_nao_avaliados} não avaliados.", level="INFO", system="PROCESS_FILES")
     return {
         'nome_base': nome_base,
         'areas_encontradas': areas_encontradas,
@@ -57,6 +60,7 @@ def _processar_base_dados_imoveis(polygon_wkt, dados_imoveis, nome_base, verific
 def _processar_base_dados_zoneamento(polygon_wkt, dados_imoveis, nome_base, verificador):
     """Processa especificamente os dados dos zoneamentos que contêm tuplas (WKT, numero_car)"""
     if not dados_imoveis:
+        log_print(f"{nome_base}: nenhum registro de zoneamento para processar.", level="WARNING", system="PROCESS_FILES")
         return {
             'nome_base': nome_base,
             'areas_encontradas': [],
@@ -86,8 +90,9 @@ def _processar_base_dados_zoneamento(polygon_wkt, dados_imoveis, nome_base, veri
                 })
         except Exception as e:
             quantidade_nao_avaliados += 1
+            log_print(f"{nome_base}: erro ao avaliar item: {e}", level="DEBUG", system="PROCESS_FILES")
             continue
-    
+    log_print(f"{nome_base}: {len(areas_encontradas)} sobreposições, {quantidade_nao_avaliados} não avaliados.", level="INFO", system="PROCESS_FILES")
     return {
         'nome_base': nome_base,
         'areas_encontradas': areas_encontradas,
@@ -97,6 +102,7 @@ def _processar_base_dados_zoneamento(polygon_wkt, dados_imoveis, nome_base, veri
 def _processar_base_dados_fitoecologias(polygon_wkt, dados, nome_base, verificador):
     """Processa especificamente os dados de fitoecologias preservando o nome"""
     if not dados:
+        log_print(f"{nome_base}: nenhum registro de fitoecologia para processar.", level="WARNING", system="PROCESS_FILES")
         return {
             'nome_base': nome_base,
             'areas_encontradas': [],
@@ -125,8 +131,9 @@ def _processar_base_dados_fitoecologias(polygon_wkt, dados, nome_base, verificad
                 })
         except Exception as e:
             quantidade_nao_avaliados += 1
+            log_print(f"{nome_base}: erro ao avaliar item: {e}", level="DEBUG", system="PROCESS_FILES")
             continue
-    
+    log_print(f"{nome_base}: {len(areas_encontradas)} sobreposições, {quantidade_nao_avaliados} não avaliados.", level="INFO", system="PROCESS_FILES")
     return {
         'nome_base': nome_base,
         'areas_encontradas': areas_encontradas,
@@ -136,6 +143,7 @@ def _processar_base_dados_fitoecologias(polygon_wkt, dados, nome_base, verificad
 def _processar_base_dados_apas(polygon_wkt, dados_apas, nome_base, verificador):
     """Processa especificamente os dados de APAs com informações detalhadas"""
     if not dados_apas:
+        log_print(f"{nome_base}: nenhum registro de APAs para processar.", level="WARNING", system="PROCESS_FILES")
         return {
             'nome_base': nome_base,
             'areas_encontradas': [],
@@ -170,8 +178,9 @@ def _processar_base_dados_apas(polygon_wkt, dados_apas, nome_base, verificador):
                 })
         except Exception as e:
             quantidade_nao_avaliados += 1
+            log_print(f"{nome_base}: erro ao avaliar item {i}: {e}", level="DEBUG", system="PROCESS_FILES")
             continue
-    
+    log_print(f"{nome_base}: {len(areas_encontradas)} sobreposições, {quantidade_nao_avaliados} não avaliados.", level="INFO", system="PROCESS_FILES")
     return {
         'nome_base': nome_base,
         'areas_encontradas': areas_encontradas,

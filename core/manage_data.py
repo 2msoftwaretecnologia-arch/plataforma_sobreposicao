@@ -1,3 +1,4 @@
+from cores_log import log_print, color_print
 class CacheManager:
     def __init__(self):
         # Caches e timestamps
