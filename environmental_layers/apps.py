@@ -1,7 +1,6 @@
 from django.apps import AppConfig
 
 
-class AreasConfig(AppConfig):
+class EnvironmentalLayersConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'areas'
-    verbose_name = 'Áreas'
+    name = 'environmental_layers'

@@ -73,11 +73,11 @@ def upload_zip_car(request):
                 })
             except Exception as e:
                 context['erro'] = f'Erro ao analisar pelo CAR: {str(e)}'
-                return render(request, 'homepage/upload.html', context)
+                return render(request, 'analysis/upload.html', context)
 
         if not zip_file:
             context['erro'] = 'Por favor, envie um arquivo ZIP ou informe o número do CAR.'
-            return render(request, 'homepage/upload.html', context)
+            return render(request, 'analysis/upload.html', context)
 
         try:
             # Diretório de uploads
@@ -113,13 +113,13 @@ def upload_zip_car(request):
 
             if not shp_path:
                 context['erro'] = 'Nenhum arquivo .shp encontrado no ZIP.'
-                return render(request, 'homepage/upload.html', context)
+                return render(request, 'analysis/upload.html', context)
 
             # Extrair coordenadas do shapefile encontrado
             coordenadas_input = extrair_cordenadas(shp_path)
             if not coordenadas_input or not str(coordenadas_input).strip():
                 context['erro'] = 'Não foi possível extrair coordenadas do shapefile enviado.'
-                return render(request, 'homepage/upload.html', context)
+                return render(request, 'analysis/upload.html', context)
 
             # Processar e retornar à homepage com os resultados
             try:
@@ -148,10 +148,10 @@ def upload_zip_car(request):
 
         except zipfile.BadZipFile:
             context['erro'] = 'Arquivo ZIP inválido ou corrompido.'
-            return render(request, 'homepage/upload.html', context)
+            return render(request, 'analysis/upload.html', context)
         except Exception as e:
             context['erro'] = f'Erro ao processar o arquivo: {str(e)}'
-            return render(request, 'homepage/upload.html', context)
+            return render(request, 'analysis/upload.html', context)
         finally:
             # Garantir que a pasta uploads fique vazia após o uso
             try:
@@ -159,4 +159,4 @@ def upload_zip_car(request):
             except Exception:
                 pass
 
-    return render(request, 'homepage/upload.html')
+    return render(request, 'analysis/upload.html')

@@ -37,19 +37,19 @@
                 #} {% endcomment %}
                 {% if area.unidade or area.dominios or area.classe or area.fundo_legal %}
                     {# APA: exibe detalhes específicos (unidade, domínios, classe, fundo legal) #}
-                    {% include "homepage/components/base/_area_item_apas.html" %}
+                    {% include "analysis/components/base/_area_item_apas.html" %}
                 {% elif area.status %}
                     {# Imóveis (SICAR/CAR): exibe área, info e status #}
-                    {% include "homepage/components/base/_area_item_imoveis.html" %}
+                    {% include "analysis/components/base/_area_item_imoveis.html" %}
                 {% elif area.item_info and 'zonemaento' in area.item_info|lower %}
                     {# Zoneamento: exibe área e descrição do zoneamento em item_info #}
-                    {% include "homepage/components/base/_area_item_zoneamento.html" %}
+                    {% include "analysis/components/base/_area_item_zoneamento.html" %}
                 {% elif area.item_info and 'fitoecolog' in area.item_info|lower %}
                     {# Fitoecologias: exibe área e descrição da fitoecologia em item_info #}
-                    {% include "homepage/components/base/_area_item_fitoecologias.html" %}
+                    {% include "analysis/components/base/_area_item_fitoecologias.html" %}
                 {% else %}
                     {# Fallback genérico: exibe campos comuns (área e item_info) #}
-                    {% include "homepage/components/_area_item.html" %}
+                    {% include "analysis/components/_area_item.html" %}
                 {% endif %}
             {% endfor %}
         {% else %}
@@ -60,5 +60,5 @@
     {% endfor %}
 {% else %}
     {# Mensagem global: não há nenhuma base para iterar ou lista vazia #}
-    {% include "homepage/components/_sem_sobreposicao_global.html" %}
+    {% include "analysis/components/_sem_sobreposicao_global.html" %}
 {% endif %}

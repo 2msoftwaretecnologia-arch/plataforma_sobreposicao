@@ -1,1 +1,0 @@
-# Package de migrações do app 'sicar'
