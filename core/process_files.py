@@ -94,6 +94,7 @@ def _processar_base_dados_imoveis(
             continue
     
     return _resultado_base(nome_base, areas_encontradas, quantidade_nao_avaliados)
+
 def _processar_base_dados_zoneamento(
     polygon_wkt: str,
     dados_zoneamento: List[Dict[str, Any]],

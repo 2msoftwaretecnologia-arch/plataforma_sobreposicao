@@ -1,14 +1,26 @@
 import geopandas as gpd
 import hashlib
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from django.core.management.base import BaseCommand, CommandError
 from django.contrib.auth.models import User
+from django.db import connection
+import numpy as np
 
 from environmental_layers.models import PhytoecologyArea
 
+
 class Command(BaseCommand):
-    help = "Verifica e insere dados geoespaciais com hash única por linha."
+    help = "Processa dados geoespaciais em paralelo com particionamento e hash única."
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--threads",
+            type=int,
+            default=4,
+            help="Número de threads para processamento paralelo."
+        )
 
     def get_user(self):
         user = User.objects.first()
@@ -16,33 +28,74 @@ class Command(BaseCommand):
             raise CommandError("Nenhum usuário encontrado.")
         return user
 
+    # =============================
+    # Função executada pela thread
+    # =============================
+    def process_partition(self, partition_df, user):
+        """Processa uma partição do DataFrame em uma thread separada."""
+        results = []
+
+        for _, row in partition_df.iterrows():
+            formatted = self.format_data(row, user)
+            formatted["hash_id"] = self.generate_hash(formatted)
+
+            try:
+                obj, created = PhytoecologyArea.objects.get_or_create(
+                    hash_id=formatted["hash_id"],
+                    defaults={
+                        "phyto_name": formatted["phyto_name"],
+                        "geometry": formatted["geometry"],
+                        "created_by": formatted["created_by"],
+                        "source": formatted["source"],
+                    }
+                )
+                results.append(obj.phyto_name)
+
+            except Exception as e:
+                print(f"[ERRO THREAD] {e}")
+
+        # Fecha conexão (boa prática quando usando threads)
+        connection.close()
+
+        return results
+
+    # =============================
+    # Execução principal
+    # =============================
     def handle(self, *args, **options):
-        print("Iniciando leitura e inserção...")
+        print("Iniciando processamento em threads...")
+
+        num_threads = options["threads"]
         user = self.get_user()
 
-        archive_path = r'Regiões_Fitoecológicas_IBGE_TO.zip'
-        df = gpd.read_file(archive_path, encoding='utf-8')
+        archive_path = r"Regiões_Fitoecológicas_IBGE_TO.zip"
+        df = gpd.read_file(archive_path, encoding="utf-8")
 
-        print(df.head())
-        for _, row in df.iterrows():
-            formatted_data = self.format_data(row, user)
-            
-            formatted_data["hash_id"] = self.generate_hash(formatted_data)
-            try:
-                zoning_area = PhytoecologyArea.objects.get_or_create(
-                    hash_id=formatted_data["hash_id"],
-                    phyto_name=formatted_data["phyto_name"],
-                    geometry=formatted_data["geometry"],
-                    created_by=formatted_data["created_by"],
-                    source=formatted_data["source"]
-                )
-                
-                print(f"Inserido: {zoning_area[0].phyto_name}")
-            except Exception as e:
-                print(f"Erro ao inserir linha: {e}")
-                
-        print("Processamento concluído com sucesso.")
+        print(f"Total de linhas: {len(df)}")
 
+        # Dividir o DataFrame em N partes
+        partitions = np.array_split(df, num_threads)
+
+        all_results = []
+
+        with ThreadPoolExecutor(max_workers=num_threads) as executor:
+            futures = [
+                executor.submit(self.process_partition, part, user)
+                for part in partitions
+            ]
+
+            for future in as_completed(futures):
+                all_results.extend(future.result())
+
+        print("Registros inseridos:")
+        for r in all_results:
+            print(" →", r)
+
+        print("Processamento paralelo concluído com sucesso!")
+
+    # =============================
+    # Funções utilitárias
+    # =============================
     @staticmethod
     def format_data(row, user):
         return {
@@ -54,9 +107,5 @@ class Command(BaseCommand):
 
     @staticmethod
     def generate_hash(data: dict) -> str:
-        """
-        Gera uma hash SHA256 determinística a partir dos dados da linha.
-        """
-        # Ordena o dicionário para garantir consistência
         json_str = json.dumps(data, sort_keys=True, default=str)
         return hashlib.sha256(json_str.encode("utf-8")).hexdigest()
