@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Optional
 
 
-def calcular_sobreposicao_segura(
+def calculate_safe_overlap(
     verificador: Any,
     polygon_wkt: str,
     multipolygon_wkt: str,
@@ -17,7 +17,7 @@ def calcular_sobreposicao_segura(
         return None
 
 
-def resultado_base(
+def base_result(
     nome_base: str,
     areas_encontradas: List[Dict[str, Any]],
     quantidade_nao_avaliados: int,

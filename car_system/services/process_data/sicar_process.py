@@ -2,8 +2,8 @@ from typing import Any, Dict, List, Tuple, Optional
 from shapely.wkt import loads
 from helpers.funcoes_utils import deve_incluir_por_percentual
 from environmental_layers.services.precess_data.common import (
-    calcular_sobreposicao_segura,
-    resultado_base,
+    calculate_safe_overlap,
+    base_result,
 )
 
 
@@ -20,7 +20,7 @@ class SicarProcess:
     ) -> Dict[str, Any]:
         """Processa a lista de imóveis, retornando o dicionário padronizado para a UI."""
         if not properties_data:
-            return resultado_base(base_name, [], 0)
+            return base_result(base_name, [], 0)
 
         found_areas: List[Dict[str, Any]] = []
         not_evaluated_count = 0
@@ -38,7 +38,7 @@ class SicarProcess:
                 not_evaluated_count += 1
                 continue
 
-        return resultado_base(base_name, found_areas, not_evaluated_count)
+        return base_result(base_name, found_areas, not_evaluated_count)
 
     def _process_property_item(
         self,
@@ -49,7 +49,7 @@ class SicarProcess:
         base_name: str,
     ) -> Tuple[Optional[Dict[str, Any]], int]:
         """Processa um único imóvel e retorna o item de resultado e o incremento de não avaliados."""
-        overlap_hectares = calcular_sobreposicao_segura(self.verifier, polygon_wkt, multi_wkt)
+        overlap_hectares = calculate_safe_overlap(self.verifier, polygon_wkt, multi_wkt)
 
         if overlap_hectares is None:
             return None, 1

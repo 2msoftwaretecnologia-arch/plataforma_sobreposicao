@@ -9,7 +9,9 @@ from typing import Optional, Union
 # Serviço: conversão WKT → geometria
 # ===============================
 class GeometryParser:
-    def parse(self, wkt: str) -> Optional[BaseGeometry]:
+    
+    @staticmethod
+    def parse(wkt: str) -> Optional[BaseGeometry]:
         """Converte WKT em geometria Shapely. Retorna None se inválido."""
         if not wkt or not wkt.strip():
             return None
@@ -50,23 +52,25 @@ class GeometryUtils:
 # Serviço: cálculos de área e conversões
 # ============================================
 class AreaCalculator:
-    GRAU_PARA_METROS_LAT = 111320
 
-    def to_hectares(self, geom: BaseGeometry) -> float:
+    @staticmethod
+    def to_hectares(geom: BaseGeometry) -> float:
+        GRAU_PARA_METROS_LAT = 111320
+
         """Converte área de graus² para hectares usando latitude média."""
         try:
             lat = geom.centroid.y
             cos_lat = math.cos(math.radians(lat))
 
-            grau_para_metros_lon = self.GRAU_PARA_METROS_LAT * cos_lat
+            grau_para_metros_lon = GRAU_PARA_METROS_LAT * cos_lat
 
             area_graus = geom.area
-            area_m2 = area_graus * self.GRAU_PARA_METROS_LAT * grau_para_metros_lon
+            area_m2 = area_graus * GRAU_PARA_METROS_LAT * grau_para_metros_lon
 
             return abs(area_m2) / 10000  # m² → hectares
 
         except Exception:
-            fallback = geom.area * self.GRAU_PARA_METROS_LAT * self.GRAU_PARA_METROS_LAT
+            fallback = geom.area * GRAU_PARA_METROS_LAT * GRAU_PARA_METROS_LAT
             return fallback / 10000
 
 
@@ -82,9 +86,9 @@ class GeometryOverlapService:
         utils: GeometryUtils,
         area_calc: AreaCalculator
     ):
-        self.parser = parser
-        self.utils = utils
-        self.area_calc = area_calc
+        self.parser = parser or GeometryParser
+        self.utils = utils or GeometryUtils
+        self.area_calc = area_calc or AreaCalculator
 
     def check_overlap(
         self,

@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Optional, Tuple
 from environmental_layers.services.precess_data.common import (
-    calcular_sobreposicao_segura,
-    resultado_base,
+    calculate_safe_overlap,
+    base_result,
 )
 
 
@@ -18,7 +18,7 @@ class ZoningProcess:
     ) -> Dict[str, Any]:
         """Processa lista de zoneamentos e retorna estrutura padronizada para UI."""
         if not zoning_data:
-            return resultado_base(base_name, [], 0)
+            return base_result(base_name, [], 0)
 
         found_areas: List[Dict[str, Any]] = []
         not_evaluated_count = 0
@@ -35,7 +35,7 @@ class ZoningProcess:
                 not_evaluated_count += 1
                 continue
 
-        return resultado_base(base_name, found_areas, not_evaluated_count)
+        return base_result(base_name, found_areas, not_evaluated_count)
 
     def _process_zone_item(
         self,
@@ -48,7 +48,7 @@ class ZoningProcess:
         zone_name = zone_item.get("nome_zona")
         zone_acronym = zone_item.get("sigla_zona")
 
-        overlap_hectares = calcular_sobreposicao_segura(
+        overlap_hectares = calculate_safe_overlap(
             self.verifier, polygon_wkt, multi_wkt
         )
 

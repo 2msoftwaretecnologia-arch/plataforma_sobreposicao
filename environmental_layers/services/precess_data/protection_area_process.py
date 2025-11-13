@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Optional, Tuple
 from environmental_layers.services.precess_data.common import (
-    calcular_sobreposicao_segura,
-    resultado_base,
+    calculate_safe_overlap,
+    base_result,
 )
 
 
@@ -18,7 +18,7 @@ class ProtectionAreaProcess:
     ) -> Dict[str, Any]:
         """Processa lista de APAs e retorna estrutura padronizada para UI."""
         if not apas_data:
-            return resultado_base(base_name, [], 0)
+            return base_result(base_name, [], 0)
 
         found_areas: List[Dict[str, Any]] = []
         not_evaluated_count = 0
@@ -36,7 +36,7 @@ class ProtectionAreaProcess:
                 not_evaluated_count += 1
                 continue
 
-        return resultado_base(base_name, found_areas, not_evaluated_count)
+        return base_result(base_name, found_areas, not_evaluated_count)
 
     def _process_protection_area_item(
         self,
@@ -46,7 +46,7 @@ class ProtectionAreaProcess:
     ) -> Tuple[Optional[Dict[str, Any]], int]:
         """Processa um item de APA e decide se deve ser incluído no resultado."""
         multi_wkt = apa_item.get("wkt")
-        overlap_hectares = calcular_sobreposicao_segura(
+        overlap_hectares = calculate_safe_overlap(
             self.verifier, polygon_wkt, multi_wkt
         )
 

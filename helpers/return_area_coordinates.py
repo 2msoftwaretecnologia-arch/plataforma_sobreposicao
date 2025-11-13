@@ -3,7 +3,7 @@ from shapely import wkt
 from shapely.geometry import Polygon, MultiPolygon
 import pyproj
 
-def calcular_area_ha(wkt_str: str) -> float:
+def calculate_area_ha(wkt_str: str) -> float:
     """
     Calcula a área (em hectares) de um POLYGON ou MULTIPOLYGON WKT (em WGS84 lon/lat)
     """

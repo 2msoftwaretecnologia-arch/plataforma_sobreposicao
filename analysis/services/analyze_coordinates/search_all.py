@@ -1,10 +1,11 @@
 from typing import Any, Dict, List, Optional, Tuple
+from car_system.services.process_data.sicar_process import SicarProcess
 from core.read_files import (
     _carregar_dados_imoveis,
 )
+from environmental_layers.services.precess_data.zoning_loader_process import ZoningProcess
 from verificador_provider import VerificadorProvider
-from environmental_layers.services.precess_data.sicar_process import SicarProcess
-from environmental_layers.services.precess_data.zoning_loaderp_process import ZoningProcess
+
 from environmental_layers.services.precess_data.phytoecology_process import PhytoecologyProcess
 from environmental_layers.services.precess_data.protection_area_process import ProtectionAreaProcess
 from environmental_layers.services.load_data.zoning_loader import ZoningLoader
@@ -153,9 +154,9 @@ class SearchAll:
     def _compute_area_size_ha(self, polygon_wkt: str) -> Optional[float]:
         """Calcula a área do polígono em hectares, com tratamento seguro de erros."""
         try:
-            from helpers.return_area_coordinates import calcular_area_ha
+            from helpers.return_area_coordinates import calculate_area_ha
             if polygon_wkt and str(polygon_wkt).strip():
-                return calcular_area_ha(polygon_wkt)
+                return calculate_area_ha(polygon_wkt)
         except Exception:
             return None
         return None
@@ -163,9 +164,9 @@ class SearchAll:
     def _load_data(self, excluir_car=None) -> Dict[str, List[Dict[str, Any]]]:
         """Carrega dados de todas as bases necessárias para a análise."""
         properties_data = _carregar_dados_imoveis(excluir_car)
-        zoning_data = ZoningLoader.load_zoning_area_data()
-        phyto_data = PhytoecologyLoader.load_phytoecology_data()
-        protection_area_data = ProtectionAreaLoader.load_protection_area_data()
+        zoning_data = ZoningLoader.load()
+        phyto_data = PhytoecologyLoader.load()
+        protection_area_data = ProtectionAreaLoader.load()
         return {
             "imoveis": properties_data,
             "zoneamento": zoning_data,
