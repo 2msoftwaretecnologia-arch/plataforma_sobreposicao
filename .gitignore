@@ -1,10 +1,92 @@
+# Ambientes virtuais Python
 venv/
-shp/
+# Ambiente virtual oculto
+.venv/
+# Ambiente virtual genérico
+env/
+# Variante em maiúsculas
+ENV/
+
+# Arquivos de variáveis de ambiente (segredos)
+.env
+# Variantes de .env (dev, test, etc.)
+.env.*
+
+# Cache e bytecode Python
 __pycache__/
+# Bytecode Python (*.pyc, *.pyo, *.pyd)
+*.py[cod]
+# Classes compiladas por intérpretes/ferramentas
+*$py.class
+
+# Extensões compiladas (módulos nativos)
+*.so
+
+# Artefatos de build e distribuição
+build/
+dist/
+
+# Metadados de pacotes (setuptools)
+*.egg-info/
+.eggs/
+
+# Logs do gerenciador de pacotes pip
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Relatórios de cobertura de testes
+.coverage
+.coverage.*
+htmlcov/
+
+# Ambientes e caches de ferramentas de teste
+.tox/
+.nox/
+.pytest_cache/
+
+# Caches de verificação de tipos e análise estática
+.mypy_cache/
+.pyre/
+.pytype/
+
+# Cache do linter Ruff
+.ruff_cache/
+
+# Cache genérica (ferramentas diversas)
+.cache/
+
+# Relatórios de testes/cobertura adicionais
+nosetests.xml
+coverage.xml
+*.cover
+
+# Arquivos de log
+*.log
+
+# Checkpoints de notebooks Jupyter
+.ipynb_checkpoints/
+
+# Banco de dados SQLite local (ex.: Django)
+db.sqlite3
+# Outros bancos SQLite
+*.sqlite3
+
+# Arquivos gerados em runtime (uploads, mídia)
+media/
+
+# Saída de collectstatic (Django)
+staticfiles/
+
+# Configuração de IDEs
+.vscode/
+.idea/
+
+# Artefatos do sistema operacional
+.DS_Store
+Thumbs.db
+
+# Diretórios específicos do projeto
+shp/
 csvvv/
 Excel/
-venv/
-.DS_Store
-db.sqlite3
-.env
 documents/
