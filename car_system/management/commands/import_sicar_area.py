@@ -2,6 +2,7 @@ import geopandas as gpd
 import hashlib
 import json
 import numpy as np
+from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from django.core.management.base import BaseCommand, CommandError
@@ -36,15 +37,14 @@ class Command(BaseCommand):
 
         for _, row in partition_df.iterrows():
             formatted = self.format_data(row, user)
-            formatted["hash_id"] = self.generate_hash(formatted)
 
             try:
                 obj, created = SicarRecord.objects.get_or_create(
-                    hash_id=formatted["hash_id"],
+                    car_number=formatted["car_number"],
                     defaults={
-                        "car_number": formatted["car_number"],
                         "status": formatted["status"],
                         "geometry": formatted["geometry"],
+                        "last_update": formatted["last_update"],
                         "created_by": formatted["created_by"],
                         "source": formatted["source"]
                     }
@@ -101,16 +101,22 @@ class Command(BaseCommand):
     # =============================================================
     # Funções auxiliares
     # =============================================================
-    @staticmethod
-    def format_data(row, user):
+    def format_data(self, row, user):
         return {
             "car_number": row.get("cod_imovel"),
             "status": row.get("ind_status"),
             "geometry": str(row.get("geometry")),
+            "last_update": self.format_date(row.get("dat_atuali")),
             "created_by": user,
             "source": "Base Sicar"
         }
 
+    def format_date(self, date_str):
+        try:
+            return datetime.strptime(date_str, "%d/%m/%Y").date()
+        except (ValueError, TypeError):
+            return None
+        
     @staticmethod
     def generate_hash(data: dict) -> str:
         json_str = json.dumps(data, sort_keys=True, default=str)

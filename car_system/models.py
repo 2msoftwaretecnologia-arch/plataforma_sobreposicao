@@ -9,6 +9,13 @@ class SicarRecord(GeoBaseModel):
         db_column='numero_car'
     )
     
+    last_update = models.DateField(
+        verbose_name="Última Atualização",
+        db_column='ultima_atualizacao',
+        null=True,
+        blank=True
+    )
+    
     status = models.CharField(max_length=50)
 
     class Meta:
