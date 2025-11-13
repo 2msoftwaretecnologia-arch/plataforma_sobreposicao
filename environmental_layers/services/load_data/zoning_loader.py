@@ -1,9 +1,10 @@
+from typing import Any, Dict, List
 from environmental_layers.models import ZoningArea
 
 class ZoningLoader:
     
     @staticmethod
-    def load_zoning_area_data():
+    def load() -> List[Dict[str, Any]:]:
         zoning_areas = ZoningArea.objects.all()
         zoning_data = []
 
