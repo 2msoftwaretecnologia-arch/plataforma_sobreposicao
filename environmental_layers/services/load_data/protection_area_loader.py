@@ -1,10 +1,11 @@
+from typing import Dict, Any, List
 from environmental_layers.models import EnvironmentalProtectionArea
 
 
 class ProtectionAreaLoader:
     
     @staticmethod
-    def load_protection_area_data():
+    def load() -> List[Dict[str, Any]:]:
         protection_areas = EnvironmentalProtectionArea.objects.all()
         protection_area_data = []
         

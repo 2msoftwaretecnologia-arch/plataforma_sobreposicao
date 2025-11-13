@@ -75,7 +75,9 @@ class Command(BaseCommand):
 
         archive_path = r"documents\AREA_IMOVEL.zip"
         df = gpd.read_file(archive_path, encoding="utf-8")
-
+        df = df[["cod_imovel", "ind_status", "dat_atuali", "geometry"]]
+        df = self.filter_existing_hashes(df)
+    
         print(f"Total de linhas encontradas: {len(df)}")
 
         # Particionar o DataFrame
@@ -121,3 +123,14 @@ class Command(BaseCommand):
     def generate_hash(data: dict) -> str:
         json_str = json.dumps(data, sort_keys=True, default=str)
         return hashlib.sha256(json_str.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def filter_existing_hashes(df):
+        existing_hashes = set(
+            SicarRecord.objects.values_list("car_number", flat=True)
+        )
+        return df[~df["cod_imovel"].isin(existing_hashes)]
+    
+    @staticmethod
+    def tractive_df(df, column_name: str):
+        return df[column_name].dropna()
