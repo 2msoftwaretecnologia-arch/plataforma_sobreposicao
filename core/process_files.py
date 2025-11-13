@@ -133,6 +133,7 @@ def _processar_base_dados_fitoecologias(polygon_wkt, dados, nome_base, verificad
         'quantidade_nao_avaliados': quantidade_nao_avaliados,
         'total_areas_com_sobreposicao': len(areas_encontradas)
     }
+    
 def _processar_base_dados_apas(polygon_wkt, dados_apas, nome_base, verificador):
     """Processa especificamente os dados de APAs com informações detalhadas"""
     if not dados_apas:

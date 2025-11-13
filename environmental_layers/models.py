@@ -16,7 +16,7 @@ class ZoningArea(GeoBaseModel):
 
 class PhytoecologyArea(GeoBaseModel):
     phyto_name = models.CharField(max_length=70, verbose_name="Nome da Fitoecologia", db_column='nome_fitoecologia')
-
+    hash_id = models.CharField(max_length=64, verbose_name="Hash ID", db_column='hash_id', unique=True, null=True, blank=True)
     class Meta:
         db_table = 'tb_area_fitoecologia'
         verbose_name = "Área de Fitoecologia"

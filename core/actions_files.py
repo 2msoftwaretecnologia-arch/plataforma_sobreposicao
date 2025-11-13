@@ -4,12 +4,14 @@ from core.read_files import (
     _carregar_dados_fitoEcologias,
     _carregar_dados_apas,
 )
+
 from core.process_files import (
     _processar_base_dados_imoveis,
     _processar_base_dados_zoneamento,
     _processar_base_dados_fitoecologias,
     _processar_base_dados_apas,
 )
+
 from logica_sobreposicao import VerificadorSobreposicao
 from core.manage_data import cache
 from core.read_files import _buscar_geometria_por_car
@@ -42,6 +44,7 @@ def fazer_busca_completa(coordenadas, excluir_car=None):
     
     dados_imoveis = _carregar_dados_imoveis(excluir_car)
     dados_zoneamento = _carregar_dados_zoneamento()
+    print(dados_zoneamento)
     dados_fito_ecologias = _carregar_dados_fitoEcologias()
     dados_apas = _carregar_dados_apas()
     

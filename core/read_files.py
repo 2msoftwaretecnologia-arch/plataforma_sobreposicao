@@ -2,7 +2,7 @@ import os
 from helpers.funcoes_utils import retornar_status_inteiro, retornar_lei
 from core.manage_data import cache
 import pandas as pd
-from environmental_layers.models import EnvironmentalProtectionArea
+from environmental_layers.models import EnvironmentalProtectionArea, ZoningArea
 
 def _carregar_dados_imoveis(excluir_car=None):
     
@@ -80,43 +80,7 @@ def _buscar_geometria_por_car(numero_car):
         pass
 
     return None
-def _carregar_dados_zoneamento():
-    """Carrega os dados de zoneamento uma única vez e mantém em cache"""
-    
-    
-    caminho_csv = r"csvvv/zoneamento__Sheet1.csv"
 
-    # Verificar se o arquivo existe
-    if not os.path.exists(caminho_csv):
-        return []
-
-    # Verificar se precisa recarregar (arquivo foi modificado)
-    arquivo_modificado = os.path.getmtime(caminho_csv)
-
-    if cache.cache_zoneamento is None or cache.cache_timestamp_zoneamento != arquivo_modificado:
-        print("Carregando dados dos zoenamentos...")
-
-        try:
-            df = pd.read_csv(caminho_csv, sep=",", encoding="utf-8")
-            print("✅ Arquivo CSV carregado com sucesso!\n")
-        except Exception as e:
-            print(f"Erro ao carregar CSV de imóveis: {e}")
-            return []
-
-        dados_zoneamento = []
-        for _, row in df.iterrows():
-            coordenadas = row.get('geometry')
-            nome_zona = row.get('nm_zona')
-            Sigla_zona = row.get('zona_sigla')
-            if isinstance(coordenadas, str) and coordenadas.strip():
-                
-                dados_zoneamento.append((coordenadas, nome_zona, Sigla_zona))
-        
-        cache.cache_zoneamento = dados_zoneamento
-        cache.cache_timestamp_zoneamento = arquivo_modificado
-        print(f"Carregados {len(dados_zoneamento)} dados de zoneamento em cache")
-    
-    return cache.cache_zoneamento
 def _carregar_dados_fitoEcologias():
     """Carrega os dados de fitoecologias uma única vez e mantém em cache"""
     
@@ -142,12 +106,25 @@ def _carregar_dados_fitoEcologias():
                 nome_fitoecologia = row.get('AnáliseCA')
                 dados_fito.append((wkt,nome_fitoecologia))
         
+        print(dados_fito)
         
         cache.cache_fito_ecologias = dados_fito
         cache.cache_timestamp_fito_ecologias = arquivo_modificado
         print(f"Carregados {len(dados_fito)} dados de fitoecologias em cache")
     
     return cache.cache_fito_ecologias
+""
+def _carregar_dados_zoneamento():
+    zoning_area = ZoningArea.objects.all()
+    dados_zoneamento = []
+    for zona in zoning_area:
+        dados_zoneamento.append({
+            'wkt': zona.geometry,
+            'nome_zona': zona.zone_name,
+            'sigla_zona': zona.zone_acronym
+        })
+        
+    return dados_zoneamento
 
 def _carregar_dados_apas():
     protection_area = EnvironmentalProtectionArea.objects.all()
