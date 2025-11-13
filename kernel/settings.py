@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'analysis',
     'environmental_layers',
+    'car_system',
 ]
 
 MIDDLEWARE = [

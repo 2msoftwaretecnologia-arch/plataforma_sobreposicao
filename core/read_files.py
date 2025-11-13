@@ -2,7 +2,7 @@ import os
 from helpers.funcoes_utils import retornar_status_inteiro, retornar_lei
 from core.manage_data import cache
 import pandas as pd
-from environmental_layers.models import EnvironmentalProtectionArea, ZoningArea
+from environmental_layers.models import EnvironmentalProtectionArea, PhytoecologyArea, ZoningArea
 
 def _carregar_dados_imoveis(excluir_car=None):
     
@@ -82,38 +82,17 @@ def _buscar_geometria_por_car(numero_car):
     return None
 
 def _carregar_dados_fitoEcologias():
-    """Carrega os dados de fitoecologias uma única vez e mantém em cache"""
+    phytoecology_area = PhytoecologyArea.objects.all()
+    dados_fitoecologias = []
     
-    caminho_csv = r'csvvv/Fito_ecologias__Sheet1.csv'
-    
-    # Verificar se o arquivo existe
-    if not os.path.exists(caminho_csv):
-        return []
-    
-    # Verificar se precisa recarregar (arquivo foi modificado)
-    arquivo_modificado = os.path.getmtime(caminho_csv)
-    
-    if cache.cache_fito_ecologias is None or cache.cache_timestamp_fito_ecologias != arquivo_modificado:
-        print("Carregando dados de fitoecologias...")
+    for fito in phytoecology_area:
+        dados_fitoecologias.append({
+            'wkt': fito.geometry,
+            'nome_fitoecologia': fito.phyto_name
+        })
         
-        df = pd.read_csv(caminho_csv, sep=",", encoding="utf-8")
-        print("✅ Arquivo CSV carregado com sucesso!\n")
-        
-        dados_fito = []
-        for _, row in df.iterrows():
-            if row.get('geometry') and row.get('AnáliseCA'):  # Verificar se tem dados WKT na coluna 24
-                wkt = row.get('geometry')
-                nome_fitoecologia = row.get('AnáliseCA')
-                dados_fito.append((wkt,nome_fitoecologia))
-        
-        print(dados_fito)
-        
-        cache.cache_fito_ecologias = dados_fito
-        cache.cache_timestamp_fito_ecologias = arquivo_modificado
-        print(f"Carregados {len(dados_fito)} dados de fitoecologias em cache")
-    
-    return cache.cache_fito_ecologias
-""
+    return dados_fitoecologias
+
 def _carregar_dados_zoneamento():
     zoning_area = ZoningArea.objects.all()
     dados_zoneamento = []

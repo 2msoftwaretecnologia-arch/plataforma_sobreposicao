@@ -13,6 +13,18 @@ class ZoningAreaAdmin(admin.ModelAdmin):
     )
 admin.site.register(ZoningArea, ZoningAreaAdmin)
 
+class PhytoecologyAreaAdmin(admin.ModelAdmin):
+    list_display = ('phyto_name', 'hash_id')
+    search_fields = ('phyto_name',)
+    
+    fieldsets = (
+        (None, {
+            'fields': ('phyto_name', 'hash_id', 'geometry')
+        }),
+    )
+    
+admin.site.register(PhytoecologyArea, PhytoecologyAreaAdmin)
+
 class EnvironmentalProtectionAreaAdmin(admin.ModelAdmin):
     list_display = ('unit_name', 'domains', 'class_group', 'legal_basis', 'hash_id')
     search_fields = ('unit_name', 'domains', 'class_group')
