@@ -10,6 +10,7 @@ from environmental_layers.services.load_data.zoning_loader import ZoningLoader
 from environmental_layers.services.load_data.phytoecology_loader import PhytoecologyLoader
 from environmental_layers.services.load_data.protection_area_loader import ProtectionAreaLoader
 from kernel.service.geometry_overlap_service import OverlapChecker
+from kernel.utils import calculate_area_ha
 
 
 class SearchAll:
@@ -152,7 +153,6 @@ class SearchAll:
     def _compute_area_size_ha(self, polygon_wkt: str) -> Optional[float]:
         """Calcula a área do polígono em hectares, com tratamento seguro de erros."""
         try:
-            from helpers.return_area_coordinates import calculate_area_ha
             if polygon_wkt and str(polygon_wkt).strip():
                 return calculate_area_ha(polygon_wkt)
         except Exception as e:
