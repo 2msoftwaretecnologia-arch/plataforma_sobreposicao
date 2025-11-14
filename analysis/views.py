@@ -122,7 +122,7 @@ def upload_zip_car(request):
 
             # Processar e retornar à homepage com os resultados
             try:
-                resultado = SearchAll.execute(coordenadas_input, car_input)
+                resultado = SearchAll().execute(coordenadas_input, car_input)
 
                 municipio, uf = None, None
                 try:
