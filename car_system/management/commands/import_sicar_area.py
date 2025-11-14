@@ -54,7 +54,7 @@ class Command(BaseCommand):
                     print(f"[CRIADO] CAR: {obj.car_number}")
                 else:
                     print(f"[JÁ EXISTIA] CAR: {obj.car_number}")
-                
+   
                 results.append(obj.car_number)
 
             except Exception as e:
