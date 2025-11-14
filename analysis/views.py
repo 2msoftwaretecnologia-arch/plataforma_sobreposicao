@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from django.conf import settings
-from core.actions_files import fazer_busca_completa, fazer_busca_por_car
+from analysis.services.analyze_coordinates.search_all import SearchAll
+from analysis.services.analyze_coordinates.search_for_car import SearchForCar
 from helpers.get_municipio import localizar_cidade_estado
 from core.read_files import _buscar_geometria_por_car
 from helpers.extact_cordinates import extrair_cordenadas
@@ -13,14 +14,12 @@ def homepage(request):
     if request.method == 'POST':
         
         coordenadas_input = extrair_cordenadas()
-                            
         car_input = request.POST.get('car_input', '').strip()
-        
         if coordenadas_input.strip():
             try:
                 
                 # Chama a função de busca completa em todas as bases
-                resultado = fazer_busca_completa(coordenadas_input, car_input)
+                resultado = SearchAll().execute(coordenadas_input, car_input)
                 
                 return render(request, 'analysis/index.html', {
                     'resultado': resultado,
@@ -51,10 +50,11 @@ def upload_zip_car(request):
 
         context = { 'car_input': car_input }
 
+        print(f"CAR input recebido: '{car_input}'")
         # Permitir análise apenas pelo número do CAR quando nenhum ZIP for enviado
         if not zip_file and car_input:
             try:
-                resultado = fazer_busca_por_car(car_input)
+                resultado = SearchForCar().execute(car_input)
 
                 municipio, uf = None, None
                 try:
@@ -123,7 +123,7 @@ def upload_zip_car(request):
 
             # Processar e retornar à homepage com os resultados
             try:
-                resultado = fazer_busca_completa(coordenadas_input, car_input)
+                resultado = SearchAll.execute(coordenadas_input, car_input)
 
                 municipio, uf = None, None
                 try:

@@ -10,7 +10,7 @@ class PhytoecologyProcess:
         """Inicializa com o verificador de sobreposição."""
         self.verifier = verifier
 
-    def processar(
+    def process(
         self,
         polygon_wkt: str,
         phyto_data: List[Tuple[str, str]],

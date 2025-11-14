@@ -1,13 +1,18 @@
-from core.read_files import _buscar_geometria_por_car
+from car_system.utils import get_sicar_record
 from .search_all import SearchAll
 
 
-class BuscaPorCAR:
-    def executar(self, numero_car):
-        geometria_wkt = _buscar_geometria_por_car(numero_car)
-        if not geometria_wkt or not str(geometria_wkt).strip():
-            raise ValueError(
-                f"Não foi possível localizar a geometria para o CAR {numero_car}."
-            )
+class SearchForCar:
+    
+    def execute(self, car: str) -> dict:
+        car_searched = get_sicar_record(car_number=car)
 
-        return SearchAll().executar(geometria_wkt, excluir_car=numero_car)
+        if not car_searched.exists():
+            return {}
+        
+        if not car_searched.first().geometry:
+            return {}
+        
+        geometria_wkt = car_searched.first().geometry
+        
+        return SearchAll().execute(geometria_wkt, excluir_car=car)

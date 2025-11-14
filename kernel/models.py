@@ -8,6 +8,14 @@ class GeoBaseModel(models.Model):
         verbose_name="Coordenadas Geográficas",
         db_column="coordenadas_geograficas"
     )
+    
+    geometry_type = models.CharField(
+        max_length=50,
+        verbose_name="Tipo de Geometria",
+        db_column="tipo_geometria",
+        null=True, blank=True
+    )
+    
     source = models.CharField(
         max_length=100,
         verbose_name="Fonte de Dados",

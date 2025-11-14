@@ -10,7 +10,7 @@ class ProtectionAreaProcess:
         """Inicializa com o verificador de sobreposição."""
         self.verifier = verifier
 
-    def processar(
+    def process(
         self,
         polygon_wkt: str,
         apas_data: List[Dict[str, Any]],

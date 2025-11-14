@@ -12,7 +12,7 @@ class SicarProcess:
         """Inicializa com a instância responsável por verificar sobreposição."""
         self.verifier = verifier
 
-    def processar(
+    def process(
         self,
         polygon_wkt: str,
         properties_data: List[Tuple[str, Any, Any]],

@@ -4,15 +4,16 @@ from shapely.geometry import Polygon, MultiPolygon
 from typing import Any, Dict, List, Optional
 
 from kernel.service.geometry_overlap_service import GeometryOverlapService
+from logica_sobreposicao import VerificadorSobreposicao
 
 
 def calculate_safe_overlap(
-    checker: GeometryOverlapService,
+    checker: VerificadorSobreposicao,
     polygon_wkt: str,
     multipolygon_wkt: str,
 ) -> Optional[float]:
     try:
-        return checker.check_overlap(
+        return checker.verificar_sobreposicao(
             polygon_wkt,
             multipolygon_wkt,
         )

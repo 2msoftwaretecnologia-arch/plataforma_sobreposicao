@@ -1,5 +1,6 @@
 from __future__ import annotations
-from shapely.geometry import Polygon, MultiPolygon, BaseGeometry
+from shapely.geometry import Polygon, MultiPolygon
+from shapely.geometry.base import BaseGeometry
 from shapely.wkt import loads
 import math
 from typing import Optional, Union
@@ -82,9 +83,9 @@ class GeometryOverlapService:
 
     def __init__(
         self,
-        parser: GeometryParser,
-        utils: GeometryUtils,
-        area_calc: AreaCalculator
+        parser: GeometryParser = None,
+        utils: GeometryUtils = None,
+        area_calc: AreaCalculator = None,
     ):
         self.parser = parser or GeometryParser
         self.utils = utils or GeometryUtils

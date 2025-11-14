@@ -1,17 +1,16 @@
 from typing import Any, Dict, List, Optional, Tuple
 from car_system.services.process_data.sicar_process import SicarProcess
-from core.read_files import (
-    _carregar_dados_imoveis,
-)
+from car_system.services.read_files.sicar_loader import SicarRecordLoader
+
 from environmental_layers.services.precess_data.zoning_loader_process import ZoningProcess
-from verificador_provider import VerificadorProvider
 
 from environmental_layers.services.precess_data.phytoecology_process import PhytoecologyProcess
 from environmental_layers.services.precess_data.protection_area_process import ProtectionAreaProcess
 from environmental_layers.services.load_data.zoning_loader import ZoningLoader
 from environmental_layers.services.load_data.phytoecology_loader import PhytoecologyLoader
 from environmental_layers.services.load_data.protection_area_loader import ProtectionAreaLoader
-
+from kernel.service.geometry_overlap_service import GeometryOverlapService
+from logica_sobreposicao import VerificadorSobreposicao
 
 
 class SearchAll:
@@ -25,14 +24,14 @@ class SearchAll:
 
     def __init__(self):
         # Instância única do verificador de sobreposição
-        self.verifier = VerificadorProvider.get()
+        self.verifier = VerificadorSobreposicao()
         # Processadores por base de dados
         self.sicar_process = SicarProcess(self.verifier)
         self.zoning_process = ZoningProcess(self.verifier)
         self.phyto_process = PhytoecologyProcess(self.verifier)
         self.protection_area_process = ProtectionAreaProcess(self.verifier)
 
-    def executar(self, coordenadas, excluir_car=None):
+    def execute(self, coordenadas, excluir_car=None):
         """Executa a análise completa de sobreposições para o WKT informado.
 
         Parâmetros:
@@ -76,14 +75,14 @@ class SearchAll:
 
         # SICAR / Imóveis
         results_by_base.append(
-            self.sicar_process.processar(
+            self.sicar_process.process(
                 polygon_wkt, data["imoveis"], "Base de Dados Sicar"
             )
         )
 
         # Zoneamento
         results_by_base.append(
-            self.zoning_process.processar(
+            self.zoning_process.process(
                 polygon_wkt, data["zoneamento"], "Base de Dados de Zoneamento"
             )
         )
@@ -94,14 +93,14 @@ class SearchAll:
             for item in data["fitoecologias"]
         ]
         results_by_base.append(
-            self.phyto_process.processar(
+            self.phyto_process.process(
                 polygon_wkt, phyto_input, "Base de Dados de Fitoecologias"
             )
         )
 
         # APAs
         results_by_base.append(
-            self.protection_area_process.processar(
+            self.protection_area_process.process(
                 polygon_wkt, data["apas"], "Base de Dados de APAs"
             )
         )
@@ -163,10 +162,13 @@ class SearchAll:
 
     def _load_data(self, excluir_car=None) -> Dict[str, List[Dict[str, Any]]]:
         """Carrega dados de todas as bases necessárias para a análise."""
-        properties_data = _carregar_dados_imoveis(excluir_car)
+        properties_data = SicarRecordLoader.load(car=excluir_car)
         zoning_data = ZoningLoader.load()
         phyto_data = PhytoecologyLoader.load()
         protection_area_data = ProtectionAreaLoader.load()
+        
+        print("Dados carregados das bases de dados.")
+        
         return {
             "imoveis": properties_data,
             "zoneamento": zoning_data,
