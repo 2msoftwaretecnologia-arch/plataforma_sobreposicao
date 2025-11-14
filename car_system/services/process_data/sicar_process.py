@@ -1,10 +1,10 @@
 from typing import Any, Dict, List, Tuple, Optional
 from shapely.wkt import loads
-from helpers.funcoes_utils import deve_incluir_por_percentual
 from environmental_layers.services.precess_data.common import (
     calculate_safe_overlap,
     base_result,
 )
+from kernel.utils import should_include_by_percentage
 
 
 class SicarProcess:
@@ -88,7 +88,7 @@ class SicarProcess:
         self, overlap_hectares: float, car_area_hectares: float, threshold: float
     ) -> bool:
         """Decide se deve incluir o item com base no percentual de sobreposição do CAR."""
-        return deve_incluir_por_percentual(overlap_hectares, car_area_hectares, threshold)
+        return should_include_by_percentage(overlap_hectares, car_area_hectares, threshold)
 
     def _build_result_item(
         self, base_name: str, car_number: Any, car_status: Any, overlap_hectares: float

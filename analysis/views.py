@@ -1,162 +1,167 @@
 from django.shortcuts import render
-from django.conf import settings
 from analysis.services.analyze_coordinates.search_all import SearchAll
 from analysis.services.analyze_coordinates.search_for_car import SearchForCar
-from helpers.get_municipio import localizar_cidade_estado
-from core.read_files import _buscar_geometria_por_car
-from helpers.extact_cordinates import extrair_cordenadas
-from helpers.clean import limpar_uploads_dir
+from analysis.services.view_services.zip_upload_service import ZipUploadService
+from car_system.utils import get_sicar_record
 import zipfile
-import os
+from kernel.utils import extract_geometry, locate_city_state
 
 
-def homepage(request):
-    if request.method == 'POST':
-        
-        coordenadas_input = extrair_cordenadas()
+from django.views import View
+from django.shortcuts import render
+
+class AnswerspageView(View):
+    template_name = 'analysis/index.html'
+
+    def get(self, request):
+        """Exibe a página inicial."""
+        return render(request, self.template_name)
+
+    def post(self, request):
+        """Processa o envio das coordenadas via POST."""
+        coordenadas_input = extract_geometry()
         car_input = request.POST.get('car_input', '').strip()
-        if coordenadas_input.strip():
-            try:
-                
-                # Chama a função de busca completa em todas as bases
-                resultado = SearchAll().execute(coordenadas_input, car_input)
-                
-                return render(request, 'analysis/index.html', {
-                    'resultado': resultado,
-                    'coordenadas_recebidas': coordenadas_input,
-                    'car_input': car_input,
-                    'sucesso': True
-                })
-            except Exception as e:
-                return render(request, 'analysis/index.html', {
-                    'erro': f'Erro ao processar coordenadas: {str(e)}',
-                    'coordenadas_recebidas': coordenadas_input,
-                    'car_input': car_input,
-                    'sucesso': False
-                })
-        else:
-            return render(request, 'analysis/index.html', {
-                'erro': 'Por favor, insira coordenadas válidas.',
+
+        if not coordenadas_input or not str(coordenadas_input).strip():
+            return self._render_error('Por favor, insira coordenadas válidas.', car_input)
+
+        return self._process_coordinates(coordenadas_input, car_input)
+
+    # =====================================================================
+    # Métodos auxiliares (Clean Code)
+    # =====================================================================
+
+    def _process_coordinates(self, coordenadas_input, car_input):
+        """Executa a pesquisa nas bases e retorna o resultado."""
+        try:
+            resultado = SearchAll().execute(coordenadas_input, car_input)
+
+            return render(self.request, self.template_name, {
+                'resultado': resultado,
+                'coordenadas_recebidas': coordenadas_input,
+                'car_input': car_input,
+                'sucesso': True
+            })
+
+        except Exception as e:
+            return render(self.request, self.template_name, {
+                'erro': f'Erro ao processar coordenadas: {str(e)}',
+                'coordenadas_recebidas': coordenadas_input,
+                'car_input': car_input,
                 'sucesso': False
             })
+
+    def _render_error(self, message, car_input=None):
+        return render(self.request, self.template_name, {
+            'erro': message,
+            'car_input': car_input,
+            'sucesso': False
+        })
+
+class UploadZipCarView(View):
+    template_upload = 'analysis/upload.html'
+    template_index = 'analysis/index.html'
     
-    return render(request, 'analysis/index.html')
+    def get(self, request):
+        return render(request, self.template_upload)
 
-
-def upload_zip_car(request):
-    if request.method == 'POST':
+    def post(self, request):
         zip_file = request.FILES.get('zip_file')
         car_input = request.POST.get('car_input', '').strip()
 
-        context = { 'car_input': car_input }
+        context = {'car_input': car_input}
 
-        print(f"CAR input recebido: '{car_input}'")
-        # Permitir análise apenas pelo número do CAR quando nenhum ZIP for enviado
+        # --------------------------------------
+        # 1) Caso só CAR informado (sem ZIP)
+        # --------------------------------------
         if not zip_file and car_input:
-            try:
-                resultado = SearchForCar().execute(car_input)
+            return self._handle_only_car(request, car_input, context)
 
-                municipio, uf = None, None
-                try:
-                    wkt_car = _buscar_geometria_por_car(car_input)
-                    if wkt_car:
-                        municipio, uf = localizar_cidade_estado(wkt_car)
-                except Exception:
-                    pass
-
-                return render(request, 'analysis/index.html', {
-                    'resultado': resultado,
-                    'car_input': car_input,
-                    'municipio': municipio,
-                    'uf': uf,
-                    'sucesso': True
-                })
-            except Exception as e:
-                context['erro'] = f'Erro ao analisar pelo CAR: {str(e)}'
-                return render(request, 'analysis/upload.html', context)
-
+        # --------------------------------------
+        # 2) Nenhum arquivo enviado
+        # --------------------------------------
         if not zip_file:
             context['erro'] = 'Por favor, envie um arquivo ZIP ou informe o número do CAR.'
-            return render(request, 'analysis/upload.html', context)
+            return render(request, self.template_upload, context)
 
+        # --------------------------------------
+        # 3) Caso ZIP enviado
+        # --------------------------------------
         try:
-            # Diretório de uploads
-            uploads_dir = os.path.join(settings.BASE_DIR, 'uploads')
-            os.makedirs(uploads_dir, exist_ok=True)
+            zip_dataframe = ZipUploadService().extract_geodataframe(zip_file)
 
-            # Salvar ZIP temporariamente em uploads
-            temp_zip_path = os.path.join(uploads_dir, f"upload_tmp_{zip_file.name}")
+            if zip_dataframe is None or zip_dataframe.empty:
+                context['erro'] = 'O arquivo ZIP não contém dados geográficos válidos.'
+                return render(request, self.template_upload, context)
 
-            with open(temp_zip_path, 'wb') as f:
-                for chunk in zip_file.chunks():
-                    f.write(chunk)
+            coordenadas_input = extract_geometry(zip_dataframe)
 
-            # Extrair conteúdo do ZIP para uploads
-            with zipfile.ZipFile(temp_zip_path, 'r') as zf:
-                zf.extractall(uploads_dir)
-
-            # Remover ZIP temporário
-            try:
-                os.remove(temp_zip_path)
-            except OSError:
-                pass
-
-            # Localizar o primeiro arquivo .shp extraído
-            shp_path = None
-            for root, _, files in os.walk(uploads_dir):
-                for fname in files:
-                    if fname.lower().endswith('.shp'):
-                        shp_path = os.path.join(root, fname)
-                        break
-                if shp_path:
-                    break
-
-            if not shp_path:
-                context['erro'] = 'Nenhum arquivo .shp encontrado no ZIP.'
-                return render(request, 'analysis/upload.html', context)
-
-            # Extrair coordenadas do shapefile encontrado
-            coordenadas_input = extrair_cordenadas(shp_path)
             if not coordenadas_input or not str(coordenadas_input).strip():
                 context['erro'] = 'Não foi possível extrair coordenadas do shapefile enviado.'
-                return render(request, 'analysis/upload.html', context)
+                return render(request, self.template_upload, context)
 
-            # Processar e retornar à homepage com os resultados
-            try:
-                resultado = SearchAll.execute(coordenadas_input, car_input)
-
-                municipio, uf = None, None
-                try:
-                    municipio, uf = localizar_cidade_estado(coordenadas_input)
-                except Exception:
-                    pass
-                return render(request, 'analysis/index.html', {
-                    'resultado': resultado,
-                    'coordenadas_recebidas': coordenadas_input,
-                    'car_input': car_input,
-                    'municipio': municipio,
-                    'uf': uf,
-                    'sucesso': True
-                })
-            except Exception as e:
-                return render(request, 'analysis/index.html', {
-                    'erro': f'Erro ao processar coordenadas: {str(e)}',
-                    'coordenadas_recebidas': coordenadas_input,
-                    'car_input': car_input,
-                    'sucesso': False
-                })
+            return self._process_coordinates(request, coordenadas_input, car_input)
 
         except zipfile.BadZipFile:
             context['erro'] = 'Arquivo ZIP inválido ou corrompido.'
-            return render(request, 'analysis/upload.html', context)
+            return render(request, self.template_upload, context)
+
         except Exception as e:
             context['erro'] = f'Erro ao processar o arquivo: {str(e)}'
-            return render(request, 'analysis/upload.html', context)
-        finally:
-            # Garantir que a pasta uploads fique vazia após o uso
+            return render(request, self.template_upload, context)
+
+    # =====================================================================
+    # Métodos auxiliares
+    # =====================================================================
+
+    def _handle_only_car(self, request, car_input, context):
+        """Processa requisição apenas com o CAR (sem ZIP)."""
+        try:
+            resultado = SearchForCar().execute(car_input)
+
+            municipality, state = None, None
+            wkt_car = get_sicar_record(car_number=car_input)
+
+            if wkt_car.exists():
+                geometry = wkt_car.first().geometry
+                municipality, state = locate_city_state(geometry)
+
+            return render(request, self.template_index, {
+                'resultado': resultado,
+                'car_input': car_input,
+                'municipio': municipality,
+                'uf': state,
+                'sucesso': True
+            })
+
+        except Exception as e:
+            context['erro'] = f'Erro ao analisar pelo CAR: {str(e)}'
+            return render(request, self.template_upload, context)
+
+    def _process_coordinates(self, request, coordenadas_input, car_input):
+        """Processa os dados extraídos do shapefile."""
+        try:
+            resultado = SearchAll().execute(coordenadas_input, car_input)
+
+            municipio, uf = None, None
             try:
-                limpar_uploads_dir(uploads_dir)
+                municipio, uf = locate_city_state(coordenadas_input)
             except Exception:
                 pass
 
-    return render(request, 'analysis/upload.html')
+            return render(request, self.template_index, {
+                'resultado': resultado,
+                'coordenadas_recebidas': coordenadas_input,
+                'car_input': car_input,
+                'municipio': municipio,
+                'uf': uf,
+                'sucesso': True
+            })
+
+        except Exception as e:
+            return render(request, self.template_index, {
+                'erro': f'Erro ao processar coordenadas: {str(e)}',
+                'coordenadas_recebidas': coordenadas_input,
+                'car_input': car_input,
+                'sucesso': False
+            })

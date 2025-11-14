@@ -1,9 +1,11 @@
 import pyproj
 from shapely import wkt
+import geopandas as gpd
 from shapely.geometry import Polygon, MultiPolygon
 from typing import Any, Dict, List, Optional
 
 from kernel.service.geometry_overlap_service import GeometryOverlapService
+from kernel.service.city_state_locator_service import CityStateLocatorService
 from logica_sobreposicao import VerificadorSobreposicao
 
 
@@ -19,6 +21,7 @@ def calculate_safe_overlap(
         )
     except Exception:
         return None
+
 
 
 def base_result(
@@ -65,3 +68,57 @@ def calculate_area_ha(wkt_str: str) -> float:
 
     return area_m2_total / 10_000  # converte m² para hectares
 
+def locate_city_state(wkt_str: str, method: str = 'representative') -> tuple[Optional[str], Optional[str]]:
+    """Função auxiliar para localizar cidade e estado a partir de WKT usando CityStateLocatorService."""
+    locator = CityStateLocatorService()
+    return locator.locate(wkt_str, method)
+
+def extract_geometry(gdf: gpd.GeoDataFrame = None) -> str:
+    """
+    Lê um shapefile e retorna o primeiro polígono no formato POLYGON ((...))
+    """
+    # Para cada geometria no arquivo
+    for geom in gdf.geometry:
+        if geom is None:
+            continue
+            
+        if geom.geom_type == 'Polygon':
+            # Extrai as coordenadas do exterior do polígono
+            coords = list(geom.exterior.coords)
+            # Formata no estilo POLYGON ((x1 y1, x2 y2, ...))
+            coord_str = ", ".join([f"{x} {y}" for x, y in coords])
+            return f"POLYGON (({coord_str}))"
+            
+        elif geom.geom_type == 'MultiPolygon':
+            # Para multipolígonos, retorna o primeiro polígono
+            if len(geom.geoms) > 0:
+                primeira_parte = geom.geoms[0]
+                coords = list(primeira_parte.exterior.coords)
+                coord_str = ", ".join([f"{x} {y}" for x, y in coords])
+                return f"POLYGON (({coord_str}))"
+    
+    print("Erro: Nenhuma geometria válida encontrada no arquivo")
+    return None
+
+
+def should_include_by_percentage(
+    overlap_area: float,
+    total_area: float,
+    limit_percentage: float
+) -> bool:
+    """
+    Define se um item deve ser incluído com base no percentual de sobreposição.
+
+    - Retorna True quando o percentual de sobreposição é menor que o limite.
+    - Caso total_area seja None ou menor/igual a 0, não aplica a regra e retorna True.
+    - Em caso de erro de cálculo, retorna True por segurança.
+    """
+    try:
+        if total_area is None or total_area <= 0:
+            return True
+
+        overlap_percentage = overlap_area / total_area
+        return overlap_percentage < limit_percentage
+
+    except Exception:
+        return True

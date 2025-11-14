@@ -156,7 +156,8 @@ class SearchAll:
             from helpers.return_area_coordinates import calculate_area_ha
             if polygon_wkt and str(polygon_wkt).strip():
                 return calculate_area_ha(polygon_wkt)
-        except Exception:
+        except Exception as e:
+            print(f"Erro ao calcular a área do polígono. {e}")
             return None
         return None
 
