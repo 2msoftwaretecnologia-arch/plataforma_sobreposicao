@@ -1,12 +1,10 @@
+from kernel.service.geometry_overlap_service import OverlapChecker
 from typing import Any, Dict, List, Tuple, Optional
-from environmental_layers.services.precess_data.common import (
-    calculate_safe_overlap,
-    base_result,
-)
+from kernel.utils import base_result, calculate_safe_overlap
 
 
 class PhytoecologyProcess:
-    def __init__(self, verifier: Any):
+    def __init__(self, verifier: OverlapChecker):
         """Inicializa com o verificador de sobreposição."""
         self.verifier = verifier
 

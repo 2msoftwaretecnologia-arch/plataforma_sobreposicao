@@ -6,11 +6,10 @@ from typing import Any, Callable, Dict, List, Optional
 from kernel.service.city_state_locator_service import CityStateLocatorService
 from kernel.service.geometry_overlap_service import OverlapChecker
 
-
 def calculate_safe_overlap(
     checker: OverlapChecker | Callable[[], OverlapChecker],
     polygon_wkt: str,
-    multipolygon_wkt: str,
+    multi_wkt: str,
 ) -> Optional[float]:
     try:
         overlap_checker = (
@@ -18,12 +17,10 @@ def calculate_safe_overlap(
         )
         return overlap_checker.check_overlap(
             polygon_wkt,
-            multipolygon_wkt,
+            multi_wkt,
         )
     except Exception:
         return None
-
-
 
 def base_result(
     base_name: str,

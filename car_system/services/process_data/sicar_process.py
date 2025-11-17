@@ -1,10 +1,7 @@
 from typing import Any, Dict, List, Tuple, Optional
 from shapely.wkt import loads
-from environmental_layers.services.precess_data.common import (
-    calculate_safe_overlap,
-    base_result,
-)
-from kernel.utils import should_include_by_percentage
+
+from kernel.utils import base_result, calculate_safe_overlap, should_include_by_percentage
 
 
 class SicarProcess:
@@ -52,7 +49,11 @@ class SicarProcess:
         base_name: str,
     ) -> Tuple[Optional[Dict[str, Any]], int]:
         """Processa um único imóvel e retorna o item de resultado e o incremento de não avaliados."""
-        overlap_hectares = calculate_safe_overlap(self.verifier, polygon_wkt, multi_wkt)
+        overlap_hectares = calculate_safe_overlap(
+            self.verifier,
+            polygon_wkt,
+            multi_wkt,
+        )
 
         if overlap_hectares is None:
             return None, 1

@@ -1,8 +1,7 @@
 from typing import Any, Dict, List, Optional, Tuple
-from environmental_layers.services.precess_data.common import (
-    calculate_safe_overlap,
-    base_result,
-)
+
+from kernel.utils import base_result, calculate_safe_overlap
+
 
 
 class ZoningProcess:
