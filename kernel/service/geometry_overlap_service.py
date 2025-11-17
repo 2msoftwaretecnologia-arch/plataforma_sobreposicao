@@ -1,6 +1,9 @@
-from shapely.geometry import Polygon, MultiPolygon
-from shapely.wkt import loads
 import math
+from functools import lru_cache
+
+from shapely.geometry import MultiPolygon, Polygon
+from shapely.prepared import prep
+from shapely.wkt import loads
 
 class GeometryParser:
     def parse(self, wkt):
@@ -49,20 +52,36 @@ class OverlapChecker:
         self.bounds = BoundsChecker()
         self.converter = AreaConverter(degree_to_meters_lat)
 
+    @lru_cache(maxsize=2048)
+    def _get_geometria_cached(self, wkt):
+        return self.parser.parse(wkt)
+
+    @lru_cache(maxsize=128)
+    def _get_prepared_geometry(self, wkt):
+        geometry = self._get_geometria_cached(wkt)
+        return prep(geometry) if geometry is not None else None
+
+    def _convert_to_hectares_optimized(self, geometry):
+        return self.converter.to_hectares(geometry) if geometry is not None else 0
+
     def check_overlap(self, wkt1, wkt2, name1="Polígono 1", name2="Polígono 2"):
         try:
-            poly1 = self.parser.parse(wkt1)
-            poly2 = self.parser.parse(wkt2)
+            poly1 = self._get_geometria_cached(wkt1)
+            poly2 = self._get_geometria_cached(wkt2)
             if poly1 is None or poly2 is None:
                 return None
             if not BoundsChecker.intersects(poly1, poly2):
                 return 0
-            if not poly1.intersects(poly2):
+            prepared_poly1 = self._get_prepared_geometry(wkt1)
+            if prepared_poly1 is not None:
+                if not prepared_poly1.intersects(poly2):
+                    return 0
+            elif not poly1.intersects(poly2):
                 return 0
             intersection = poly1.intersection(poly2)
             if intersection.is_empty:
                 return 0
-            hectares_area = self.converter.to_hectares(intersection)
+            hectares_area = self._convert_to_hectares_optimized(intersection)
             if hectares_area < self.MIN_OVERLAP_AREA:
                 return 0
             return hectares_area
