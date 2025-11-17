@@ -68,6 +68,3 @@ class OverlapChecker:
             return hectares_area
         except Exception:
             return None
-
-Polygon.bounds_intersect = lambda self, other: BoundsChecker.intersects(self, other)
-MultiPolygon.bounds_intersect = lambda self, other: BoundsChecker.intersects(self, other)

@@ -5,7 +5,7 @@ from environmental_layers.models import PhytoecologyArea
 class PhytoecologyLoader:
     
     @staticmethod
-    def load() -> List[Dict[str, Any]:]:
+    def load() -> List[Dict[str, Any]]:
         phytoecology_areas = PhytoecologyArea.objects.all()
         phytoecology_data = []
         

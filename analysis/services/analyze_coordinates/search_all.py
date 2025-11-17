@@ -1,5 +1,10 @@
 from typing import Any, Dict, List, Optional, Tuple
 import time
+from analysis.services.analyze_coordinates.helpers_service.load_all_data_service import LoadAllDataService
+from analysis.services.analyze_coordinates.helpers_service.process_all_data_service import ProcessAllDataService
+from analysis.services.analyze_coordinates.helpers_service.search.final_result_builder import FinalResultBuilder
+from analysis.services.analyze_coordinates.helpers_service.search.processor_registry import ProcessorRegistry
+from analysis.services.analyze_coordinates.helpers_service.search.result_aggregator import ResultAggregator
 from car_system.services.process_data.sicar_process import SicarProcess
 from car_system.services.read_files.sicar_loader import SicarRecordLoader
 
@@ -26,45 +31,46 @@ class SearchAll:
     def __init__(self):
         # Instância única do verificador de sobreposição
         self.verifier = OverlapChecker()
-        # Processadores por base de dados
-        self.sicar_process = SicarProcess(self.verifier)
-        self.zoning_process = ZoningProcess(self.verifier)
-        self.phyto_process = PhytoecologyProcess(self.verifier)
-        self.protection_area_process = ProtectionAreaProcess(self.verifier)
+        
+        # Carregamento inicial de dados (evita carregar múltiplas vezes)
+        self.load_all_data_service = LoadAllDataService()
+        self.processors_all_data_service = ProcessAllDataService()
+        self.processor_registry = ProcessorRegistry(self.verifier)
+        self.result_aggregator = ResultAggregator()
+        self.final_result_builder = FinalResultBuilder()
 
-    def execute(self, coordenadas, excluir_car=None):
+    def execute(self, geometry, car=None):
         """Executa a análise completa de sobreposições para o WKT informado.
 
         Parâmetros:
-        - coordenadas: WKT do polígono analisado
-        - excluir_car: número de CAR a ser desconsiderado na base de imóveis
+        - geometry: WKT do polígono analisado
+        - car: número de CAR a ser desconsiderado na base de imóveis    
         """
-        polygon_wkt: str = coordenadas
+        
+        # Calcular área do polígono em hectares
+        area_size_ha = self._compute_area_size_ha(geometry)
 
-        # Cálculo de área do polígono (ha)
-        area_size_ha: Optional[float] = self._compute_area_size_ha(polygon_wkt)
-
-        # Log de tempo de leitura e processamento
-        start_read = time.perf_counter()
-        data: Dict[str, List[Dict[str, Any]]] = self._load_data(excluir_car)
-        read_time = time.perf_counter() - start_read
-        print(f"Tempo de leitura dos dados: {read_time:.3f}s")
-
-        start_process = time.perf_counter()
-        results_by_base: List[Dict[str, Any]] = self._process_all_bases(polygon_wkt, data)
-        process_time = time.perf_counter() - start_process
-        print(f"Tempo de processamento das bases: {process_time:.3f}s")
-
+        # Carregar todos os dados necessários (evita carregar múltiplas vezes)
+        data_loaded = self.load_all_data_service.load_all(car=car)
+        
+        # Processar sobreposições para cada base de dados
+        results_by_base = self._organize_processors(
+            geometry, 
+            data_loaded
+        )
+    
         # Agregar métricas globais a partir das bases
-        all_found_areas, total_not_evaluated, total_overlaps = self._aggregate_base_results(
+        all_found_areas, total_not_evaluated, total_overlaps = self.result_aggregator.aggregate(
             results_by_base
         )
-
+        
         # Resumo das quantidades por base (mantém chaves esperadas pela UI)
-        summary_bases: Dict[str, int] = self._build_summary(data)
+        summary_bases = self.result_aggregator.summary(
+            data_loaded
+        )
 
         # Montar dicionário final (mantém compatibilidade com templates atuais)
-        final_result: Dict[str, Any] = self._build_final_result(
+        final_result  = self.final_result_builder.build(
             results_by_base,
             all_found_areas,
             total_not_evaluated,
@@ -72,89 +78,8 @@ class SearchAll:
             area_size_ha,
             summary_bases,
         )
-
+        
         return final_result
-
-    def _process_all_bases(self, polygon_wkt: str, data: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Processa todas as bases e retorna a lista de resultados por base."""
-        results_by_base: List[Dict[str, Any]] = []
-
-        # SICAR / Imóveis
-        results_by_base.append(
-            self.sicar_process.process(
-                polygon_wkt, data["imoveis"], "Base de Dados Sicar"
-            )
-        )
-
-        # Zoneamento
-        results_by_base.append(
-            self.zoning_process.process(
-                polygon_wkt, data["zoneamento"], "Base de Dados de Zoneamento"
-            )
-        )
-
-        # Fitoecologias: normaliza entrada para tuplas (wkt, nome)
-        phyto_input: List[Tuple[str, str]] = [
-            (item.get("wkt"), item.get("nome_fitoecologia"))
-            for item in data["fitoecologias"]
-        ]
-        results_by_base.append(
-            self.phyto_process.process(
-                polygon_wkt, phyto_input, "Base de Dados de Fitoecologias"
-            )
-        )
-
-        # APAs
-        results_by_base.append(
-            self.protection_area_process.process(
-                polygon_wkt, data["apas"], "Base de Dados de APAs"
-            )
-        )
-
-        return results_by_base
-
-    def _aggregate_base_results(
-        self, results_by_base: List[Dict[str, Any]]
-    ):
-        """Agrega áreas encontradas e contadores globais a partir das bases."""
-        all_found_areas: List[Dict[str, Any]] = []
-        total_not_evaluated: int = 0
-        total_overlaps: int = 0
-
-        for base_result in results_by_base:
-            all_found_areas.extend(base_result["areas_encontradas"])
-            total_not_evaluated += base_result["quantidade_nao_avaliados"]
-            total_overlaps += base_result["total_areas_com_sobreposicao"]
-
-        return all_found_areas, total_not_evaluated, total_overlaps
-
-    def _build_summary(self, data: Dict[str, List[Dict[str, Any]]]) -> Dict[str, int]:
-        """Cria resumo de quantidades por base (mantém chaves em português)."""
-        return {
-            "imoveis": len(data["imoveis"]),
-            "zoneamento": len(data["zoneamento"]),
-            "fitoecologias": len(data["fitoecologias"]),
-            "apas": len(data["apas"]),
-        }
-
-    def _build_final_result(
-        self,
-        results_by_base: List[Dict[str, Any]],
-        all_found_areas: List[Dict[str, Any]],
-        total_not_evaluated: int,
-        total_overlaps: int,
-        area_size_ha: Optional[float],
-        summary_bases: Dict[str, int],
-    ) -> Dict[str, Any]:
-        """Monta o dicionário final esperado pela UI (mantém chaves atuais)."""
-        return {
-            "resultados_por_base": results_by_base,
-            "areas_encontradas": all_found_areas,
-            "quantidade_nao_avaliados": total_not_evaluated,
-            "total_areas_com_sobreposicao": total_overlaps,
-            "tamanho_area": area_size_ha,
-            "resumo_bases": summary_bases,
-        }
 
     def _compute_area_size_ha(self, polygon_wkt: str) -> Optional[float]:
         """Calcula a área do polígono em hectares, com tratamento seguro de erros."""
@@ -165,19 +90,14 @@ class SearchAll:
             print(f"Erro ao calcular a área do polígono. {e}")
             return None
         return None
+    
+    def _organize_processors(self, polygon_wkt: str, data: List[Dict[str, Any]]) -> None:
+        """Organiza e processa os dados carregados com base nos loaders registrados.
 
-    def _load_data(self, excluir_car=None) -> Dict[str, List[Dict[str, Any]]]:
-        """Carrega dados de todas as bases necessárias para a análise."""
-        properties_data = SicarRecordLoader.load(car=excluir_car)
-        zoning_data = ZoningLoader.load()
-        phyto_data = PhytoecologyLoader.load()
-        protection_area_data = ProtectionAreaLoader.load()
-        
-        print("Dados carregados das bases de dados.")
-        
-        return {
-            "imoveis": properties_data,
-            "zoneamento": zoning_data,
-            "fitoecologias": phyto_data,
-            "apas": protection_area_data,
-        }
+        Parâmetros:
+        - polygon_wkt: WKT do polígono analisado
+        - data: Lista de dicionários contendo os dados carregados de cada loader
+        """
+        self.processors_all_data_service.set_processors(self.processor_registry.processors)
+
+        return self.processors_all_data_service.process(polygon_wkt, data)

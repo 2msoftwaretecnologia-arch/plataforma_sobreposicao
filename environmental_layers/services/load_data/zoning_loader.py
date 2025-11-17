@@ -4,7 +4,7 @@ from environmental_layers.models import ZoningArea
 class ZoningLoader:
     
     @staticmethod
-    def load() -> List[Dict[str, Any]:]:
+    def load() -> List[Dict[str, Any]]:
         zoning_areas = ZoningArea.objects.all()
         zoning_data = []
 

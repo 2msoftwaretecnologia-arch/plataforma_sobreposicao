@@ -15,4 +15,4 @@ class SearchForCar:
         
         geometria_wkt = car_searched.first().geometry
         
-        return SearchAll().execute(geometria_wkt, excluir_car=car)
+        return SearchAll().execute(geometria_wkt, car=car)

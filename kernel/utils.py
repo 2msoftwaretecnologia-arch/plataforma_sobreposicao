@@ -13,7 +13,7 @@ def calculate_safe_overlap(
     multipolygon_wkt: str,
 ) -> Optional[float]:
     try:
-        return checker.check_overlap(
+        return checker().check_overlap(
             polygon_wkt,
             multipolygon_wkt,
         )

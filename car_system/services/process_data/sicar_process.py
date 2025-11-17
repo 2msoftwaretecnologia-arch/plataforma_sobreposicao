@@ -15,7 +15,7 @@ class SicarProcess:
     def process(
         self,
         polygon_wkt: str,
-        properties_data: List[Tuple[str, Any, Any]],
+        properties_data: List[Dict[str, Any]],  
         base_name: str,
     ) -> Dict[str, Any]:
         """Processa a lista de imóveis, retornando o dicionário padronizado para a UI."""
@@ -25,7 +25,10 @@ class SicarProcess:
         found_areas: List[Dict[str, Any]] = []
         not_evaluated_count = 0
 
-        for multi_wkt, car_number, car_status in properties_data:
+        for item in properties_data:
+            multi_wkt = item.get("wkt")
+            car_number = item.get("numero_car")
+            car_status = item.get("sigla_zona")
             try:
                 item_result, not_eval_inc = self._process_property_item(
                     polygon_wkt, multi_wkt, car_number, car_status, base_name

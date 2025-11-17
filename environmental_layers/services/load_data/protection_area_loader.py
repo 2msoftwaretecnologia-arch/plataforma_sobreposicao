@@ -5,7 +5,7 @@ from environmental_layers.models import EnvironmentalProtectionArea
 class ProtectionAreaLoader:
     
     @staticmethod
-    def load() -> List[Dict[str, Any]:]:
+    def load() -> List[Dict[str, Any]]:
         protection_areas = EnvironmentalProtectionArea.objects.all()
         protection_area_data = []
         

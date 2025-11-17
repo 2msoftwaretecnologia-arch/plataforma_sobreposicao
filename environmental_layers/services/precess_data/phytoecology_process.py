@@ -13,7 +13,7 @@ class PhytoecologyProcess:
     def process(
         self,
         polygon_wkt: str,
-        phyto_data: List[Tuple[str, str]],
+        phyto_data: List[Dict[str, Any]],
         base_name: str,
     ) -> Dict[str, Any]:
         """Processa lista de fitoecologias e retorna estrutura padronizada para UI."""
@@ -23,7 +23,9 @@ class PhytoecologyProcess:
         found_areas: List[Dict[str, Any]] = []
         not_evaluated_count = 0
 
-        for multi_wkt, phyto_name in phyto_data:
+        for item in phyto_data:
+            multi_wkt = item.get("wkt")
+            phyto_name = item.get("nome_fitoecologia")
             try:
                 item_result, not_eval_inc = self._process_phyto_item(
                     polygon_wkt, multi_wkt, phyto_name, base_name
