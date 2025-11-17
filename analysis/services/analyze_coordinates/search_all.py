@@ -51,13 +51,28 @@ class SearchAll:
         area_size_ha = self._compute_area_size_ha(geometry)
 
         # Carregar todos os dados necessários (evita carregar múltiplas vezes)
+        # Marca o início da medição de tempo para carregamento dos dados
+        _t_read_start = time.perf_counter()
+        # Carrega todos os dados das bases (SICAR, Zoneamento, Fitoecologia, APAs) de uma só vez
+        # O parâmetro 'car' permite ignorar um imóvel específico da base SICAR
         data_loaded = self.load_all_data_service.load_all(car=car)
+        _t_read_end = time.perf_counter()
+        # Exibe o tempo total gasto para leitura das bases
+        print(f"Tempo para ler todas as bases: {(_t_read_end - _t_read_start):.3f}s")
         
         # Processar sobreposições para cada base de dados
+        # Marca o início da medição de tempo para processamento de sobreposições
+        _t_proc_start = time.perf_counter()
+        # Organiza e executa o processamento de sobreposição para cada base carregada
+        # Retorna um dicionário com os resultados separados por tipo de base
         results_by_base = self._organize_processors(
             geometry, 
             data_loaded
         )
+        _t_proc_end = time.perf_counter()
+        # Exibe o tempo total gasto para processar todas as sobreposições
+        print(f"Tempo para processar todas as bases: {(_t_proc_end - _t_proc_start):.3f}s")
+        #fim da logica de redução de processamento
     
         # Agregar métricas globais a partir das bases
         all_found_areas, total_not_evaluated, total_overlaps = self.result_aggregator.aggregate(
