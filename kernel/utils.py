@@ -4,23 +4,7 @@ import geopandas as gpd
 from shapely.geometry import Polygon, MultiPolygon
 from typing import Any, Callable, Dict, List, Optional
 from kernel.service.city_state_locator_service import CityStateLocatorService
-from kernel.service.geometry_overlap_service import OverlapChecker
-
-def calculate_safe_overlap(
-    checker: OverlapChecker | Callable[[], OverlapChecker],
-    polygon_wkt: str,
-    multi_wkt: str,
-) -> Optional[float]:
-    try:
-        overlap_checker = (
-            checker() if callable(checker) and not isinstance(checker, OverlapChecker) else checker
-        )
-        return overlap_checker.check_overlap(
-            polygon_wkt,
-            multi_wkt,
-        )
-    except Exception:
-        return None
+from django.contrib.gis.geos import GEOSGeometry
 
 def base_result(
     base_name: str,
@@ -71,30 +55,23 @@ def locate_city_state(wkt_str: str, method: str = 'representative') -> tuple[Opt
     locator = CityStateLocatorService()
     return locator.locate(wkt_str, method)
 
-def extract_geometry(gdf: gpd.GeoDataFrame = None) -> str:
+from django.contrib.gis.geos import GEOSGeometry
+import geopandas as gpd
+
+def extract_geometry(gdf: gpd.GeoDataFrame, srid: int = 4674) -> GEOSGeometry:
     """
-    Lê um shapefile e retorna o primeiro polígono no formato POLYGON ((...))
+    Retorna a primeira geometria como GEOSGeometry com SRID definido.
     """
-    # Para cada geometria no arquivo
+
     for geom in gdf.geometry:
         if geom is None:
             continue
-            
-        if geom.geom_type == 'Polygon':
-            # Extrai as coordenadas do exterior do polígono
-            coords = list(geom.exterior.coords)
-            # Formata no estilo POLYGON ((x1 y1, x2 y2, ...))
-            coord_str = ", ".join([f"{x} {y}" for x, y in coords])
-            return f"POLYGON (({coord_str}))"
-            
-        elif geom.geom_type == 'MultiPolygon':
-            # Para multipolígonos, retorna o primeiro polígono
-            if len(geom.geoms) > 0:
-                primeira_parte = geom.geoms[0]
-                coords = list(primeira_parte.exterior.coords)
-                coord_str = ", ".join([f"{x} {y}" for x, y in coords])
-                return f"POLYGON (({coord_str}))"
-    
+
+        if geom.geom_type in ("Polygon", "MultiPolygon"):
+            g = GEOSGeometry(geom.wkt)
+            g.srid = srid  # <<< FUNDAMENTAL
+            return g
+
     print("Erro: Nenhuma geometria válida encontrada no arquivo")
     return None
 
