@@ -1,6 +1,7 @@
 # core/models.py
 from django.db import models
 from django.conf import settings
+from django.contrib.gis.db import models as gis_models
 
 class GeoBaseModel(models.Model):
     """Classe abstrata para modelos com dados geográficos."""
@@ -9,11 +10,26 @@ class GeoBaseModel(models.Model):
         db_column="coordenadas_geograficas"
     )
     
-    geometry_type = models.CharField(
-        max_length=50,
-        verbose_name="Tipo de Geometria",
-        db_column="tipo_geometria",
-        null=True, blank=True
+    geometry_new = gis_models.GeometryField(
+        srid=4674,
+        null=True,
+        blank=True,
+        spatial_index=True,
+        db_column="geometria_tmp",
+    )
+    
+    area_m2 = models.FloatField(
+        verbose_name="Área (m²)",
+        db_column="area_m2",
+        null=True,
+        blank=True
+    )
+    
+    area_ha = models.FloatField(
+        verbose_name="Área (ha)",
+        db_column="area_ha",
+        null=True,
+        blank=True
     )
     
     source = models.CharField(

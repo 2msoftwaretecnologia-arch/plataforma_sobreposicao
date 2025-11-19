@@ -10,8 +10,6 @@ from environmental_layers.services.precess_data.zoning_loader_process import Zon
 from environmental_layers.services.load_data.phytoecology_loader import PhytoecologyLoader
 from environmental_layers.services.load_data.protection_area_loader import ProtectionAreaLoader
 
-
-
 class ProcessorRegistry:
     """Registra os processadores associados aos loaders."""
     
