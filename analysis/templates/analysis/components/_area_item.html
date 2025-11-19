@@ -1,8 +1,12 @@
 <div class="area-item area-item--generico">
-    {% if area.area %}
-    <div class="area-value">Área sobreposta: {{ area.area|floatformat:4 }} ha</div>
-    {% endif %}
-    {% if area.item_info %}
-    <div class="area-info">{{ area.item_info }}</div>
-    {% endif %}
+    <div class="area-item__icon" aria-hidden="true">📍</div>
+    <div class="area-item__content">
+        {% if area.area %}
+        <p class="area-item__label">Área sobreposta</p>
+        <p class="area-item__value">{{ area.area|floatformat:4 }} ha</p>
+        {% endif %}
+        {% if area.item_info %}
+        <p class="area-item__meta">{{ area.item_info }}</p>
+        {% endif %}
+    </div>
 </div>
