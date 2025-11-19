@@ -289,7 +289,7 @@ body {
 
 .base-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 12px;
 }
 
@@ -300,7 +300,6 @@ body {
     padding: 14px;
     display: grid;
     gap: 10px;
-    align-items: top;
 }
 
 .base-card__header {
@@ -465,6 +464,14 @@ body {
 
     .base-grid {
         grid-template-columns: 1fr;
+    }
+
+    .summary-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .hero-title {
+        font-size: 20px;
     }
 
     .summary-grid {

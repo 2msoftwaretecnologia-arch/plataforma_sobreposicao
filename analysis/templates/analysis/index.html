@@ -11,28 +11,6 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 </head>
 <body>
-    <div class="container">
-        <h1>🗺️ Análise de Sobreposição de Áreas</h1>
-        <p style="margin-bottom: 20px;">
-            <a href="{% url 'upload_zip_car' %}" style="display:inline-block;padding:10px 16px;border-radius:8px;background:#e9ecef;color:#333;text-decoration:none;">📦 Ir para Upload de ZIP e CAR</a>
-            {% if user.is_authenticated %}
-            <a href="{% url 'logout' %}" style="display:inline-block;padding:10px 16px;border-radius:8px;background:#e9ecef;color:#333;text-decoration:none;margin-left:8px;">🚪 Logout</a>
-            {% else %}
-            <a href="{% url 'login' %}" style="display:inline-block;padding:10px 16px;border-radius:8px;background:#e9ecef;color:#333;text-decoration:none;margin-left:8px;">🔐 Login</a>
-            {% endif %}
-        </p>
-        {% if municipio or uf %}
-        <div class="location-box" role="status" aria-live="polite">
-            <span class="location-icon" aria-hidden="true">📍</span>
-            <div class="location-text">
-                <span class="location-label">Localização</span>
-                <div class="location-value">
-                    {% if municipio %}<span class="city" title="Município">{{ municipio }}</span>{% endif %}
-                    {% if uf %}<span class="uf-badge" title="UF">{{ uf }}</span>{% endif %}
-                </div>
-            </div>
-        </div>
-        {% endif %}
     <div class="page">
         <header class="header">
             <div class="brand">

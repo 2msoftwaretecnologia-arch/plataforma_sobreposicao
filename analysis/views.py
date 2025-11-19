@@ -23,20 +23,20 @@ class AnswerspageView(View):
         car_input = request.POST.get('car_input', '').strip()
 
         if not coordenadas_input or not str(coordenadas_input).strip():
-            return self._render_error('Por favor, insira coordenadas válidas.', car_input)
+            return self._render_error(request, 'Por favor, insira coordenadas válidas.', car_input)
 
-        return self._process_coordinates(coordenadas_input, car_input)
+        return self._process_coordinates(request, coordenadas_input, car_input)
 
     # =====================================================================
     # Métodos auxiliares (Clean Code)
     # =====================================================================
 
-    def _process_coordinates(self, coordenadas_input, car_input):
+    def _process_coordinates(self, request, coordenadas_input, car_input):
         """Executa a pesquisa nas bases e retorna o resultado."""
         try:
             resultado = SearchAll().execute(coordenadas_input, car_input)
 
-            return render(self.request, self.template_name, {
+            return render(request, self.template_name, {
                 'resultado': resultado,
                 'coordenadas_recebidas': coordenadas_input,
                 'car_input': car_input,
@@ -44,15 +44,15 @@ class AnswerspageView(View):
             })
 
         except Exception as e:
-            return render(self.request, self.template_name, {
+            return render(request, self.template_name, {
                 'erro': f'Erro ao processar coordenadas: {str(e)}',
                 'coordenadas_recebidas': coordenadas_input,
                 'car_input': car_input,
                 'sucesso': False
             })
 
-    def _render_error(self, message, car_input=None):
-        return render(self.request, self.template_name, {
+    def _render_error(self, request, message, car_input=None):
+        return render(request, self.template_name, {
             'erro': message,
             'car_input': car_input,
             'sucesso': False
