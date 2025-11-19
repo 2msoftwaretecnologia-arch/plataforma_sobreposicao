@@ -94,6 +94,9 @@
             <div class="status-error">❌ {{ erro }}</div>
             {% endif %}
 
+            <div style="margin-top:12px">
+              <a href="{% url 'login' %}" class="btn btn-secondary">🔐 Fazer login</a>
+            </div>
         </div>
     </div>
     {% include 'analysis/loader.html' %}
