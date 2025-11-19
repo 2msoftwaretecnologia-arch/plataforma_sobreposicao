@@ -1,6 +1,10 @@
 <div class="area-item area-item--fitoecologias">
-    <div class="area-value">Área sobreposta: {{ area.area|floatformat:4 }} ha</div>
-    {% if area.item_info %}
-    <div class="area-info">{{ area.item_info }}</div>
-    {% endif %}
+    <div class="area-item__icon" aria-hidden="true">🌿</div>
+    <div class="area-item__content">
+        <p class="area-item__label">Área sobreposta</p>
+        <p class="area-item__value">{{ area.area|floatformat:4 }} ha</p>
+        {% if area.item_info %}
+        <p class="area-item__meta">{{ area.item_info }}</p>
+        {% endif %}
+    </div>
 </div>

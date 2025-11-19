@@ -1,64 +1,49 @@
-{% comment %} 
+{% comment %}
   Componente: Resultados por Base de Dados
   Objetivo: Renderizar os resultados de sobreposição agrupados por cada base de dados.
-  Estrutura esperada (do backend):
-    - resultado.resultados_por_base: lista de objetos de base
-      - cada base_resultado contém:
-        - nome_base: nome da base
-        - areas_encontradas: lista de dicionários de áreas encontradas
-        - total_areas_com_sobreposicao: contagem de áreas encontradas
-    - Cada item em areas_encontradas pode ter chaves diferentes conforme a base:
-        - Imóveis (SICAR/CAR): area, item_info (e.g., "CAR: <num>"), status
-        - Zoneamento: area, item_info (contém texto com "Zonemaento")
-        - Fitoecologias: area, item_info (contém texto com "FitoEcolog")
-        - APAs: area, unidade, dominios, classe, fundo_legal
-  Decisão de componente:
-    - Baseada nos campos presentes em cada área (detecção robusta sem depender estritamente do nome_base).
-    - Fallback para componente genérico quando nenhuma regra específica se aplica. 
 {% endcomment %}
 
 {% if resultado.resultados_por_base %}
-    {# Se houver pelo menos uma base para iterar, mostramos o título e iteramos pelas bases #}
-    <h3>🎯 Resultados por Base de Dados:</h3>
-    {% for base_resultado in resultado.resultados_por_base %}
-    <div class="base-resultado">
-        <h4>{{ base_resultado.nome_base }}</h4>
-        {% if base_resultado.areas_encontradas %}
-            {# Caso a base tenha áreas encontradas, mostramos a contagem e iteramos por cada área #}
-            <p><strong>Sobreposições encontradas: {{ base_resultado.total_areas_com_sobreposicao }}</strong></p>
-            {% for area in base_resultado.areas_encontradas %}
-                {% comment %} {#
-                  Seleção do componente por base via campos:
-                    - APAs: presença de qualquer um dos campos específicos (unidade/domínios/classe/fundo_legal)
-                    - Imóveis (SICAR/CAR): presença de status
-                    - Zoneamento: item_info contendo "zonemaento"
-                    - Fitoecologias: item_info contendo "fitoecolog"
-                    - Genérico: nenhuma das condições acima
-                #} {% endcomment %}
-                {% if area.unidade or area.dominios or area.classe or area.fundo_legal %}
-                    {# APA: exibe detalhes específicos (unidade, domínios, classe, fundo legal) #}
-                    {% include "analysis/components/base/_area_item_apas.html" %}
-                {% elif area.status %}
-                    {# Imóveis (SICAR/CAR): exibe área, info e status #}
-                    {% include "analysis/components/base/_area_item_imoveis.html" %}
-                {% elif area.item_info and 'zonemaento' in area.item_info|lower %}
-                    {# Zoneamento: exibe área e descrição do zoneamento em item_info #}
-                    {% include "analysis/components/base/_area_item_zoneamento.html" %}
-                {% elif area.item_info and 'fitoecolog' in area.item_info|lower %}
-                    {# Fitoecologias: exibe área e descrição da fitoecologia em item_info #}
-                    {% include "analysis/components/base/_area_item_fitoecologias.html" %}
-                {% else %}
-                    {# Fallback genérico: exibe campos comuns (área e item_info) #}
-                    {% include "analysis/components/_area_item.html" %}
-                {% endif %}
-            {% endfor %}
-        {% else %}
-            {# Mensagem por base: esta base específica não possui áreas com sobreposição #}
-            <p>✅ Nenhuma sobreposição encontrada nesta base de dados.</p>
-        {% endif %}
+    <div class="panel-subheader">
+        <p class="eyebrow">Bases consultadas</p>
+        <p class="panel-description">Visualize as intersecções identificadas em cada fonte. Cada item destaca os campos mais relevantes de forma compacta.</p>
     </div>
-    {% endfor %}
+    <div class="base-grid">
+        {% for base_resultado in resultado.resultados_por_base %}
+        <article class="base-card">
+            <header class="base-card__header">
+                <div>
+                    <p class="base-card__label">Base</p>
+                    <p class="base-card__title">{{ base_resultado.nome_base }}</p>
+                </div>
+                <span class="pill">{{ base_resultado.total_areas_com_sobreposicao }} sobreposições</span>
+            </header>
+
+            {% if base_resultado.areas_encontradas %}
+                <div class="area-list">
+                    {% for area in base_resultado.areas_encontradas %}
+                        {% if area.unidade or area.dominios or area.classe or area.fundo_legal %}
+                            {% include "analysis/components/base/_area_item_apas.html" %}
+                        {% elif area.status %}
+                            {% include "analysis/components/base/_area_item_imoveis.html" %}
+                        {% elif area.item_info and 'zonemaento' in area.item_info|lower %}
+                            {% include "analysis/components/base/_area_item_zoneamento.html" %}
+                        {% elif area.item_info and 'fitoecolog' in area.item_info|lower %}
+                            {% include "analysis/components/base/_area_item_fitoecologias.html" %}
+                        {% else %}
+                            {% include "analysis/components/_area_item.html" %}
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <p class="empty-title">Nenhuma sobreposição nesta base</p>
+                    <p class="empty-description">A consulta não encontrou intersecções para esta fonte de dados.</p>
+                </div>
+            {% endif %}
+        </article>
+        {% endfor %}
+    </div>
 {% else %}
-    {# Mensagem global: não há nenhuma base para iterar ou lista vazia #}
     {% include "analysis/components/_sem_sobreposicao_global.html" %}
 {% endif %}
