@@ -100,6 +100,7 @@ class EnvironmentalProtectionArea(GeoBaseModel):
 
     def __str__(self):
         return self.unit_name
+    
 class IndigenousArea(GeoBaseModel):
     indigenous_name = models.CharField(
         max_length=70, 

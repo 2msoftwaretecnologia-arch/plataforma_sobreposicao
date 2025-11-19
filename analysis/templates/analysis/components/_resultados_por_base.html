@@ -22,10 +22,10 @@
     <h3>🎯 Resultados por Base de Dados:</h3>
     {% for base_resultado in resultado.resultados_por_base %}
     <div class="base-resultado">
-        <h4>{{ base_resultado.nome_base }}</h4>
+        <div class="base-header"><h4>{{ base_resultado.nome_base }}</h4></div>
         {% if base_resultado.areas_encontradas %}
             {# Caso a base tenha áreas encontradas, mostramos a contagem e iteramos por cada área #}
-            <p><strong>Sobreposições encontradas: {{ base_resultado.total_areas_com_sobreposicao }}</strong></p>
+            <p><span class="badge">Sobreposições: {{ base_resultado.total_areas_com_sobreposicao }}</span></p>
             {% for area in base_resultado.areas_encontradas %}
                 {% comment %} {#
                   Seleção do componente por base via campos:

@@ -1,109 +1,77 @@
-from typing import Any, Dict, List, Optional, Tuple
+import json
 import time
-from analysis.services.analyze_coordinates.helpers_service.load_all_data_service import LoadAllDataService
-from analysis.services.analyze_coordinates.helpers_service.process_all_data_service import ProcessAllDataService
-from analysis.services.analyze_coordinates.helpers_service.search.final_result_builder import FinalResultBuilder
-from analysis.services.analyze_coordinates.helpers_service.search.processor_registry import ProcessorRegistry
-from analysis.services.analyze_coordinates.helpers_service.search.result_aggregator import ResultAggregator
-
-from kernel.service.geometry_overlap_service import OverlapChecker
-from kernel.utils import calculate_area_ha
+from analysis.services.analyze_coordinates.overlap.final_result_builder import FinalResultBuilder
+from analysis.services.analyze_coordinates.overlap.formatter_register import FormatterRegister
+from analysis.services.analyze_coordinates.overlap.geometry_target import GeometryTarget
+from analysis.services.analyze_coordinates.overlap.pipeline import OverlapPipeline
 
 
 class SearchAll:
-    """Orquestra a busca de sobreposições em todas as bases de dados.
-
-    Responsável por:
-    - Carregar dados das bases (SICAR, Zoneamento, Fitoecologias, APAs)
-    - Processar sobreposições com verificador
-    - Consolidar e padronizar o resultado para a UI
+    """
+    High-level service responsible for:
+    - Preparing the geometry target (CAR or external polygon)
+    - Executing the overlap pipeline
+    - Building the final structured response for the UI
+    - Tracking performance (timing each step)
     """
 
     def __init__(self):
-        # Instância única do verificador de sobreposição
-        self.verifier = OverlapChecker()
-        
-        # Carregamento inicial de dados (evita carregar múltiplas vezes)
-        self.load_all_data_service = LoadAllDataService()
-        self.processors_all_data_service = ProcessAllDataService()
-        self.processor_registry = ProcessorRegistry(self.verifier)
-        self.result_aggregator = ResultAggregator()
-        self.final_result_builder = FinalResultBuilder()
+        self.pipeline = OverlapPipeline()
+        self.builder = FinalResultBuilder()
+        self.formatters = FormatterRegister()
 
-    def execute(self, geometry, car=None):
-        """Executa a análise completa de sobreposições para o WKT informado.
+    def execute(self, geometry_or_car):
+        performance = {}
 
-        Parâmetros:
-        - geometry: WKT do polígono analisado
-        - car: número de CAR a ser desconsiderado na base de imóveis    
-        """
-        
-        # Calcular área do polígono em hectares
-        area_size_ha = self._compute_area_size_ha(geometry)
+        # ------------------------------------------------------
+        # Detect input type and create a GeometryTarget
+        # ------------------------------------------------------
+        t0 = time.perf_counter()
 
-        # Carregar todos os dados necessários (evita carregar múltiplas vezes)
-        # Marca o início da medição de tempo para carregamento dos dados
-        _t_read_start = time.perf_counter()
-        # Carrega todos os dados das bases (SICAR, Zoneamento, Fitoecologia, APAs) de uma só vez
-        # O parâmetro 'car' permite ignorar um imóvel específico da base SICAR
-        data_loaded = self.load_all_data_service.load_all(car=car)
-        _t_read_end = time.perf_counter()
-        # Exibe o tempo total gasto para leitura das bases
-        print(f"Tempo para ler todas as bases: {(_t_read_end - _t_read_start):.3f}s")
-        
-        # Processar sobreposições para cada base de dados
-        # Marca o início da medição de tempo para processamento de sobreposições
-        _t_proc_start = time.perf_counter()
-        # Organiza e executa o processamento de sobreposição para cada base carregada
-        # Retorna um dicionário com os resultados separados por tipo de base
-        results_by_base = self._organize_processors(
-            geometry, 
-            data_loaded
-        )
-        _t_proc_end = time.perf_counter()
-        # Exibe o tempo total gasto para processar todas as sobreposições
-        print(f"Tempo para processar todas as bases: {(_t_proc_end - _t_proc_start):.3f}s")
-        #fim da logica de redução de processamento
-    
-        # Agregar métricas globais a partir das bases
-        all_found_areas, total_not_evaluated, total_overlaps = self.result_aggregator.aggregate(
-            results_by_base
-        )
-        
-        # Resumo das quantidades por base (mantém chaves esperadas pela UI)
-        summary_bases = self.result_aggregator.summary(
-            data_loaded
+        if hasattr(geometry_or_car, "geometry_new"):
+            target = GeometryTarget(geometry_or_car.geometry_new)
+            target.car = geometry_or_car
+            input_type = "CAR"
+        else:
+            target = GeometryTarget(geometry_or_car)
+            target.car = None
+            input_type = "ExternalGeometry"
+
+        performance["input_type"] = input_type
+        performance["time_target_creation"] = time.perf_counter() - t0
+
+        # ------------------------------------------------------
+        # Run overlap pipeline
+        # ------------------------------------------------------
+        t1 = time.perf_counter()
+
+        layers = list(self.formatters.formatters.keys())
+
+        pipeline_result= self.pipeline.run(
+            target=target,
+            layers=layers,
+            formatters=self.formatters.formatters,
         )
 
-        # Montar dicionário final (mantém compatibilidade com templates atuais)
-        final_result  = self.final_result_builder.build(
-            results_by_base,
-            all_found_areas,
-            total_not_evaluated,
-            total_overlaps,
-            area_size_ha,
-            summary_bases,
+        performance["time_pipeline_total"] = time.perf_counter() - t1
+
+        # ------------------------------------------------------
+        # Build final structured output (UI format)
+        # ------------------------------------------------------
+        t2 = time.perf_counter()
+
+        final_output = self.builder.build(
+            target=target,
+            results_by_layer=pipeline_result,
+            layers=layers,
         )
-        
-        return final_result
 
-    def _compute_area_size_ha(self, polygon_wkt: str) -> Optional[float]:
-        """Calcula a área do polígono em hectares, com tratamento seguro de erros."""
-        try:
-            if polygon_wkt and str(polygon_wkt).strip():
-                return calculate_area_ha(polygon_wkt)
-        except Exception as e:
-            print(f"Erro ao calcular a área do polígono. {e}")
-            return None
-        return None
-    
-    def _organize_processors(self, polygon_wkt: str, data: List[Dict[str, Any]]) -> None:
-        """Organiza e processa os dados carregados com base nos loaders registrados.
+        performance["time_builder"] = time.perf_counter() - t2
 
-        Parâmetros:
-        - polygon_wkt: WKT do polígono analisado
-        - data: Lista de dicionários contendo os dados carregados de cada loader
-        """
-        self.processors_all_data_service.set_processors(self.processor_registry.processors)
+        # ------------------------------------------------------
+        # Save output for debugging
+        # ------------------------------------------------------
+        with open("performance_log.json", "w") as f:
+            json.dump(performance, f, indent=2)
 
-        return self.processors_all_data_service.process(polygon_wkt, data)
+        return final_output

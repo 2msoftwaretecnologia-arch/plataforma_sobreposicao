@@ -7,12 +7,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Análise de Sobreposição de Áreas</title>
     <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/style.css' %}">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 </head>
 <body>
     <div class="container">
         <h1>🗺️ Análise de Sobreposição de Áreas</h1>
-        <p style="margin-bottom: 20px;">
-            <a href="{% url 'upload_zip_car' %}" style="display:inline-block;padding:10px 16px;border-radius:8px;background:#e9ecef;color:#333;text-decoration:none;">📦 Ir para Upload de ZIP e CAR</a>
+        <p class="action-bar">
+            <a href="{% url 'upload_zip_car' %}" class="btn btn-secondary">📦 Ir para Upload de ZIP e CAR</a>
         </p>
         {% if municipio or uf %}
         <div class="location-box" role="status" aria-live="polite">
@@ -54,6 +56,30 @@
             {% include "analysis/components/_resultados_por_base.html" %}
         </div>
         {% endif %}
+
+        <div class="map-section">
+            <h2>🗺️ Visualização no Mapa</h2>
+            <div id="map" class="map"></div>
+        </div>
+
+        <script>
+            (function() {
+                var map = L.map('map').setView([-10, -48], 7);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 18,
+                    attribution: '&copy; OpenStreetMap contributors'
+                }).addTo(map);
+
+                fetch('/api/zoning/geojson/')
+                  .then(function(response){ return response.json(); })
+                  .then(function(data){
+                      L.geoJSON(data, {
+                          style: { color: '#0d6efd', weight: 2, opacity: 0.8 }
+                      }).addTo(map);
+                  })
+                  .catch(function(err){ console.error('Falha ao carregar GeoJSON:', err); });
+            })();
+        </script>
 
         <div class="info">
             <p><strong>💡 Como usar:</strong></p>

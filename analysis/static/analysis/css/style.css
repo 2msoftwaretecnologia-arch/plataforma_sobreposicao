@@ -398,8 +398,58 @@ input[type="text"]:focus {
     .base-resultado {
         padding: 15px;
     }
+}
+
+/* Map styles */
+.map-section { margin: 20px 0; }
+.map { height: 600px; border-radius: 12px; box-shadow: 0 10px 20px rgba(0,0,0,0.08); border: 1px solid #e1e5e9; }
+
+/* Design system enhancements */
+:root {
+    --color-bg: #ffffff;
+    --color-primary: #0d6efd;
+    --color-secondary: #6c757d;
+    --color-accent: #17a2b8;
+    --color-success: #28a745;
+    --color-danger: #dc3545;
+    --shadow-sm: 0 2px 8px rgba(0,0,0,0.1);
+    --radius-md: 10px;
+}
+
+.action-bar { margin-bottom: 20px; }
+
+.btn {
+    display: inline-block;
+    padding: 10px 16px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    box-shadow: var(--shadow-sm);
+}
+
+.btn-secondary {
+    background: #e9ecef;
+    color: #333;
+}
+
+.badge {
+    display: inline-block;
+    padding: 6px 10px;
+    border-radius: 9999px;
+    background: rgba(13,110,253,.08);
+    border: 1px solid rgba(13,110,253,.3);
+    color: var(--color-primary);
+    font-weight: 700;
+}
+
+.base-header h4 {
+    margin: 0 0 12px 0;
+    color: var(--color-accent);
+    font-size: 1.25em;
+    font-weight: 700;
+}
     
     .base-resultado h4 {
         font-size: 1.1em;
     }
-}
+
