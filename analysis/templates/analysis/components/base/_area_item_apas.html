@@ -1,13 +1,42 @@
 <div class="area-item area-item--apas">
+    
+    <!-- Ícone / Identificação visual -->
     <div class="area-item__icon" aria-hidden="true">🏞️</div>
+
+    <!-- Conteúdo da área -->
     <div class="area-item__content">
+
+        <!-- Rótulo e valor principal -->
         <p class="area-item__label">Área sobreposta</p>
-        <p class="area-item__value">{{ area.area|floatformat:4 }} ha</p>
+        <p class="area-item__value">
+            {{ area.area|floatformat:4 }} ha
+        </p>
+
+        <!-- Metadados da APA -->
         <div class="area-details">
-            <p class="area-item__meta"><strong>Unidade:</strong> {{ area.unidade }}</p>
-            {% if area.dominios %}<p class="area-item__meta"><strong>Domínios:</strong> {{ area.dominios }}</p>{% endif %}
-            {% if area.classe %}<p class="area-item__meta"><strong>Classe:</strong> {{ area.classe }}</p>{% endif %}
-            {% if area.fundo_legal %}<p class="area-item__meta"><strong>Fundo Legal:</strong> {{ area.fundo_legal }}</p>{% endif %}
+
+            <p class="area-item__meta">
+                <strong>Unidade:</strong> {{ area.unidade }}
+            </p>
+
+            {% if area.dominios %}
+            <p class="area-item__meta">
+                <strong>Domínios:</strong> {{ area.dominios }}
+            </p>
+            {% endif %}
+
+            {% if area.classe %}
+            <p class="area-item__meta">
+                <strong>Classe:</strong> {{ area.classe }}
+            </p>
+            {% endif %}
+
+            {% if area.fundo_legal %}
+            <p class="area-item__meta">
+                <strong>Fundo Legal:</strong> {{ area.fundo_legal }}
+            </p>
+            {% endif %}
         </div>
+
     </div>
 </div>

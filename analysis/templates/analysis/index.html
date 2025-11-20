@@ -6,12 +6,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Análise de Sobreposição de Áreas</title>
-    <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/style.css' %}">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+    <!-- CSS principal -->
+    <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/index.css' %}">
 </head>
+
 <body>
     <div class="page">
+
+        <!-- =============================== -->
+        <!-- HEADER -->
+        <!-- =============================== -->
         <header class="header">
             <div class="brand">
                 <div class="brand-icon">🧭</div>
@@ -20,105 +25,152 @@
                     <h1 class="brand-title">Análise de Sobreposição</h1>
                 </div>
             </div>
-            <div class="header-actions">
-                <a class="ghost-button" href="{% url 'upload_zip_car' %}">📦 Upload de ZIP ou CAR</a>
-            </div>
+
+            <a class="ghost-button" href="{% url 'upload_zip_car' %}">
+                📦 Upload de ZIP ou CAR
+            </a>
         </header>
 
-        <main class="layout">
-            <section class="hero">
+
+        <!-- =============================== -->
+        <!-- HERO -->
+        <!-- =============================== -->
+        <section class="hero">
+            <p class="eyebrow">Monitoramento de áreas</p>
+
+            <h2 class="hero-title">Verifique intersecções de polígonos com bases oficiais em segundos.</h2>
+
+            <p class="hero-subtitle">
+                Cole as coordenadas WKT do polígono ou faça o upload de um shapefile/CAR. Os resultados são organizados por base consultada para facilitar sua análise.
+            </p>
+        </section>
+
+
+        <!-- =============================== -->
+        <!-- LOCALIZAÇÃO -->
+        <!-- =============================== -->
+        {% if municipio or uf %}
+        <section class="panel">
+            <div class="panel-header">
+                <span class="pill">Localização</span>
+
+                <div class="location-summary">
+                    {% if municipio %}
+                        <span class="badge badge-strong">{{ municipio }}</span>
+                    {% endif %}
+                    {% if uf %}
+                        <span class="badge">{{ uf }}</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <p class="panel-description">
+                Identificamos automaticamente o município e estado pertencentes ao polígono informado.
+            </p>
+        </section>
+        {% endif %}
+
+
+        <!-- =============================== -->
+        <!-- ERRO -->
+        <!-- =============================== -->
+        {% if erro %}
+        <section class="alert">
+            <div class="alert-icon">⚠️</div>
+            <div>
+                <p class="alert-title">Algo não deu certo</p>
+                <p class="alert-text">{{ erro }}</p>
+            </div>
+        </section>
+        {% endif %}
+
+
+        <!-- =============================== -->
+        <!-- RESULTADOS -->
+        <!-- =============================== -->
+        {% if resultado %}
+        <section class="panel">
+
+            <div class="panel-header">
                 <div>
-                    <p class="eyebrow">Monitoramento de áreas</p>
-                    <p class="hero-title">Verifique intersecções de polígonos com bases oficiais em poucos segundos.</p>
-                    <p class="hero-subtitle">Cole as coordenadas WKT do polígono ou avance para o upload de shapefile/CAR. Os resultados são organizados por base consultada, facilitando a tomada de decisão.</p>
+                    <p class="eyebrow">Resumo da execução</p>
+                    <h2 class="panel-title">Resultados da Análise</h2>
                 </div>
-            </section>
 
-            {% if municipio or uf %}
-            <section class="panel panel-inline" role="status" aria-live="polite">
-                <div class="panel-header">
-                    <div class="pill pill-primary">Localização</div>
-                    <div class="location-summary">
-                        {% if municipio %}<span class="badge badge-strong" title="Município">{{ municipio }}</span>{% endif %}
-                        {% if uf %}<span class="badge" title="UF">{{ uf }}</span>{% endif %}
-                    </div>
+                <span class="badge">Consulta concluída</span>
+            </div>
+
+            <!-- RESUMO -->
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <p class="summary-label">Áreas com Sobreposição</p>
+                    <p class="summary-value">{{ resultado.total_areas_com_sobreposicao }}</p>
+                    <p class="summary-detail">Total de intersecções encontradas</p>
                 </div>
-                <p class="panel-description">Identificamos a área informada na pesquisa e localizamos o município e o estado correspondentes.</p>
-            </section>
-            {% endif %}
 
-            {% if erro %}
-            <section class="alert alert-error">
-                <div class="alert-icon">⚠️</div>
+                <div class="summary-card">
+                    <p class="summary-label">Tamanho da Área (ha)</p>
+                    <p class="summary-value">
+                        {% if resultado.tamanho_area %}
+                            {% localize on %}
+                                {{ resultado.tamanho_area|floatformat:4 }}
+                            {% endlocalize %}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </p>
+                    <p class="summary-detail">Extensão do polígono analisado</p>
+                </div>
+            </div>
+
+            <!-- RESULTADOS DETALHADOS POR BASE -->
+            {% include "analysis/components/_resultados_por_base.html" %}
+        </section>
+        {% endif %}
+
+
+        <!-- =============================== -->
+        <!-- GUIA RÁPIDO -->
+        <!-- =============================== -->
+        <section class="panel">
+            <div class="panel-header">
                 <div>
-                    <p class="alert-title">Algo não deu certo</p>
-                    <p class="alert-text">{{ erro }}</p>
+                    <p class="eyebrow">Guia rápido</p>
+                    <h2 class="panel-title">Como usar a análise</h2>
                 </div>
-            </section>
-            {% endif %}
+            </div>
 
-            {% if resultado %}
-            <section class="panel">
-                <div class="panel-header">
-                    <div>
-                        <p class="eyebrow">Resumo da execução</p>
-                        <h2 class="panel-title">Resultados da Análise</h2>
-                    </div>
-                    <div class="status-chip">Consulta concluída</div>
-                </div>
-                <div class="summary-grid">
-                    <div class="summary-card">
-                        <p class="summary-label">Áreas com Sobreposição</p>
-                        <p class="summary-value">{{ resultado.total_areas_com_sobreposicao }}</p>
-                        <p class="summary-detail">Total de intersecções identificadas</p>
-                    </div>
-                    <div class="summary-card">
-                        <p class="summary-label">Tamanho da Área (ha)</p>
-                        <p class="summary-value">
-                            {% if resultado.tamanho_area %}{% localize on %}{{ resultado.tamanho_area|floatformat:4 }}{% endlocalize %}{% else %}-{% endif %}
-                        </p>
-                        <p class="summary-detail">Extensão da geometria consultada</p>
-                    </div>
+            <div class="info-grid">
+
+                <div class="info-block">
+                    <p class="info-title">Preparação</p>
+                    <ul>
+                        <li>Cole as coordenadas WKT ou carregue um zip/shapefile/CAR.</li>
+                        <li>Verifique se a geometria é válida e fechada.</li>
+                    </ul>
                 </div>
 
-                {% include "analysis/components/_resultados_por_base.html" %}
-            </section>
-            {% endif %}
+                <div class="info-block">
+                    <p class="info-title">Bases consultadas</p>
+                    <ul>
+                        <li>Imóveis SICAR/CAR</li>
+                        <li>Zoneamento territorial</li>
+                        <li>Fitoecologias</li>
+                        <li>APAs</li>
+                    </ul>
+                </div>
 
-            <section class="panel info-panel">
-                <div class="panel-header">
-                    <div>
-                        <p class="eyebrow">Guia rápido</p>
-                        <h2 class="panel-title">Como usar a análise</h2>
-                    </div>
+                <div class="info-block">
+                    <p class="info-title">Interpretação</p>
+                    <ul>
+                        <li>As sobreposições são agrupadas por base.</li>
+                        <li>Use os valores e status para priorizar ações.</li>
+                    </ul>
                 </div>
-                <div class="info-grid">
-                    <div class="info-block">
-                        <p class="info-title">Preparação</p>
-                        <ul>
-                            <li>Cole as coordenadas WKT do polígono ou carregue um shapefile/CAR.</li>
-                            <li>Confirme se a geometria está fechada e válida para processamento.</li>
-                        </ul>
-                    </div>
-                    <div class="info-block">
-                        <p class="info-title">Bases consultadas</p>
-                        <ul>
-                            <li>Imóveis da base SICAR/CAR</li>
-                            <li>Zoneamento territorial</li>
-                            <li>Fitoecologias</li>
-                            <li>APAs (Áreas de Proteção Ambiental)</li>
-                        </ul>
-                    </div>
-                    <div class="info-block">
-                        <p class="info-title">Interpretação</p>
-                        <ul>
-                            <li>As sobreposições aparecem agrupadas por base.</li>
-                            <li>Use os detalhes de status e área para priorizar ações.</li>
-                        </ul>
-                    </div>
-                </div>
-            </section>
-        </main>
+
+            </div>
+        </section>
+
     </div>
 </body>
 </html>

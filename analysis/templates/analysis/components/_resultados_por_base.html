@@ -1,49 +1,73 @@
-{% comment %}
-  Componente: Resultados por Base de Dados
-  Objetivo: Renderizar os resultados de sobreposição agrupados por cada base de dados.
-{% endcomment %}
-
 {% if resultado.resultados_por_base %}
+    
     <div class="panel-subheader">
         <p class="eyebrow">Bases consultadas</p>
-        <p class="panel-description">Visualize as intersecções identificadas em cada fonte. Cada item destaca os campos mais relevantes de forma compacta.</p>
+        <p class="panel-description">
+            Visualize as intersecções identificadas em cada fonte. 
+            As informações aparecem organizadas por base de dados.
+        </p>
     </div>
+
     <div class="base-grid">
-        {% for base_resultado in resultado.resultados_por_base %}
+        
+        {% for base in resultado.resultados_por_base %}
         <article class="base-card">
+            
             <header class="base-card__header">
                 <div>
-                    <p class="base-card__label">Base</p>
-                    <p class="base-card__title">{{ base_resultado.nome_base }}</p>
+                    <p class="base-card__title">{{ base.nome_base }}</p>
                 </div>
-                <span class="pill">{{ base_resultado.total_areas_com_sobreposicao }} sobreposições</span>
+
+                <span class="pill">
+                    {{ base.total_areas_com_sobreposicao }} sobreposições
+                </span>
             </header>
 
-            {% if base_resultado.areas_encontradas %}
+            {% if base.areas_encontradas %}
+                
                 <div class="area-list">
-                    {% for area in base_resultado.areas_encontradas %}
+                    {% for area in base.areas_encontradas %}
+
+                        {# --- APAs / Domínios legais / Unidades #}
                         {% if area.unidade or area.dominios or area.classe or area.fundo_legal %}
                             {% include "analysis/components/base/_area_item_apas.html" %}
+
+                        {# --- Imóveis SICAR #}
                         {% elif area.status %}
                             {% include "analysis/components/base/_area_item_imoveis.html" %}
-                        {% elif area.item_info and 'zonemaento' in area.item_info|lower %}
+
+                        {# --- Zoneamento #}
+                        {% elif area.item_info and "zoneamento" in area.item_info|lower %}
                             {% include "analysis/components/base/_area_item_zoneamento.html" %}
-                        {% elif area.item_info and 'fitoecolog' in area.item_info|lower %}
+
+                        {# --- Fitoecologias #}
+                        {% elif area.item_info and "fitoecolog" in area.item_info|lower %}
                             {% include "analysis/components/base/_area_item_fitoecologias.html" %}
+
+                        {# --- Fallback genérico #}
                         {% else %}
                             {% include "analysis/components/_area_item.html" %}
                         {% endif %}
+
                     {% endfor %}
                 </div>
+
             {% else %}
+
                 <div class="empty-state">
                     <p class="empty-title">Nenhuma sobreposição nesta base</p>
-                    <p class="empty-description">A consulta não encontrou intersecções para esta fonte de dados.</p>
+                    <p class="empty-description">
+                        A consulta não encontrou intersecções para esta fonte de dados.
+                    </p>
                 </div>
+
             {% endif %}
+
         </article>
         {% endfor %}
+
     </div>
+
 {% else %}
     {% include "analysis/components/_sem_sobreposicao_global.html" %}
 {% endif %}

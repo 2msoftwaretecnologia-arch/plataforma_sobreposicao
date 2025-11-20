@@ -1,0 +1,392 @@
+/* -----------------------------------------------------
+   CORE / RESET
+------------------------------------------------------ */
+:root {
+    --bg: #ffffff;
+    --surface: #f7f7f7;
+    --text: #111;
+    --muted: #555;
+    --line: #e2e2e2;
+    --shadow: 0 4px 24px rgba(0,0,0,0.06);
+    --radius: 14px;
+
+    --title-size: 26px;
+    --subtitle-size: 16px;
+    --label-size: 12px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: "Inter", sans-serif;
+}
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    justify-content: center;
+    padding: 40px 24px;
+}
+
+/* -----------------------------------------------------
+   CONTAINER PRINCIPAL
+------------------------------------------------------ */
+.page {
+    width: 100%;
+    max-width: 1100px;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+}
+
+/* -----------------------------------------------------
+   HEADER
+------------------------------------------------------ */
+.header {
+    padding: 24px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--shadow);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.brand-icon {
+    background: #fff;
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius);
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--line);
+    font-size: 22px;
+}
+
+.brand-title {
+    font-size: var(--title-size);
+    font-weight: 700;
+}
+
+.brand-label {
+    font-size: var(--label-size);
+    text-transform: uppercase;
+    color: var(--muted);
+    letter-spacing: 1px;
+}
+
+.ghost-button {
+    padding: 10px 18px;
+    border-radius: var(--radius);
+    border: 1px solid var(--text);
+    text-decoration: none;
+    font-weight: 600;
+    color: var(--text);
+    transition: 0.2s;
+}
+
+.ghost-button:hover {
+    background: var(--text);
+    color: #fff;
+}
+
+/* -----------------------------------------------------
+   SEÇÃO PRINCIPAL (HERO)
+------------------------------------------------------ */
+.hero {
+    border: 1px solid var(--line);
+    padding: 28px;
+    border-radius: var(--radius);
+    background: #fff;
+    box-shadow: var(--shadow);
+}
+
+.hero-title {
+    font-size: 24px;
+    margin-bottom: 10px;
+}
+
+.hero-subtitle {
+    font-size: 15px;
+    color: var(--muted);
+    line-height: 1.6;
+}
+
+/* -----------------------------------------------------
+   PANELS / BLOCOS DE CONTEÚDO
+------------------------------------------------------ */
+.panel {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: #fff;
+    padding: 24px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.panel-title {
+    font-size: 22px;
+    font-weight: 700;
+}
+
+.panel-description {
+    color: var(--muted);
+    line-height: 1.5;
+}
+
+/* -----------------------------------------------------
+   CARDS DE RESUMO
+------------------------------------------------------ */
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 14px;
+}
+
+.summary-card {
+    padding: 20px;
+    border-radius: var(--radius);
+    background: var(--surface);
+    border: 1px solid var(--line);
+}
+
+.summary-value {
+    font-size: 32px;
+    font-weight: 800;
+    margin-top: 4px;
+}
+
+/* -----------------------------------------------------
+   INFO GRID
+------------------------------------------------------ */
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 18px;
+}
+
+.info-block {
+    background: var(--surface);
+    padding: 20px;
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+}
+
+.info-title {
+    font-weight: 700;
+    margin-bottom: 10px;
+    font-size: 16px;
+}
+
+.info-block ul {
+    list-style: none;
+    display: grid;
+    gap: 6px;
+    color: var(--muted);
+}
+
+/* -----------------------------------------------------
+   STATUS / BADGES
+------------------------------------------------------ */
+.pill {
+    background: #111;
+    color: #fff;
+    padding: 6px 14px;
+    font-size: 13px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+}
+
+.badge {
+    padding: 6px 14px;
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    background: var(--surface);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+/* -----------------------------------------------------
+   ALERTAS
+------------------------------------------------------ */
+.alert {
+    display: flex;
+    gap: 14px;
+    padding: 18px;
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    background: var(--surface);
+}
+
+.alert-title {
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+/* -----------------------------------------------------
+   RESPONSIVO
+------------------------------------------------------ */
+@media (max-width: 768px) {
+    .header {
+        flex-direction: column;
+        gap: 20px;
+    }
+}
+
+/* -----------------------------------------------------
+   BASE GRID (2 colunas fixas)
+------------------------------------------------------ */
+.base-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);  /* DUAS COLUNAS SEMPRE */
+    gap: 20px;
+}
+
+/* Responsivo — 1 coluna no mobile */
+@media (max-width: 768px) {
+    .base-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* -----------------------------------------------------
+   BASE CARD
+------------------------------------------------------ */
+.base-card {
+    padding: 22px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+
+    /* impede transbordamento */
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+/* -----------------------------------------------------
+   LISTA DE ÁREAS
+------------------------------------------------------ */
+.area-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+/* -----------------------------------------------------
+   CARD DE ÁREA
+------------------------------------------------------ */
+.area-item {
+    display: grid;
+    grid-template-columns: 48px 1fr;
+    gap: 16px;
+    padding: 16px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+
+    /* evita estouro */
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+.area-item__icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius);
+    display: grid;
+    place-items: center;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    font-size: 20px;
+}
+
+.area-item__label {
+    font-size: var(--label-size);
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+
+    overflow-wrap: break-word;
+}
+
+.area-item__value {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.area-details {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+.area-item__meta {
+    font-size: 14px;
+    color: var(--muted);
+    line-height: 1.4;
+
+    overflow-wrap: break-word;
+}
+
+/* -----------------------------------------------------
+   EMPTY STATE
+------------------------------------------------------ */
+.empty-state {
+    padding: 20px;
+    border: 1px dashed var(--line);
+    border-radius: var(--radius);
+    background: #fff;
+}
+
+.empty-title {
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.empty-description {
+    font-size: 14px;
+    color: var(--muted);
+}
+
+/* -----------------------------------------------------
+   RESPONSIVO ÁREA-ITEM
+------------------------------------------------------ */
+@media (max-width: 600px) {
+    .area-item {
+        grid-template-columns: 1fr;
+    }
+
+    .area-item__icon {
+        width: 42px;
+        height: 42px;
+    }
+}
