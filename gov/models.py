@@ -38,8 +38,38 @@ class Sigef(GeoBaseModel):
    
     class Meta:
         db_table = 'tb_area_sigef'
-        verbose_name = "Área da area"
-        verbose_name_plural = "Nome das areas"
+        verbose_name = "Sigef"
+        verbose_name_plural = "Sigef"
+
+    def __str__(self):
+        return self.name
+
+class Ruralsettlement(GeoBaseModel):
+    project_name = models.CharField(
+        max_length=70, 
+        verbose_name="Nome do projeto", 
+        db_column='nome_proje'
+    )
+    
+    method_obtaining = models.CharField(
+        max_length=70, 
+        verbose_name="Método de obtenção", 
+        db_column='forma_obte'
+    )
+
+    hash_id = models.CharField(
+        max_length=64, 
+        verbose_name="Hash ID", 
+        db_column='hash_id', 
+        unique=True, 
+        null=True, 
+        blank=True
+    )
+   
+    class Meta:
+        db_table = 'tb_assentamento_rural'
+        verbose_name = "Assentamento rural"
+        verbose_name_plural = "Assentamentos rurais"
 
     def __str__(self):
         return self.name
