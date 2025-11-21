@@ -1,8 +1,6 @@
 from pickle import TRUE
 from django.db import models
 
-from django.db import models
-
 class FileManagement(models.Model):
     phytoecology_zip_file = models.FileField(
         upload_to='documents/',
@@ -35,6 +33,15 @@ class FileManagement(models.Model):
         null = True,
         blank = True
     )
+
+    quilombolas_zip_file = models.FileField(
+        upload_to='documents/',
+        verbose_name="Documentos Quilombolas",
+        help_text="Arquivo ZIP contendo dados da Área de Quilombolas.",
+        null = True,
+        blank = True
+    )
+
     class Meta:
         db_table = 'tb_gerenciamento_arquivos'
         verbose_name = "Gerenciamento de Arquivos"

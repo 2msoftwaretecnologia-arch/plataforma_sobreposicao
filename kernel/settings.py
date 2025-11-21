@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'car_system',
     'control_panel',
     'authentication',
+    'naturatins',
 ]
 
 MIDDLEWARE = [
