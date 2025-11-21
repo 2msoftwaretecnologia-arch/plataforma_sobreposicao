@@ -68,3 +68,27 @@ class ConservationUnits(GeoBaseModel):
         db_table = 'tb_area_unidades_conservacao'
         verbose_name = "Unidade de Conservação"
         verbose_name_plural = "Unidades de Conservação"
+
+class MunicipalBoundaries(GeoBaseModel):
+    name = models.CharField(
+        max_length=70, 
+        verbose_name="Nome do município",
+        db_column='NOME'
+    )
+    
+    hash_id = models.CharField(
+        max_length=64, 
+        verbose_name="Hash ID", 
+        db_column='hash_id', 
+        unique=True, 
+        null=True, 
+        blank=True
+    )
+   
+    class Meta:
+        db_table = 'tb_area_municipios'
+        verbose_name = "Área de Município"
+        verbose_name_plural = "Áreas de Municípios"
+
+    def __str__(self):
+        return self.name

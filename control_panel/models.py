@@ -57,7 +57,15 @@ class FileManagement(models.Model):
         null = True,
         blank = True
     )
-
+    
+    municipal_boundaries_zip_file = models.FileField(
+        upload_to='documents/',
+        verbose_name="Documentos Municípios",
+        help_text="Arquivo ZIP contendo dados da Área de Municípios.",
+        null = True,
+        blank = True
+    )
+    
     class Meta:
         db_table = 'tb_gerenciamento_arquivos'
         verbose_name = "Gerenciamento de Arquivos"
