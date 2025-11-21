@@ -12,6 +12,7 @@ class FileManagementAdmin(admin.ModelAdmin):
         'quilombolas_zip_file',
         'paths_zip_file',
         'municipal_boundaries_zip_file',
+        'sigef_zip_file',
     )
     
     list_display_links = (
@@ -23,6 +24,7 @@ class FileManagementAdmin(admin.ModelAdmin):
         'quilombolas_zip_file',
         'paths_zip_file',
         'municipal_boundaries_zip_file',
+        'sigef_zip_file',
     )
     
     search_fields = (
@@ -34,6 +36,7 @@ class FileManagementAdmin(admin.ModelAdmin):
         'quilombolas_zip_file',
         'paths_zip_file',
         'municipal_boundaries_zip_file',
+        'sigef_zip_file',
     )
     
     def has_add_permission(self, request):

@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'control_panel',
     'authentication',
     'naturatins',
+    'gov'
 ]
 
 MIDDLEWARE = [
