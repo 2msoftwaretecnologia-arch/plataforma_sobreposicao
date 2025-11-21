@@ -89,3 +89,4 @@ Thumbs.db
 shps/
 documents/
 .DS_Store
+performance_log.json

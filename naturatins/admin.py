@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Quilombolas
+from .models import Quilombolas , Paths
 # Register your models here.
 from leaflet.admin import LeafletGeoAdmin
 
@@ -24,3 +24,21 @@ class QuilombolasAdmin(LeafletGeoAdmin):
         )
     
 admin.site.register(Quilombolas, QuilombolasAdmin)
+
+class PathsAdmin(LeafletGeoAdmin):   
+    list_display = ('hash_id', 'area_ha')
+    fieldsets = (
+        (None, {
+            'fields': ('hash_id', 'geometry')
+        }),
+        (None, {
+            'fields': ('geometry_new', 'area_m2', 'area_ha')
+        }),
+    )
+    
+    readonly_fields = (
+            'area_m2',
+            'area_ha',
+        )
+    
+admin.site.register(Paths, PathsAdmin)

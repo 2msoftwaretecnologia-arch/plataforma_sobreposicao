@@ -41,6 +41,14 @@ class FileManagement(models.Model):
         null = True,
         blank = True
     )
+    
+    paths_zip_file = models.FileField(
+        upload_to='documents/',
+        verbose_name="Documentos Veredas",
+        help_text="Arquivo ZIP contendo dados da Área de Veredas.",
+        null = True,
+        blank = True
+    )
 
     class Meta:
         db_table = 'tb_gerenciamento_arquivos'

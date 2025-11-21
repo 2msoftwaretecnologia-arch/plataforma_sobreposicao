@@ -25,3 +25,19 @@ class Quilombolas(GeoBaseModel):
 
     def __str__(self):
         return self.name
+
+class Paths(GeoBaseModel):
+    
+    hash_id = models.CharField(
+        max_length=64, 
+        verbose_name="Hash ID", 
+        db_column='hash_id', 
+        unique=True, 
+        null=True, 
+        blank=True
+    )
+   
+    class Meta:
+        db_table = 'tb_area_veredas'
+        verbose_name = "Área de Vereda"
+        verbose_name_plural = "Áreas de Veredas"
