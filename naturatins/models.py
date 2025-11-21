@@ -41,3 +41,30 @@ class Paths(GeoBaseModel):
         db_table = 'tb_area_veredas'
         verbose_name = "Área de Vereda"
         verbose_name_plural = "Áreas de Veredas"
+
+class ConservationUnits(GeoBaseModel):
+    unit = models.CharField(
+        max_length=70, 
+        verbose_name="Unidade de Conservação", 
+        db_column='Unidades'
+    )
+    
+    domain = models.CharField(
+        max_length=70, 
+        verbose_name="Domínio", 
+        db_column='Dominios'
+    )
+
+    hash_id = models.CharField(
+        max_length=64, 
+        verbose_name="Hash ID", 
+        db_column='hash_id', 
+        unique=True, 
+        null=True, 
+        blank=True
+    )
+   
+    class Meta:
+        db_table = 'tb_area_unidades_conservacao'
+        verbose_name = "Unidade de Conservação"
+        verbose_name_plural = "Unidades de Conservação"
