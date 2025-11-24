@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Sigef , Ruralsettlement
+from .models import Sigef , Ruralsettlement , SnicTotal
 # Register your models here.
 from leaflet.admin import LeafletGeoAdmin
 
@@ -45,3 +45,23 @@ class RuralsettlementAdmin(LeafletGeoAdmin):
         )
 
 admin.site.register(Ruralsettlement, RuralsettlementAdmin)
+
+class SnicTotalAdmin(LeafletGeoAdmin):
+    list_display = ('property_name', 'property_code', 'hash_id', 'area_ha')
+    search_fields = ('property_name',)
+    
+    fieldsets = (
+        (None, {
+            'fields': ('property_name', 'property_code', 'hash_id', 'geometry')
+        }),
+        (None, {
+            'fields': ('geometry_new', 'area_m2', 'area_ha')
+        }),
+    )
+    
+    readonly_fields = (
+            'area_m2',
+            'area_ha',
+        )
+    
+admin.site.register(SnicTotal, SnicTotalAdmin)

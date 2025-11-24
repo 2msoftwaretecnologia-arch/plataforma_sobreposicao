@@ -73,3 +73,35 @@ class Ruralsettlement(GeoBaseModel):
 
     def __str__(self):
         return self.name
+
+
+class SnicTotal(GeoBaseModel):
+    property_name = models.CharField(
+        max_length=70, 
+        verbose_name="Nome do imovel", 
+        db_column='nome_imove'
+    )
+    
+    property_code = models.CharField(
+        max_length=70, 
+        verbose_name="Código do imovel", 
+        db_column='cod_imovel'
+    )
+
+
+    hash_id = models.CharField(
+        max_length=64, 
+        verbose_name="Hash ID", 
+        db_column='hash_id', 
+        unique=True, 
+        null=True, 
+        blank=True
+    )
+   
+    class Meta:
+        db_table = 'tb_snic_total'
+        verbose_name = "Snic Total"
+        verbose_name_plural = "Snic Total"
+
+    def __str__(self):
+        return self.name
