@@ -44,7 +44,8 @@ INSTALLED_APPS = [
     'control_panel',
     'authentication',
     'naturatins',
-    'gov'
+    'gov',
+    'deforestation_fires',
 ]
 
 MIDDLEWARE = [

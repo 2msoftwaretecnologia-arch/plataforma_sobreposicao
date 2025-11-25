@@ -14,6 +14,8 @@ class FileManagementAdmin(admin.ModelAdmin):
         'municipal_boundaries_zip_file',
         'sigef_zip_file',
         'ruralsettlement_zip_file',
+        'snic_total_zip_file',
+        'deforestation_mapbiomas_zip_file',
     )
     
     list_display_links = (
@@ -27,6 +29,8 @@ class FileManagementAdmin(admin.ModelAdmin):
         'municipal_boundaries_zip_file',
         'sigef_zip_file',
         'ruralsettlement_zip_file',
+        'snic_total_zip_file',
+        'deforestation_mapbiomas_zip_file',
     )
     
     search_fields = (
@@ -40,6 +44,8 @@ class FileManagementAdmin(admin.ModelAdmin):
         'municipal_boundaries_zip_file',
         'sigef_zip_file',
         'ruralsettlement_zip_file',
+        'snic_total_zip_file',
+        'deforestation_mapbiomas_zip_file',
     )
     
     def has_add_permission(self, request):

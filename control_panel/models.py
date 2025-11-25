@@ -82,6 +82,22 @@ class FileManagement(models.Model):
         blank = True
     )
     
+    snic_total_zip_file = models.FileField(
+        upload_to='documents/',
+        verbose_name="Documentos SNIC Total",
+        help_text="Arquivo ZIP contendo dados da Área de SNIC Total.",
+        null = True,
+        blank = True
+    )
+    
+    deforestation_mapbiomas_zip_file = models.FileField(
+        upload_to='documents/',
+        verbose_name="Documentos Mapa de Deforestação",
+        help_text="Arquivo ZIP contendo dados da Área de Mapa de Deforestação.",
+        null = True,
+        blank = True
+    )
+
     class Meta:
         db_table = 'tb_gerenciamento_arquivos'
         verbose_name = "Gerenciamento de Arquivos"
