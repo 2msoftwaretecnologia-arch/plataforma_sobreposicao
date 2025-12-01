@@ -14,7 +14,7 @@ class DeforestationMapbiomasAdmin(LeafletGeoAdmin):
             'fields': ('alert_code', 'detection_year', 'source', 'geometry')
         }),
         (None, {
-            'fields': ('geometry_new', 'area_m2', 'area_ha')
+            'fields': ('usable_geometry', 'area_m2', 'area_ha')
         }),
     )
     

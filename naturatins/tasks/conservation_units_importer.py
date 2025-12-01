@@ -4,6 +4,7 @@ import json
 from django.contrib.auth.models import User
 from control_panel.utils import get_file_management
 from naturatins.models import ConservationUnits
+from kernel.service.geometry_processing_service import GeometryProcessingService
 
 
 class ConservationUnitsImporter:
@@ -52,5 +53,8 @@ class ConservationUnitsImporter:
                     "source": formatted["source"],
                 }
             )
-            print(f"[OK] {obj.unit}" if created else f"[SKIP] {obj.unit} já existe")
-
+            if created:
+                GeometryProcessingService(ConservationUnits).process_instance(obj)
+                print(f"[OK] {obj.unit}")
+            else:
+                print(f"[SKIP] {obj.unit} já existe")

@@ -10,6 +10,7 @@ from django.db import connection
 import numpy as np
 
 from environmental_layers.models import PhytoecologyArea
+from kernel.service.geometry_processing_service import GeometryProcessingService
 
 
 class Command(BaseCommand):
@@ -53,6 +54,7 @@ class Command(BaseCommand):
                 results.append(obj.phyto_name)
                 
                 if created:
+                    GeometryProcessingService(PhytoecologyArea).process_instance(obj)
                     print(f"[OK] {obj.phyto_name}")
                 else:
                     print(f"[SKIP] {obj.phyto_name} já existe")

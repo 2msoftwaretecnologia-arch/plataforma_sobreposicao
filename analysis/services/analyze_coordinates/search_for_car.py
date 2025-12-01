@@ -10,7 +10,7 @@ class SearchForCar:
         if not car_searched.exists():
             return {}
         
-        if not car_searched.first().geometry_new:
+        if not car_searched.first().usable_geometry:
             return {}
         
         geometria_wkt = car_searched.first()

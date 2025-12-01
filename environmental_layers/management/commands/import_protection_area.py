@@ -7,6 +7,7 @@ from django.contrib.auth.models import User
 
 from control_panel.utils import get_file_management
 from environmental_layers.models import EnvironmentalProtectionArea
+from kernel.service.geometry_processing_service import GeometryProcessingService
 
 class Command(BaseCommand):
     help = "Verifica e insere dados geoespaciais com hash única por linha."
@@ -42,6 +43,7 @@ class Command(BaseCommand):
                 )
                 
                 if created:
+                    GeometryProcessingService(EnvironmentalProtectionArea).process_instance(protection_area)
                     print(f"APA {protection_area.unit_name} criada.")
                 else:
                     print(f"APA {protection_area.unit_name} já existe.")

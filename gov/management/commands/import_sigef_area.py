@@ -10,6 +10,7 @@ from django.db import connection
 import numpy as np
 
 from gov.models import Sigef
+from kernel.service.geometry_processing_service import GeometryProcessingService
 
 
 class Command(BaseCommand):
@@ -56,6 +57,7 @@ class Command(BaseCommand):
                 results.append(obj.name)
                 
                 if created:
+                    GeometryProcessingService(Sigef).process_instance(obj)
                     print(f"[OK] {obj.name}")
                 else:
                     print(f"[SKIP] {obj.name} já existe")

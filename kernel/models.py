@@ -10,12 +10,12 @@ class GeoBaseModel(models.Model):
         db_column="coordenadas_geograficas"
     )
     
-    geometry_new = gis_models.GeometryField(
+    usable_geometry = gis_models.GeometryField(
         srid=4674,
         null=True,
         blank=True,
         spatial_index=True,
-        db_column="geometria_tmp",
+        db_column="geometria_util",
     )
     
     area_m2 = models.FloatField(

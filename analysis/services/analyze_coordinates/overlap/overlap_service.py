@@ -31,7 +31,7 @@ class OverlapService:
     def get_intersecting(self, layer_model):
         """Return queryset of layer objects that intersect the target geometry."""
         return layer_model.objects.filter(
-            geometry_new__intersects=self.target_geom
+            usable_geometry__intersects=self.target_geom
         )
 
     # -----------------------------------------------------------
@@ -44,8 +44,8 @@ class OverlapService:
         """
         qs = (
             layer_model.objects
-            .filter(geometry_new__intersects=self.target_geom)
-            .annotate(intersection=Intersection(F("geometry_new"), self.target_geom))
+            .filter(usable_geometry__intersects=self.target_geom)
+            .annotate(intersection=Intersection(F("usable_geometry"), self.target_geom))
         )
 
         results = []

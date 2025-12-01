@@ -3,8 +3,6 @@ from .models import Sigef , Ruralsettlement , SnicTotal
 # Register your models here.
 from leaflet.admin import LeafletGeoAdmin
 
-
-
 class SigefAdmin(LeafletGeoAdmin):   
     list_display = ('name', 'installment_code', 'property_code', 'status', 'hash_id', 'area_ha')
     search_fields = ('name',)
@@ -14,7 +12,7 @@ class SigefAdmin(LeafletGeoAdmin):
             'fields': ('name', 'installment_code', 'property_code', 'status', 'hash_id', 'geometry')
         }),
         (None, {
-            'fields': ('geometry_new', 'area_m2', 'area_ha')
+            'fields': ('usable_geometry', 'area_m2', 'area_ha')
         }),
     )
     
@@ -35,7 +33,7 @@ class RuralsettlementAdmin(LeafletGeoAdmin):
             'fields': ('project_name', 'method_obtaining', 'hash_id', 'geometry')
         }),
         (None, {
-            'fields': ('geometry_new', 'area_m2', 'area_ha')
+            'fields': ('usable_geometry', 'area_m2', 'area_ha')
         }),
     )
     
@@ -55,7 +53,7 @@ class SnicTotalAdmin(LeafletGeoAdmin):
             'fields': ('property_name', 'property_code', 'hash_id', 'geometry')
         }),
         (None, {
-            'fields': ('geometry_new', 'area_m2', 'area_ha')
+            'fields': ('usable_geometry', 'area_m2', 'area_ha')
         }),
     )
     

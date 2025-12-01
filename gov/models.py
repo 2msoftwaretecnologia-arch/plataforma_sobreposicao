@@ -10,19 +10,19 @@ class Sigef(GeoBaseModel):
     )
     
     installment_code = models.CharField(
-        max_length=70, 
+        max_length=150, 
         verbose_name="Código do imovel", 
         db_column='codigo_imo'
     )
 
     property_code = models.CharField(
-        max_length=70, 
+        max_length=150, 
         verbose_name="Código do imovel", 
         db_column='propriedade_co'
     )
 
     status = models.CharField(
-        max_length=70, 
+        max_length=150, 
         verbose_name="Status", 
         db_column='status'
     )
@@ -72,18 +72,18 @@ class Ruralsettlement(GeoBaseModel):
         verbose_name_plural = "Assentamentos rurais"
 
     def __str__(self):
-        return self.name
+        return self.project_name
 
 
 class SnicTotal(GeoBaseModel):
     property_name = models.CharField(
-        max_length=70, 
+        max_length=150, 
         verbose_name="Nome do imovel", 
         db_column='nome_imove'
     )
     
     property_code = models.CharField(
-        max_length=70, 
+        max_length=150, 
         verbose_name="Código do imovel", 
         db_column='cod_imovel'
     )
@@ -104,4 +104,4 @@ class SnicTotal(GeoBaseModel):
         verbose_name_plural = "Snic Total"
 
     def __str__(self):
-        return self.name
+        return self.property_name

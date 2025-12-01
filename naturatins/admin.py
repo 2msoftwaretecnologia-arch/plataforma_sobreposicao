@@ -14,7 +14,7 @@ class QuilombolasAdmin(LeafletGeoAdmin):
             'fields': ('name', 'hash_id', 'geometry')
         }),
         (None, {
-            'fields': ('geometry_new', 'area_m2', 'area_ha')
+            'fields': ('usable_geometry', 'area_m2', 'area_ha')
         }),
     )
     
@@ -32,7 +32,7 @@ class PathsAdmin(LeafletGeoAdmin):
             'fields': ('hash_id', 'geometry')
         }),
         (None, {
-            'fields': ('geometry_new', 'area_m2', 'area_ha')
+            'fields': ('usable_geometry', 'area_m2', 'area_ha')
         }),
     )
     
@@ -52,7 +52,7 @@ class ConservationUnitsAdmin(LeafletGeoAdmin):
             'fields': ('unit', 'domain', 'hash_id', 'geometry')
         }),
         (None, {
-            'fields': ('geometry_new', 'area_m2', 'area_ha')
+            'fields': ('usable_geometry', 'area_m2', 'area_ha')
         }),
     )
     
@@ -72,7 +72,7 @@ class MunicipalBoundariesAdmin(LeafletGeoAdmin):
             'fields': ('name', 'hash_id', 'geometry')
         }),
         (None, {
-            'fields': ('geometry_new', 'area_m2', 'area_ha')
+            'fields': ('usable_geometry', 'area_m2', 'area_ha')
         }),
     )
     

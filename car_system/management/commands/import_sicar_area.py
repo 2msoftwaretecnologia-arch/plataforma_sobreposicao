@@ -11,6 +11,7 @@ from django.contrib.auth.models import User
 from django.db import connection
 
 from car_system.models import SicarRecord
+from kernel.service.geometry_processing_service import GeometryProcessingService
 
 
 class Command(BaseCommand):
@@ -52,6 +53,7 @@ class Command(BaseCommand):
                 )
 
                 if created:
+                    GeometryProcessingService(SicarRecord).process_instance(obj)
                     print(f"[CRIADO] CAR: {obj.car_number}")
                 else:
                     print(f"[JÁ EXISTIA] CAR: {obj.car_number}")

@@ -10,6 +10,7 @@ from django.db import connection
 import numpy as np
 
 from deforestation_fires.models import DeforestationMapbiomas
+from kernel.service.geometry_processing_service import GeometryProcessingService
 
 
 class Command(BaseCommand):
@@ -54,6 +55,7 @@ class Command(BaseCommand):
                 results.append(obj.alert_code)
                 
                 if created:
+                    GeometryProcessingService(DeforestationMapbiomas).process_instance(obj)
                     print(f"[OK] {obj.alert_code}")
                 else:
                     print(f"[SKIP] {obj.alert_code} já existe")

@@ -10,6 +10,7 @@ from django.db import connection
 import numpy as np
 
 from naturatins.models import ConservationUnits
+from kernel.service.geometry_processing_service import GeometryProcessingService
 
 
 class Command(BaseCommand):
@@ -54,6 +55,7 @@ class Command(BaseCommand):
                 results.append(obj.unit)
                 
                 if created:
+                    GeometryProcessingService(ConservationUnits).process_instance(obj)
                     print(f"[OK] {obj.unit}")
                 else:
                     print(f"[SKIP] {obj.unit} já existe")

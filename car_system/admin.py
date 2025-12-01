@@ -14,7 +14,7 @@ class SicarRecordAdmin(LeafletGeoAdmin):
         }),
         (None, {
             'fields': (
-                'geometry_new',
+                'usable_geometry',
                 'area_m2',
                 'area_ha',
                 'bbox_display',
@@ -32,15 +32,15 @@ class SicarRecordAdmin(LeafletGeoAdmin):
     list_per_page = 200
 
     def bbox_display(self, obj):
-        if not obj.geometry_new:
+        if not obj.usable_geometry:
             return "—"
-        minx, miny, maxx, maxy = obj.geometry_new.extent
+        minx, miny, maxx, maxy = obj.usable_geometry.extent
         return f"({minx:.4f}, {miny:.4f}) — ({maxx:.4f}, {maxy:.4f})"
     bbox_display.short_description = "Bounding Box"
 
     def centroid_display(self, obj):
-        if not obj.geometry_new:
+        if not obj.usable_geometry:
             return "—"
-        c = obj.geometry_new.centroid
+        c = obj.usable_geometry.centroid
         return f"{c.y:.5f}, {c.x:.5f}"
     centroid_display.short_description = "Centro (Lat, Lng)"

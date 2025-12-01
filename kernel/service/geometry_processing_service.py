@@ -14,7 +14,7 @@ class GeometryProcessingService:
         """
         :param model: Django Model containing:
             - geometry (TextField com WKT)
-            - geometry_new (GeometryField SRID=4674)
+            - usable_geometry (GeometryField SRID=4674)
             - area_m2 (FloatField)
             - area_ha (FloatField)
         """
@@ -30,7 +30,7 @@ class GeometryProcessingService:
         """
         queryset = self.model.objects.filter(
             geometry__isnull=False,
-            geometry_new__isnull=True
+            usable_geometry__isnull=True
         )
 
         count = 0
@@ -41,8 +41,8 @@ class GeometryProcessingService:
                 if not geom.valid:
                     geom = geom.buffer(0)
 
-                obj.geometry_new = geom
-                obj.save(update_fields=["geometry_new"])    
+                obj.usable_geometry = geom
+                obj.save(update_fields=["usable_geometry"])    
                 count += 1
 
             except Exception:
@@ -55,19 +55,19 @@ class GeometryProcessingService:
     # ============================================================
     def fix_srid(self):
         """
-        Ensures geometry_new always has SRID 4674.
+        Ensures usable_geometry always has SRID 4674.
         """
         queryset = self.model.objects.exclude(
-            geometry_new__isnull=True
+            usable_geometry__isnull=True
         ).exclude(
-            geometry_new__srid=4674
+            usable_geometry__srid=4674
         )
 
         count = 0
         for obj in queryset:
             try:
-                obj.geometry_new.srid = 4674
-                obj.save(update_fields=["geometry_new"])
+                obj.usable_geometry.srid = 4674
+                obj.save(update_fields=["usable_geometry"])
                 count += 1
             except Exception:
                 continue
@@ -82,12 +82,12 @@ class GeometryProcessingService:
         Calculates fixed areas in m² and hectares using
         UTM Zone 22S projection (EPSG:31982).
         """
-        queryset = self.model.objects.exclude(geometry_new__isnull=True)
+        queryset = self.model.objects.exclude(usable_geometry__isnull=True)
 
         count = 0
         for obj in queryset:
             try:
-                geom_utm = obj.geometry_new.transform(31982, clone=True)
+                geom_utm = obj.usable_geometry.transform(31982, clone=True)
 
                 area_m2 = geom_utm.area
                 area_ha = area_m2 / 10000
@@ -142,10 +142,10 @@ class GeometryProcessingService:
             area_m2 = geom_utm.area
             area_ha = area_m2 / 10000
 
-            obj.geometry_new = geom
+            obj.usable_geometry = geom
             obj.area_m2 = area_m2
             obj.area_ha = area_ha
-            obj.save(update_fields=["geometry_new", "area_m2", "area_ha"])
+            obj.save(update_fields=["usable_geometry", "area_m2", "area_ha"])
             return True
         except Exception:
             return False

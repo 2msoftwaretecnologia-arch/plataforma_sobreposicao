@@ -10,6 +10,7 @@ from django.db import connection
 import numpy as np
 
 from naturatins.models import Paths
+from kernel.service.geometry_processing_service import GeometryProcessingService
 
 
 class Command(BaseCommand):
@@ -53,6 +54,7 @@ class Command(BaseCommand):
                 results.append(obj.name)
                 
                 if created:
+                    GeometryProcessingService(Paths).process_instance(obj)
                     print(f"[OK] {obj.name}")
                 else:
                     print(f"[SKIP] {obj.name} já existe")

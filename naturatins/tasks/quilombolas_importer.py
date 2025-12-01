@@ -5,6 +5,7 @@ from django.contrib.gis.geos import GEOSGeometry
 from django.contrib.auth.models import User
 from control_panel.utils import get_file_management
 from naturatins.models import Quilombolas
+from kernel.service.geometry_processing_service import GeometryProcessingService
 
 
 class QuilombolasImporter:
@@ -45,7 +46,7 @@ class QuilombolasImporter:
         return area_m2 / 10000
 
     def format_data(self, row, user):
-        raw_geom = row.get("geometry_new")
+        raw_geom = row.get("usable_geometry")
         geom = GEOSGeometry(str(raw_geom)) if raw_geom else None
         geom_fixed = self.fix_srid(geom)
         geom_utm = self.transform_to_utm(geom_fixed)
@@ -54,7 +55,7 @@ class QuilombolasImporter:
         return {
             "name": row.get("nm_comunid"),
             "geometry": str(row.get("geometry")),
-            "geometry_new": geom_fixed,
+            "usable_geometry": geom_fixed,
             "area_m2": area_m2,
             "area_ha": area_ha,
             "created_by": user,
@@ -65,7 +66,7 @@ class QuilombolasImporter:
     def generate_hash(data: dict) -> str:
         compact = {
             "name": data["name"],
-            "geometry_new": data["geometry_new"].wkt if data["geometry_new"] else None,
+            "usable_geometry": data["usable_geometry"].wkt if data["usable_geometry"] else None,
             "area_m2": data["area_m2"],
         }
         json_str = json.dumps(compact, sort_keys=True, default=str)
@@ -84,5 +85,8 @@ class QuilombolasImporter:
                 hash_id=formatted["hash_id"],
                 defaults=formatted
             )
-            print(f"[OK] {obj.name}" if created else f"[SKIP] {obj.name} já existe")
-
+            if created:
+                GeometryProcessingService(Quilombolas).process_instance(obj)
+                print(f"[OK] {obj.name}")
+            else:
+                print(f"[SKIP] {obj.name} já existe")

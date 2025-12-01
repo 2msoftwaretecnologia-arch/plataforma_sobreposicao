@@ -28,8 +28,8 @@ class SearchAll:
         # ------------------------------------------------------
         t0 = time.perf_counter()
 
-        if hasattr(geometry_or_car, "geometry_new"):
-            target = GeometryTarget(geometry_or_car.geometry_new)
+        if hasattr(geometry_or_car, "usable_geometry"):
+            target = GeometryTarget(geometry_or_car.usable_geometry)
             target.car = geometry_or_car
             input_type = "CAR"
         else:

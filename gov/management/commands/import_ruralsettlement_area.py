@@ -10,6 +10,7 @@ from django.db import connection
 import numpy as np
 
 from gov.models import Ruralsettlement
+from kernel.service.geometry_processing_service import GeometryProcessingService
 
 
 class Command(BaseCommand):
@@ -54,6 +55,7 @@ class Command(BaseCommand):
                 results.append(obj.project_name)
                 
                 if created:
+                    GeometryProcessingService(Ruralsettlement).process_instance(obj)
                     print(f"[OK] {obj.project_name}")
                 else:
                     print(f"[SKIP] {obj.project_name} já existe")
@@ -83,7 +85,7 @@ class Command(BaseCommand):
         if not archive_path.ruralsettlement_zip_file.path:
             raise CommandError("Nenhum arquivo de assentamento rural foi configurado.")
         
-        df = gpd.read_file(archive_path.ruralsettlement_zip_file.path, encoding="utf-8")
+        df = gpd.read_file(archive_path.ruralsettlement_zip_file.path)
 
         print(f"Total de linhas: {len(df)}")
 

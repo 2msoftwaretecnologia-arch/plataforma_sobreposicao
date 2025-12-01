@@ -5,6 +5,7 @@ from datetime import datetime
 from django.contrib.auth.models import User
 from control_panel.utils import get_file_management
 from car_system.models import SicarRecord
+from kernel.service.geometry_processing_service import GeometryProcessingService
 
 
 class SicarImporter:
@@ -67,5 +68,8 @@ class SicarImporter:
                     "source": formatted["source"],
                 },
             )
-            print(f"[CRIADO] CAR: {obj.car_number}" if created else f"[JÁ EXISTIA] CAR: {obj.car_number}")
-
+            if created:
+                GeometryProcessingService(SicarRecord).process_instance(obj)
+                print(f"[CRIADO] CAR: {obj.car_number}")
+            else:
+                print(f"[JÁ EXISTIA] CAR: {obj.car_number}")

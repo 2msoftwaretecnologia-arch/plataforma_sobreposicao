@@ -10,6 +10,7 @@ from django.db import connection
 import numpy as np
 
 from gov.models import SnicTotal
+from kernel.service.geometry_processing_service import GeometryProcessingService
 
 
 class Command(BaseCommand):
@@ -51,9 +52,10 @@ class Command(BaseCommand):
                         "source": formatted["source"],
                     }
                 )
-                results.append(obj.name)
+                results.append(obj.property_name)
                 
                 if created:
+                    GeometryProcessingService(SnicTotal).process_instance(obj)
                     print(f"[OK] {obj.property_name}")
                 else:
                     print(f"[SKIP] {obj.property_name} já existe")
@@ -83,7 +85,7 @@ class Command(BaseCommand):
         if not archive_path.snic_total_zip_file.path:
             raise CommandError("Nenhum arquivo de SnicTotal foi configurado.")
         
-        df = gpd.read_file(archive_path.snic_total_zip_file.path, encoding="utf-8")
+        df = gpd.read_file(archive_path.snic_total_zip_file.path)
 
         print(f"Total de linhas: {len(df)}")
 

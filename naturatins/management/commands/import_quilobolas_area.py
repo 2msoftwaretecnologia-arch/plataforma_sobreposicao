@@ -10,6 +10,7 @@ from django.db import connection
 import numpy as np
 
 from naturatins.models import Quilombolas
+from kernel.service.geometry_processing_service import GeometryProcessingService
 
 
 class Command(BaseCommand):
@@ -47,6 +48,7 @@ class Command(BaseCommand):
                 results.append(obj.name)
                 
                 if created:
+                    GeometryProcessingService(Quilombolas).process_instance(obj)
                     print(f"[OK] {obj.name}")
                 else:
                     print(f"[SKIP] {obj.name} já existe")
@@ -137,7 +139,7 @@ class Command(BaseCommand):
         """Formata os dados de uma linha do DataFrame."""
 
         # Carregar a geometria corretamente
-        raw_geom = row.get("geometry_new")
+        raw_geom = row.get("usable_geometry")
         geom = GEOSGeometry(str(raw_geom)) if raw_geom else None
 
         # Corrigir SRID
@@ -153,7 +155,7 @@ class Command(BaseCommand):
         return {
             "name": row.get("nm_comunid"),
             "geometry": GEOSGeometry(str(row.get("geometry"))),
-            "geometry_new": geom_fixed,      # geometria corrigida (EPSG 4674)
+            "usable_geometry": geom_fixed,      # geometria corrigida (EPSG 4674)
             "area_m2": area_m2,
             "area_ha": area_ha,
             "created_by": user,
@@ -167,7 +169,7 @@ class Command(BaseCommand):
         """
         compact = {
             "name": data["name"],
-            "geometry_new": data["geometry_new"].wkt if data["geometry_new"] else None,
+            "usable_geometry": data["usable_geometry"].wkt if data["usable_geometry"] else None,
             "area_m2": data["area_m2"],
         }
         json_str = json.dumps(compact, sort_keys=True, default=str)

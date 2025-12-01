@@ -26,23 +26,23 @@ class ZoningAreaAdmin(LeafletGeoAdmin):
             )
         }),
         (None, {
-            'fields': ('geometry_new', 'area_m2', 'area_ha')
+            'fields': ('usable_geometry', 'area_m2', 'area_ha')
         }),
     )
 
     # === CAMPOS CALCULADOS ===
 
     def bbox_display(self, obj):
-        if not obj.geometry_new:
+        if not obj.usable_geometry:
             return "—"
-        minx, miny, maxx, maxy = obj.geometry_new.extent
+        minx, miny, maxx, maxy = obj.usable_geometry.extent
         return f"({minx:.4f}, {miny:.4f}) — ({maxx:.4f}, {maxy:.4f})"
     bbox_display.short_description = "Bounding Box"
 
     def centroid_display(self, obj):
-        if not obj.geometry_new:
+        if not obj.usable_geometry:
             return "—"
-        c = obj.geometry_new.centroid
+        c = obj.usable_geometry.centroid
         return f"{c.y:.5f}, {c.x:.5f}"
     centroid_display.short_description = "Centro (Lat, Lng)"
 
@@ -57,7 +57,7 @@ class PhytoecologyAreaAdmin(LeafletGeoAdmin):
             'fields': ('phyto_name', 'hash_id', 'geometry')
         }),
         (None, {
-            'fields': ('geometry_new', 'area_m2', 'area_ha')
+            'fields': ('usable_geometry', 'area_m2', 'area_ha')
         }),
     )
     
@@ -77,7 +77,7 @@ class EnvironmentalProtectionAreaAdmin(LeafletGeoAdmin):
             'fields': ('unit_name', 'domains', 'class_group', 'legal_basis', 'hash_id', 'geometry')
         }),
         (None, {
-            'fields': ('geometry_new', 'area_m2', 'area_ha')
+            'fields': ('usable_geometry', 'area_m2', 'area_ha')
         }),
     )
     
@@ -97,7 +97,7 @@ class IndigenousAreaAdmin(LeafletGeoAdmin):
             'fields': ('indigenous_name', 'hash_id', 'geometry')
         }),   
         (None, {
-            'fields': ('geometry_new', 'area_m2', 'area_ha')
+            'fields': ('usable_geometry', 'area_m2', 'area_ha')
         }),
     )
     

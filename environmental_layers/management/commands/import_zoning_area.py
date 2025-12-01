@@ -7,6 +7,7 @@ from django.contrib.auth.models import User
 
 from control_panel.utils import get_file_management
 from environmental_layers.models import ZoningArea
+from kernel.service.geometry_processing_service import GeometryProcessingService
 
 class Command(BaseCommand):
     help = "Verifica e insere dados geoespaciais com hash única por linha."
@@ -45,8 +46,9 @@ class Command(BaseCommand):
                     created_by=formatted_data["created_by"],
                     source=formatted_data["source"]
                 )
-                                
+                
                 if created:
+                    GeometryProcessingService(ZoningArea).process_instance(zoning_area)
                     print(f"Zona {zoning_area[0].zone_name} criada.")
                 else:
                     print(f"Zona {zoning_area[0].zone_name} já existe.")

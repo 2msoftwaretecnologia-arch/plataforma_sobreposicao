@@ -4,6 +4,7 @@ import json
 from django.contrib.auth.models import User
 from control_panel.utils import get_file_management
 from gov.models import Sigef
+from kernel.service.geometry_processing_service import GeometryProcessingService
 
 
 class SigefImporter:
@@ -56,5 +57,8 @@ class SigefImporter:
                     "source": formatted["source"],
                 },
             )
-            print(f"[OK] {obj.name}" if created else f"[SKIP] {obj.name} já existe")
-
+            if created:
+                GeometryProcessingService(Sigef).process_instance(obj)
+                print(f"[OK] {obj.name}")
+            else:
+                print(f"[SKIP] {obj.name} já existe")
