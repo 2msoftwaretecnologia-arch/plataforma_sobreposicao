@@ -1,3 +1,4 @@
+from kernel.service.geometry_processing_service import GeometryProcessingService
 import geopandas as gpd
 import hashlib
 import json
@@ -50,5 +51,9 @@ class PhytoecologyAreaImporter:
                     "source": formatted["source"],
                 },
             )
-            print(f"{obj.phyto_name} criada." if created else f"{obj.phyto_name} já existe.")
+            if created:
+                GeometryProcessingService(PhytoecologyArea).process_instance(obj)
+                print(f"[OK] {obj.phyto_name}")
+            else:
+                print(f"[SKIP] {obj.phyto_name} já existe")
 

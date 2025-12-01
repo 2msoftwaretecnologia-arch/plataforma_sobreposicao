@@ -1,3 +1,4 @@
+from kernel.service.geometry_processing_service import GeometryProcessingService
 import geopandas as gpd
 import hashlib
 import json
@@ -52,5 +53,8 @@ class ZoningAreaImporter:
                     "source": formatted["source"],
                 },
             )
-            print(f"Zona {obj.zone_name} criada." if created else f"Zona {obj.zone_name} já existe.")
-
+            if created:
+                GeometryProcessingService(ZoningArea).process_instance(obj)
+                print(f"[OK] {obj.zone_name}")
+            else:
+                print(f"[SKIP] {obj.zone_name} já existe")

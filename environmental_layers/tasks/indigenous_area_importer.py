@@ -51,6 +51,8 @@ class IndigenousAreaImporter:
                     "source": formatted["source"],
                 }
             )
-            print(f"[OK] {obj.indigenous_name}" if created else f"[SKIP] {obj.indigenous_name} já existe")
-        GeometryProcessingService(IndigenousArea).process_all()
-
+            if created:
+                GeometryProcessingService(IndigenousArea).process_instance(obj)
+                print(f"[OK] {obj.indigenous_name}")
+            else:
+                print(f"[SKIP] {obj.indigenous_name} já existe")

@@ -1,3 +1,4 @@
+from kernel.service.geometry_processing_service import GeometryProcessingService
 import geopandas as gpd
 import hashlib
 import json
@@ -48,5 +49,9 @@ class EnvironmentalProtectionAreaImporter:
                 hash_id=formatted["hash_id"],
                 defaults=formatted,
             )
-            print(f"APA {obj.unit_name} criada." if created else f"APA {obj.unit_name} já existe.")
+            if created:
+                GeometryProcessingService(EnvironmentalProtectionArea).process_instance(obj)
+                print(f"[OK] {obj.unit_name}")
+            else:
+                print(f"[SKIP] {obj.unit_name} já existe")
 

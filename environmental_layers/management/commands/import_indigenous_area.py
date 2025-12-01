@@ -54,16 +54,14 @@ class Command(BaseCommand):
                 results.append(obj.indigenous_name)
                 
                 if created:
-                    print(f"[OK] {obj.indigenous_name}")
+                    processing = GeometryProcessingService(IndigenousArea)
+                    processing.process_instance(obj)
                 else:
                     print(f"[SKIP] {obj.indigenous_name} já existe")
 
             except Exception as e:
                 print(f"[ERRO THREAD] {e}")
                 
-        processing = GeometryProcessingService(IndigenousArea)
-        processing.process_all()
-      
         # Fecha conexão (boa prática quando usando threads)
         connection.close()
 

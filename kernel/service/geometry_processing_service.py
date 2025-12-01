@@ -142,7 +142,6 @@ class GeometryProcessingService:
             area_m2 = geom_utm.area
             area_ha = area_m2 / 10000
 
-            setattr(obj, "_geo_processing_guard", True)
             obj.geometry_new = geom
             obj.area_m2 = area_m2
             obj.area_ha = area_ha
