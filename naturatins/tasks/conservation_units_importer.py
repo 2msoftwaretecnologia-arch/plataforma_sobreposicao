@@ -22,8 +22,8 @@ class ConservationUnitsImporter:
     @staticmethod
     def format_data(row, user):
         return {
-            "unit": row.get("unit"),
-            "domain": row.get("domain"),
+            "unit": row.get("Unidades"),
+            "domain": row.get("Dominios"),
             "geometry": str(row.get("geometry")),
             "created_by": user,
             "source": "Base Unidades de Conservação",
@@ -39,7 +39,7 @@ class ConservationUnitsImporter:
         archive_path = get_file_management()
         if not archive_path or not archive_path.conservation_units_zip_file.path:
             raise ValueError("Nenhum arquivo de unidades de conservação foi configurado.")
-        df = gpd.read_file(archive_path.conservation_units_zip_file.path, encoding="utf-8")
+        df = gpd.read_file(archive_path.conservation_units_zip_file.path)
         for _, row in df.iterrows():
             formatted = self.format_data(row, user)
             formatted["hash_id"] = self.generate_hash(formatted)

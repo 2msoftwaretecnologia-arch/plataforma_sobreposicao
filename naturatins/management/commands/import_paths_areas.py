@@ -45,19 +45,18 @@ class Command(BaseCommand):
                 obj, created = Paths.objects.get_or_create(
                     hash_id=formatted["hash_id"],
                     defaults={
-                        "name": formatted["name"],
                         "geometry": formatted["geometry"],
                         "created_by": formatted["created_by"],
                         "source": formatted["source"],
                     }
                 )
-                results.append(obj.name)
+                results.append(obj.hash_id)
                 
                 if created:
                     GeometryProcessingService(Paths).process_instance(obj)
-                    print(f"[OK] {obj.name}")
+                    print(f"[OK] {obj.hash_id}")
                 else:
-                    print(f"[SKIP] {obj.name} já existe")
+                    print(f"[SKIP] {obj.hash_id} já existe")
 
             except Exception as e:
                 print(f"[ERRO THREAD] {e}")
@@ -81,10 +80,10 @@ class Command(BaseCommand):
         if not archive_path:
             raise CommandError("Nenhum arquivo de quilombolas foi configurado.")
         
-        if not archive_path.quilombolas_zip_file.path:
-            raise CommandError("Nenhum arquivo de quilombolas foi configurado.")
+        if not archive_path.paths_zip_file.path:
+            raise CommandError("Nenhum arquivo de veredas foi configurado.")
         
-        df = gpd.read_file(archive_path.quilombolas_zip_file.path, encoding="utf-8")
+        df = gpd.read_file(archive_path.paths_zip_file.path)
 
         print(f"Total de linhas: {len(df)}")
 
@@ -114,8 +113,6 @@ class Command(BaseCommand):
     @staticmethod
     def format_data(row, user):
         return {
-            #observação: o não tem nenhuma couluna em veredas que realmente vai importar
-            "name": row.get("nm_vereda"),
             "geometry": str(row.get("geometry")),
             "created_by": user,
             "source": "Base Veredas"

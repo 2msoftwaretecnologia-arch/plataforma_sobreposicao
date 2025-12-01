@@ -85,7 +85,7 @@ class Command(BaseCommand):
         if not archive_path.conservation_units_zip_file.path:
             raise CommandError("Nenhum arquivo de unidades de conservação foi configurado.")
         
-        df = gpd.read_file(archive_path.conservation_units_zip_file.path, encoding="utf-8")
+        df = gpd.read_file(archive_path.conservation_units_zip_file.path)
 
         print(f"Total de linhas: {len(df)}")
 
@@ -116,8 +116,8 @@ class Command(BaseCommand):
     def format_data(row, user):
         return {
             #observação: o não tem nenhuma couluna em veredas que realmente vai importar
-            "unit": row.get("unit"),
-            "domain": row.get("domain"),
+            "unit": row.get("Unidades"),
+            "domain": row.get("Dominios"),
             "geometry": str(row.get("geometry")),
             "created_by": user,
             "source": "Base Unidades de Conservação"

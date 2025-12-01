@@ -21,7 +21,6 @@ class PathsImporter:
     @staticmethod
     def format_data(row, user):
         return {
-            "name": row.get("nm_vereda"),
             "geometry": str(row.get("geometry")),
             "created_by": user,
             "source": "Base Veredas",
@@ -37,18 +36,17 @@ class PathsImporter:
         archive_path = get_file_management()
         if not archive_path or not archive_path.paths_zip_file.path:
             raise ValueError("Nenhum arquivo de veredas foi configurado.")
-        df = gpd.read_file(archive_path.paths_zip_file.path, encoding="utf-8")
+        df = gpd.read_file(archive_path.paths_zip_file.path)
         for _, row in df.iterrows():
             formatted = self.format_data(row, user)
             formatted["hash_id"] = self.generate_hash(formatted)
             obj, created = Paths.objects.get_or_create(
                 hash_id=formatted["hash_id"],
                 defaults={
-                    "name": formatted["name"],
                     "geometry": formatted["geometry"],
                     "created_by": formatted["created_by"],
                     "source": formatted["source"],
                 }
             )
-            print(f"[OK] {obj.name}" if created else f"[SKIP] {obj.name} já existe")
+            print(f"[OK] {obj.hash_id}" if created else f"[SKIP] {obj.hash_id} já existe")
 
