@@ -10,6 +10,7 @@ from django.db import connection
 import numpy as np
 
 from environmental_layers.models import IndigenousArea
+from kernel.service.geometry_processing_service import GeometryProcessingService
 
 
 class Command(BaseCommand):
@@ -59,7 +60,10 @@ class Command(BaseCommand):
 
             except Exception as e:
                 print(f"[ERRO THREAD] {e}")
-
+                
+        processing = GeometryProcessingService(IndigenousArea)
+        processing.process_all()
+      
         # Fecha conexão (boa prática quando usando threads)
         connection.close()
 

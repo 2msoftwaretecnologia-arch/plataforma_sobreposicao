@@ -11,7 +11,7 @@ class Command(BaseCommand):
     )
 
     def handle(self, *args, **options):
-        table_name = "tb_registro_sicar"
+        table_name = "tb_area_quilombolas"
 
         with connection.cursor() as cursor:
 
