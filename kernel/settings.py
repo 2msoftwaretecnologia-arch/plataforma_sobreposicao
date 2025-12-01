@@ -40,6 +40,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'leaflet',
+    'django_celery_results',
+    'django_celery_beat',
     'analysis',
     'environmental_layers',
     'car_system',
@@ -150,3 +152,10 @@ LOGOUT_REDIRECT_URL = '/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='amqp://guest:guest@localhost:5672//')
+CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default='rpc://')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE

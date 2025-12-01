@@ -1,6 +1,4 @@
 from django.contrib.gis.geos import GEOSGeometry
-from django.contrib.gis.db.models.functions import Transform
-from django.db import transaction
 
 
 class GeometryProcessingService:
@@ -15,8 +13,8 @@ class GeometryProcessingService:
     def __init__(self, model):
         """
         :param model: Django Model containing:
-            - geo_wkt (TextField)
-            - geometry_tmp (MultiPolygonField)
+            - geometry (TextField com WKT)
+            - geometry_new (GeometryField SRID=4674)
             - area_m2 (FloatField)
             - area_ha (FloatField)
         """
@@ -27,7 +25,7 @@ class GeometryProcessingService:
     # ============================================================
     def convert_wkt_to_geometry(self):
         """
-        Reads WKT from geo_wkt field and converts it into a
+        Reads WKT from geometry field and converts it into a
         GEOSGeometry MultiPolygon with SRID=4674.
         """
         queryset = self.model.objects.filter(
@@ -38,7 +36,7 @@ class GeometryProcessingService:
         count = 0
         for obj in queryset:
             try:
-                geom = GEOSGeometry(obj.geo_wkt, srid=4674)
+                geom = GEOSGeometry(obj.geometry, srid=4674)
 
                 if not geom.valid:
                     geom = geom.buffer(0)
@@ -57,7 +55,7 @@ class GeometryProcessingService:
     # ============================================================
     def fix_srid(self):
         """
-        Ensures geometry_tmp always has SRID 4674.
+        Ensures geometry_new always has SRID 4674.
         """
         queryset = self.model.objects.exclude(
             geometry_new__isnull=True
@@ -119,3 +117,36 @@ class GeometryProcessingService:
         }
 
         return results
+
+    # ============================================================
+    # 5) PROCESSAR OBJETO ÚNICO
+    # ============================================================
+    def process_instance(self, obj):
+        """
+        Processa um único objeto:
+        - Converte WKT (field `geometry`) para GEOSGeometry com SRID 4674
+        - Corrige SRID se necessário
+        - Calcula área fixa (m² e ha) em UTM 22S (EPSG:31982)
+        """
+        try:
+            if not getattr(obj, "geometry", None):
+                return False
+
+            geom = GEOSGeometry(obj.geometry, srid=4674)
+            if not geom.valid:
+                geom = geom.buffer(0)
+
+            geom.srid = 4674
+
+            geom_utm = geom.transform(31982, clone=True)
+            area_m2 = geom_utm.area
+            area_ha = area_m2 / 10000
+
+            setattr(obj, "_geo_processing_guard", True)
+            obj.geometry_new = geom
+            obj.area_m2 = area_m2
+            obj.area_ha = area_ha
+            obj.save(update_fields=["geometry_new", "area_m2", "area_ha"])
+            return True
+        except Exception:
+            return False
