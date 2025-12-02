@@ -139,7 +139,10 @@ GEOS_LIBRARY_PATH = config('GEOS_LIBRARY_PATH')
 
 CSRF_TRUSTED_ORIGINS = [
     "http://69.62.126.40:8080",
-    "https://69.62.126.40",
+    "http://69.62.126.40:8000",
+    "http://localhost:8080",
+    "http://localhost:8000",
+    "http://69.62.126.40",
 ]
 
 # Static files (CSS, JavaScript, Images)
