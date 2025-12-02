@@ -120,7 +120,7 @@ class UploadZipCarView(View):
             resultado = SearchForCar().execute(car_input)
 
             municipality, state = None, None
-            wkt_car = get_sicar_record(car_number=car_input)
+            wkt_car = get_sicar_record(car_number__iexact=car_input)
 
             if wkt_car.exists():
                 geometry = wkt_car.first().geometry
