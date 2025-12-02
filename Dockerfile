@@ -25,8 +25,6 @@ COPY . /app
 
 COPY uwsgi.ini /etc/uwsgi/uwsgi.ini
 
-RUN python manage.py migrate
-
 RUN python manage.py collectstatic --no-input
 
 ENV GDAL_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/libgdal.so
