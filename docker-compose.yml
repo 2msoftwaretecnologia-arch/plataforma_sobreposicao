@@ -24,6 +24,7 @@ services:
     working_dir: /app
     volumes:
       - ./:/app
+      - ./uwsgi.ini:/app/uwsgi.ini
     command: bash -c "python manage.py migrate && uwsgi --ini /app/uwsgi.ini"
     environment:
       - DJANGO_SETTINGS_MODULE=kernel.settings
