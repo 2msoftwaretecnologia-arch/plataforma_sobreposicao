@@ -4,6 +4,7 @@ import json
 from django.contrib.auth.models import User
 from control_panel.utils import get_file_management
 from deforestation_fires.models import DeforestationMapbiomas
+from kernel.service.geometry_processing_service import GeometryProcessingService
 
 
 class DeforestationMapbiomasImporter:
@@ -52,5 +53,9 @@ class DeforestationMapbiomasImporter:
                     "created_by": formatted["created_by"],
                 },
             )
-            print(f"[OK] {obj.alert_code}" if created else f"[SKIP] {obj.alert_code} já existe")
 
+            if created:
+                GeometryProcessingService(DeforestationMapbiomas).process_instance(obj)
+                print(f"[OK] {obj.alert_code}")
+            else:
+                print(f"[SKIP] {obj.alert_code} já existe")

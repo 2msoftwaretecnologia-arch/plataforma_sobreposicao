@@ -11,7 +11,7 @@ class Command(BaseCommand):
     )
 
     def handle(self, *args, **options):
-        table_name = "tb_registro_sicar"
+        table_name = "tb_area_deforestation_mapbiomas"
 
         with connection.cursor() as cursor:
 
@@ -24,22 +24,22 @@ class Command(BaseCommand):
 
             cursor.execute(f"""
                 ALTER TABLE {table_name}
-                ALTER COLUMN geometria_tmp
+                ALTER COLUMN geometria_util
                 TYPE geometry(MultiPolygon, 4674)
-                USING ST_SetSRID(geometria_tmp, 4674);
+                USING ST_SetSRID(geometria_util, 4674);
             """)
 
             self.stdout.write(self.style.SUCCESS("✔ Coluna ajustada para SRID 4674."))
 
-            # 1) Converter WKT para geometria_tmp com SRID=4674
-            self.stdout.write("1️⃣ Convertendo WKT → geometria_tmp (SRID 4674)...")
+            # 1) Converter WKT para geometria_util com SRID=4674
+            self.stdout.write("1️⃣ Convertendo WKT → geometria_util (SRID 4674)...")
             cursor.execute(f"""
                 UPDATE {table_name}
-                SET geometria_tmp = ST_GeomFromText(coordenadas_geograficas, 4674)
+                SET geometria_util = ST_GeomFromText(coordenadas_geograficas, 4674)
                 WHERE coordenadas_geograficas IS NOT NULL
-                AND geometria_tmp IS NULL;
+                AND geometria_util IS NULL;
             """)
-            cursor.execute(f"SELECT COUNT(*) FROM {table_name} WHERE geometria_tmp IS NOT NULL;")
+            cursor.execute(f"SELECT COUNT(*) FROM {table_name} WHERE geometria_util IS NOT NULL;")
             converted = cursor.fetchone()[0]
             self.stdout.write(self.style.SUCCESS(f"✔ Geometrias convertidas: {converted}"))
 
@@ -47,8 +47,8 @@ class Command(BaseCommand):
             self.stdout.write("2️⃣ Corrigindo SRID incorreto (se houver)...")
             cursor.execute(f"""
                 UPDATE {table_name}
-                SET geometria_tmp = ST_SetSRID(geometria_tmp, 4674)
-                WHERE ST_SRID(geometria_tmp) <> 4674;
+                SET geometria_util = ST_SetSRID(geometria_util, 4674)
+                WHERE ST_SRID(geometria_util) <> 4674;
             """)
             self.stdout.write(self.style.SUCCESS("✔ SRIDs corrigidos."))
 
@@ -57,9 +57,9 @@ class Command(BaseCommand):
             cursor.execute(f"""
                 UPDATE {table_name}
                 SET 
-                    area_m2 = ST_Area(ST_Transform(geometria_tmp, 31982)),
-                    area_ha = ST_Area(ST_Transform(geometria_tmp, 31982)) / 10000
-                WHERE geometria_tmp IS NOT NULL;
+                    area_m2 = ST_Area(ST_Transform(geometria_util, 31982)),
+                    area_ha = ST_Area(ST_Transform(geometria_util, 31982)) / 10000
+                WHERE geometria_util IS NOT NULL;
             """)
             self.stdout.write(self.style.SUCCESS("✔ Áreas calculadas e atualizadas!"))
 
