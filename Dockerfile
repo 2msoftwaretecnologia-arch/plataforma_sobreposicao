@@ -23,16 +23,16 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . /app
 
+RUN python manage.py migrate
+
+RUN python manage.py collectstatic --no-input
+
 COPY uwsgi.ini /etc/uwsgi/uwsgi.ini
 
 ENV GDAL_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/libgdal.so
 ENV GEOS_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/libgeos_c.so
 
 EXPOSE 8000
-
-RUN python manage.py migrate
-
-RUN python manage.py collectstatic --no-input
 
 CMD ["uwsgi", "--ini", "/etc/uwsgi/uwsgi.ini"]
 
