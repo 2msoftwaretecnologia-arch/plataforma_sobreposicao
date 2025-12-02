@@ -16,6 +16,9 @@ GREEN = "\033[92m"
 YELLOW = "\033[93m"
 CYAN = "\033[96m"
 GRAY = "\033[90m"
+BLUE = "\033[94m"
+MAGENTA = "\033[95m"
+ENTRY_COLORS = [RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN]
 
 def clean_pycache(directory="."):
     """
@@ -31,9 +34,10 @@ def clean_pycache(directory="."):
     print(f"{GRAY}{'-' * 50}{RESET}")
     
     # Procurar por diretórios __pycache__
-    for pycache_dir in directory.rglob("__pycache__"):
+    for i, pycache_dir in enumerate(directory.rglob("__pycache__")):
         try:
-            print(f"{YELLOW}Removendo: {pycache_dir}{RESET}")
+            color = ENTRY_COLORS[i % len(ENTRY_COLORS)]
+            print(f"{color}Removendo: {pycache_dir}{RESET}")
             shutil.rmtree(pycache_dir)
             removed_count += 1
         except Exception as e:
