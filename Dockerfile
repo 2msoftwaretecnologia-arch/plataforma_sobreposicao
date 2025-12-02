@@ -11,6 +11,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libproj-dev \
     proj-bin \
     libspatialindex-dev \
+    uwsgi \
+    uwsgi-plugin-python3 \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
@@ -21,6 +23,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . /app
 
+COPY uwsgi.ini /app/uwsgi.ini
+
 ENV GDAL_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/libgdal.so
 ENV GEOS_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/libgeos_c.so
+
+CMD ["uwsgi", "--ini", "/app/uwsgi.ini"]
 

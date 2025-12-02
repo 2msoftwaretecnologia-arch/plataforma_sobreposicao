@@ -24,7 +24,7 @@ services:
     working_dir: /app
     volumes:
       - ./:/app
-    command: bash -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    command: bash -c "python manage.py migrate && uwsgi --ini /app/uwsgi.ini"
     environment:
       - DJANGO_SETTINGS_MODULE=kernel.settings
       - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
