@@ -55,12 +55,10 @@ class OverlapService:
             if inter.empty:
                 continue
 
-            # Compute intersection area using UTM projection
             inter_utm = inter.transform(UTM_SRID, clone=True)
             inter_area_m2 = inter_utm.area
             inter_area_ha = inter_area_m2 / 10000
 
-            # Percent overlap relative to the target area
             percent_overlap = (
                 (inter_area_m2 / self.target_area_m2) * 100
                 if self.target_area_m2 > 0 else 0
@@ -76,7 +74,44 @@ class OverlapService:
                 "intersection_geom": inter,
             })
 
-        return results
+        if results:
+            return results
+
+        fallback_results = []
+        for obj in layer_model.objects.exclude(geometry__isnull=True):
+            try:
+                geom = GEOSGeometry(getattr(obj, "geometry"), srid=4674)
+            except Exception:
+                continue
+            if not geom.valid:
+                try:
+                    geom = geom.buffer(0)
+                except Exception:
+                    continue
+            inter = geom.intersection(self.target_geom)
+            if inter.empty:
+                continue
+            try:
+                inter_utm = inter.transform(UTM_SRID, clone=True)
+            except Exception:
+                continue
+            inter_area_m2 = inter_utm.area
+            inter_area_ha = inter_area_m2 / 10000
+            percent_overlap = (
+                (inter_area_m2 / self.target_area_m2) * 100
+                if self.target_area_m2 > 0 else 0
+            )
+            fallback_results.append({
+                "id": obj.id,
+                "intersection_area_m2": inter_area_m2,
+                "intersection_area_ha": inter_area_ha,
+                "percent_overlap": percent_overlap,
+                "layer_area_ha": getattr(obj, "area_ha", None),
+                "target_area_ha": self.target_area_ha,
+                "intersection_geom": inter,
+            })
+
+        return fallback_results
 
     # -----------------------------------------------------------
     # Compute intersections across multiple layers

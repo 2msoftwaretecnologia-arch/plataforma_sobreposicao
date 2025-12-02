@@ -59,20 +59,35 @@ from django.contrib.gis.geos import GEOSGeometry
 import geopandas as gpd
 
 def extract_geometry(gdf: gpd.GeoDataFrame, srid: int = 4674) -> GEOSGeometry:
-    """
-    Retorna a primeira geometria como GEOSGeometry com SRID definido.
-    """
+    if gdf is None or gdf.empty:
+        return None
+
+    try:
+        current_crs = gdf.crs
+        if current_crs is not None:
+            try:
+                epsg = getattr(current_crs, "to_epsg", lambda: None)()
+            except Exception:
+                epsg = None
+            if epsg != srid:
+                gdf = gdf.to_crs(epsg=srid)
+    except Exception:
+        pass
 
     for geom in gdf.geometry:
         if geom is None:
             continue
 
         if geom.geom_type in ("Polygon", "MultiPolygon"):
-            g = GEOSGeometry(geom.wkt)
-            g.srid = srid  # <<< FUNDAMENTAL
-            return g
+            try:
+                g = GEOSGeometry(geom.wkt)
+                if not g.valid:
+                    g = g.buffer(0)
+                g.srid = srid
+                return g
+            except Exception:
+                continue
 
-    print("Erro: Nenhuma geometria válida encontrada no arquivo")
     return None
 
 
