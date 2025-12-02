@@ -87,7 +87,7 @@ class Command(BaseCommand):
         if not archive_path.sigef_zip_file.path:
             raise CommandError("Nenhum arquivo de sigef foi configurado.")
         
-        df = gpd.read_file(archive_path.sigef_zip_file.path, encoding="utf-8")
+        df = gpd.read_file(archive_path.sigef_zip_file.path)
 
         print(f"Total de linhas: {len(df)}")
 

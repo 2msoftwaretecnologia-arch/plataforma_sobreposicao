@@ -4,7 +4,7 @@ from kernel.models import GeoBaseModel
 # Create your models here.
 class Sigef(GeoBaseModel):
     name = models.CharField(
-        max_length=70, 
+        max_length=400, 
         verbose_name="Nome da area", 
         db_column='nome_area'
     )
@@ -87,7 +87,6 @@ class SnicTotal(GeoBaseModel):
         verbose_name="Código do imovel", 
         db_column='cod_imovel'
     )
-
 
     hash_id = models.CharField(
         max_length=64, 

@@ -41,7 +41,7 @@ class SigefImporter:
         archive_path = get_file_management()
         if not archive_path or not archive_path.sigef_zip_file.path:
             raise ValueError("Nenhum arquivo de sigef foi configurado.")
-        df = gpd.read_file(archive_path.sigef_zip_file.path, encoding="utf-8")
+        df = gpd.read_file(archive_path.sigef_zip_file.path)
         for _, row in df.iterrows():
             formatted = self.format_data(row, user)
             formatted["hash_id"] = self.generate_hash(formatted)
