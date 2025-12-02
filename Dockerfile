@@ -11,10 +11,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libproj-dev \
     proj-bin \
     libspatialindex-dev \
-    uwsgi \
-    uwsgi-plugin-python3 \
     curl \
     && rm -rf /var/lib/apt/lists/*
+
+RUN pip install uwsgi
 
 WORKDIR /app
 
