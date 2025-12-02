@@ -45,9 +45,9 @@ class Command(BaseCommand):
                 obj, created = DeforestationMapbiomas.objects.get_or_create(
                     hash_id=formatted["hash_id"],
                     defaults={
-                        "alert_code": formatted["CODEALERTA"],
-                        "detection_year": formatted["ANODETEC"],
-                        "source": formatted["FONTE"],
+                        "alert_code": formatted["alert_code"],
+                        "detection_year": formatted["detection_year"],
+                        "source": formatted["source"],
                         "geometry": formatted["geometry"],
                         "created_by": formatted["created_by"],
                     }
@@ -85,7 +85,7 @@ class Command(BaseCommand):
         if not archive_path.deforestation_mapbiomas_zip_file.path:
             raise CommandError("Nenhum arquivo de Deforestation Mapbiomas foi configurado.")
         
-        df = gpd.read_file(archive_path.deforestation_mapbiomas_zip_file.path, encoding="utf-8")
+        df = gpd.read_file(archive_path.deforestation_mapbiomas_zip_file.path)
 
         print(f"Total de linhas: {len(df)}")
 
@@ -115,9 +115,8 @@ class Command(BaseCommand):
     @staticmethod
     def format_data(row, user):
         return {
-            "alert_code": row.get("CODEALERTA"),
-            "detection_year": row.get("ANODETEC"),
-            "source": row.get("FONTE"),
+            "alert_code": str(row.get("CODEALERTA")),
+            "detection_year": str(row.get("ANODETEC")),
             "geometry": str(row.get("geometry")),
             "created_by": user,
             "source": "Base Deforestation Mapbiomas"

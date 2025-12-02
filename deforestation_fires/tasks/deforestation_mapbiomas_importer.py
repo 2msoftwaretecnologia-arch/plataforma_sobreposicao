@@ -21,11 +21,11 @@ class DeforestationMapbiomasImporter:
     @staticmethod
     def format_data(row, user):
         return {
-            "alert_code": row.get("CODEALERTA"),
-            "detection_year": row.get("ANODETEC"),
-            "source": row.get("FONTE"),
+            "alert_code": str(row.get("CODEALERTA")),
+            "detection_year": str(row.get("ANODETEC")),
             "geometry": str(row.get("geometry")),
             "created_by": user,
+            "source": "Base Deforestation Mapbiomas"    
         }
 
     @staticmethod

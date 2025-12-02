@@ -9,12 +9,6 @@ class DeforestationMapbiomas(GeoBaseModel):
         db_column='CODEALERTA'
     )
     
-    source = models.CharField(
-        max_length=70, 
-        verbose_name="Fonte", 
-        db_column='FONTE'
-    )
-
     detection_year = models.CharField(
         max_length=70, 
         verbose_name="Ano de detecção", 
