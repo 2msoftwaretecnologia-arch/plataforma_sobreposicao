@@ -24,7 +24,7 @@ class SigefImporter:
         return {
             "name": row.get("nome_area"),
             "installment_code": row.get("parcela_co"),
-            "property_code": row.get("codigo_imo"),
+            "property_code": row.get("propriedade_co") or None,
             "status": row.get("status"),
             "geometry": str(row.get("geometry")),
             "created_by": user,

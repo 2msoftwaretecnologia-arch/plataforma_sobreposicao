@@ -18,7 +18,9 @@ class Sigef(GeoBaseModel):
     property_code = models.CharField(
         max_length=150, 
         verbose_name="Código do imovel", 
-        db_column='propriedade_co'
+        db_column='propriedade_co',
+        null=True,
+        blank=True,
     )
 
     status = models.CharField(
