@@ -28,5 +28,5 @@ COPY uwsgi.ini /etc/uwsgi/uwsgi.ini
 ENV GDAL_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/libgdal.so
 ENV GEOS_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/libgeos_c.so
 
-CMD ["uwsgi", "--ini", "/app/uwsgi.ini"]
+CMD ["uwsgi", "--ini", "/etc/uwsgi/uwsgi.ini"]
 
