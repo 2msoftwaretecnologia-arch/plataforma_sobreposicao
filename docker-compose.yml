@@ -22,8 +22,6 @@ services:
     image: overlay-app:latest
     container_name: overlay-app
     working_dir: /app
-    volumes:
-      - ./:/app
     command: bash -c "python manage.py migrate && uwsgi --ini /etc/uwsgi/uwsgi.ini"
     environment:
       - DJANGO_SETTINGS_MODULE=kernel.settings
