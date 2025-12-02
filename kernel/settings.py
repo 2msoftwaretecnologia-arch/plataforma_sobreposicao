@@ -136,6 +136,12 @@ USE_TZ = True
 GDAL_LIBRARY_PATH = config('GDAL_LIBRARY_PATH')
 GEOS_LIBRARY_PATH = config('GEOS_LIBRARY_PATH')
 
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://69.62.126.40:8080",
+    "https://69.62.126.40",
+]
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
