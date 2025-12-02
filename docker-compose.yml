@@ -19,7 +19,6 @@ services:
 
   app:
     build: .
-    image: overlay-app:latest
     container_name: overlay-app
     working_dir: /app
     command: bash -c "uwsgi --ini /etc/uwsgi/uwsgi.ini"
