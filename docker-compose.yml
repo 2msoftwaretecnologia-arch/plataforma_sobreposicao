@@ -21,7 +21,11 @@ services:
     build: .
     container_name: overlay-app
     working_dir: /app
-    command: bash -c "uwsgi --ini /etc/uwsgi/uwsgi.ini"
+    command: bash -c "
+      python manage.py migrate &&
+      python manage.py collectstatic --no-input &&
+      uwsgi --ini /etc/uwsgi/uwsgi.ini
+      "
     volumes:
       - ./:/app
     environment:
