@@ -15,6 +15,17 @@ class OverlapPipeline:
         service = OverlapService(target)
         result = {}
 
+        total_registros = 0
+        total_intersecoes = 0
+        total_usavel = 0
+        total_sem_usavel = 0
+
+        print("\nBases disponíveis e contagem total:")
+        for layer in layers:
+            count = layer.objects.count()
+            total_registros += count
+            print(f"  • {layer.__name__}: {count} registros")
+
         for layer in layers:
             layer_name = layer.__name__
             print(f"\n--- Processing layer: {layer_name} ---")
@@ -60,6 +71,21 @@ class OverlapPipeline:
 
             print(f"  • Time formatting rows: {formatted_end - formatted_start:.4f}s")
 
+            layer_total = layer.objects.count()
+            layer_usavel = layer.objects.exclude(usable_geometry__isnull=True).count()
+            layer_sem_usavel = layer_total - layer_usavel
+            layer_intersecoes = len(rows)
+
+            total_usavel += layer_usavel
+            total_sem_usavel += layer_sem_usavel
+            total_intersecoes += layer_intersecoes
+
+            print(
+                f"  • Resumo {layer_name}: total={layer_total}, "
+                f"com_geometria_util={layer_usavel}, sem_geometria_util={layer_sem_usavel}, "
+                f"intersecoes={layer_intersecoes}"
+            )
+
             # Save results
             result[layer_name] = formatted_rows
 
@@ -71,5 +97,9 @@ class OverlapPipeline:
         # ----------------------------------------------------------
         pipeline_end = time.perf_counter()
         print(f"\n===== OVERLAP PIPELINE FINISHED in {pipeline_end - pipeline_start:.4f}s =====\n")
+        print(
+            f"[LOG] Processamento concluído: bases={len(layers)}, registros_totais={total_registros}, "
+            f"com_geometria_util={total_usavel}, sem_geometria_util={total_sem_usavel}, intersecoes_totais={total_intersecoes}"
+        )
 
         return result
