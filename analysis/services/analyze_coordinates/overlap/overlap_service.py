@@ -2,6 +2,7 @@ from django.contrib.gis.geos import GEOSGeometry
 from django.contrib.gis.db.models.functions import Intersection
 from django.db.models import F
 import pandas as pd
+from car_system.models import SicarRecord
 
 UTM_SRID = 31982  # SIRGAS 2000 / UTM 22S
 
@@ -62,6 +63,25 @@ class OverlapService:
             if inter_area_ha < 0.001:
                 continue
 
+            layer_area_m2 = None
+            if getattr(obj, "area_m2", None):
+                layer_area_m2 = obj.area_m2
+            elif getattr(obj, "area_ha", None):
+                layer_area_m2 = obj.area_ha * 10000
+            elif getattr(obj, "usable_geometry", None):
+                try:
+                    layer_area_m2 = obj.usable_geometry.transform(UTM_SRID, clone=True).area
+                except Exception:
+                    layer_area_m2 = None
+
+            percent_overlap_layer = (
+                (inter_area_m2 / layer_area_m2) * 100
+                if layer_area_m2 and layer_area_m2 > 0 else 0
+            )
+
+            if layer_model is SicarRecord and percent_overlap_layer >= 98:
+                continue
+
             percent_overlap = (
                 (inter_area_m2 / self.target_area_m2) * 100
                 if self.target_area_m2 > 0 else 0
@@ -72,6 +92,7 @@ class OverlapService:
                 "intersection_area_m2": inter_area_m2,
                 "intersection_area_ha": inter_area_ha,
                 "percent_overlap": percent_overlap,
+                "percent_overlap_layer": percent_overlap_layer,
                 "layer_area_ha": getattr(obj, "area_ha", None),
                 "target_area_ha": self.target_area_ha,
                 "intersection_geom": inter,
@@ -102,6 +123,20 @@ class OverlapService:
             inter_area_ha = inter_area_m2 / 10000
             if inter_area_ha < 0.001:
                 continue
+
+            layer_area_m2 = None
+            try:
+                layer_area_m2 = geom.transform(UTM_SRID, clone=True).area
+            except Exception:
+                layer_area_m2 = None
+
+            percent_overlap_layer = (
+                (inter_area_m2 / layer_area_m2) * 100
+                if layer_area_m2 and layer_area_m2 > 0 else 0
+            )
+
+            if layer_model is SicarRecord and percent_overlap_layer >= 98:
+                continue
             percent_overlap = (
                 (inter_area_m2 / self.target_area_m2) * 100
                 if self.target_area_m2 > 0 else 0
@@ -111,6 +146,7 @@ class OverlapService:
                 "intersection_area_m2": inter_area_m2,
                 "intersection_area_ha": inter_area_ha,
                 "percent_overlap": percent_overlap,
+                "percent_overlap_layer": percent_overlap_layer,
                 "layer_area_ha": getattr(obj, "area_ha", None),
                 "target_area_ha": self.target_area_ha,
                 "intersection_geom": inter,
