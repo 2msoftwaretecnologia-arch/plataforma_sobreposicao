@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'leaflet',
     'django_celery_results',
     'django_celery_beat',
+    'kernel',
     'analysis',
     'environmental_layers',
     'car_system',
