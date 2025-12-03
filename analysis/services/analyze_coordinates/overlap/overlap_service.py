@@ -5,6 +5,8 @@ import pandas as pd
 from car_system.models import SicarRecord
 
 UTM_SRID = 31982  # SIRGAS 2000 / UTM 22S
+MIN_INTER_AREA_HA = 0.001  # Descartar intersecções muito pequenas
+SICAR_FULL_OVERLAP_THRESHOLD = 98  # Descartar quando cobre ≥98% do polígono do SICAR
 
 
 class OverlapService:
@@ -27,21 +29,106 @@ class OverlapService:
             raise ValueError("The provided geometry is invalid.")
 
     # -----------------------------------------------------------
-    # Query layers
+    # Query helpers
     # -----------------------------------------------------------
     def get_intersecting(self, layer_model):
-        """Return queryset of layer objects that intersect the target geometry."""
-        return layer_model.objects.filter(
-            usable_geometry__intersects=self.target_geom
-        )
+        """
+        Retorna um queryset de objetos da camada com interseção em relação ao alvo.
+        Usa o campo `usable_geometry` para operações espaciais eficientes.
+        """
+        return layer_model.objects.filter(usable_geometry__intersects=self.target_geom)
+
+    def _get_layer_area_m2(self, obj, fallback_geom=None):
+        """
+        Obtém a área da geometria da camada em m², priorizando campos pré-computados.
+        Ordem de preferência: `area_m2` > `area_ha` > geometria transformada para UTM.
+        """
+        if getattr(obj, "area_m2", None):
+            return obj.area_m2
+        if getattr(obj, "area_ha", None):
+            return obj.area_ha * 10000
+        geom = getattr(obj, "usable_geometry", None) or fallback_geom
+        if geom is None:
+            return None
+        try:
+            return geom.transform(UTM_SRID, clone=True).area
+        except Exception:
+            return None
+
+    def _compute_percent_overlap_layer(self, inter_area_m2, layer_area_m2):
+        """
+        Calcula o percentual de cobertura da intersecção sobre a área da camada.
+        """
+        if layer_area_m2 and layer_area_m2 > 0:
+            return (inter_area_m2 / layer_area_m2) * 100
+        return 0
+
+    def _compute_percent_overlap_target(self, inter_area_m2):
+        """
+        Calcula o percentual de cobertura da intersecção sobre a área do alvo.
+        """
+        if self.target_area_m2 > 0:
+            return (inter_area_m2 / self.target_area_m2) * 100
+        return 0
+
+    def _should_discard(self, layer_model, inter_area_ha, percent_overlap_layer):
+        """
+        Aplica regras de descarte:
+        - Intersecções muito pequenas
+        - Para SICAR, descarta quando a intersecção cobre ≥98% do polígono do SICAR
+        """
+        if inter_area_ha < MIN_INTER_AREA_HA:
+            return True
+        if layer_model is SicarRecord and percent_overlap_layer >= SICAR_FULL_OVERLAP_THRESHOLD:
+            return True
+        return False
 
     # -----------------------------------------------------------
     # Compute intersections
     # -----------------------------------------------------------
     def compute_intersections(self, layer_model):
         """
-        Computes intersections between the target geometry and a layer.
-        Intersection geometry is transformed to UTM for precise area calculation.
+        Calcula intersecções entre o alvo e uma camada.
+        1) Usa `usable_geometry` com Intersection (PostGIS)
+        2) Fallback para `geometry` em texto quando necessário
+        """
+        results = self._compute_with_usable_geometry(layer_model)
+        if results:
+            return results
+        return self._compute_with_fallback_geometry(layer_model)
+
+    def _build_result_row(self, obj, inter, layer_model, fallback_geom=None):
+        """
+        Constrói o dicionário de saída para uma intersecção válida.
+        Inclui métricas de área e percentuais de cobertura.
+        """
+        inter_utm = inter.transform(UTM_SRID, clone=True)
+        inter_area_m2 = inter_utm.area
+        inter_area_ha = inter_area_m2 / 10000
+
+        layer_area_m2 = self._get_layer_area_m2(obj, fallback_geom=fallback_geom)
+        percent_overlap_layer = self._compute_percent_overlap_layer(inter_area_m2, layer_area_m2)
+
+        if self._should_discard(layer_model, inter_area_ha, percent_overlap_layer):
+            return None
+
+        percent_overlap_target = self._compute_percent_overlap_target(inter_area_m2)
+
+        return {
+            "id": obj.id,
+            "intersection_area_m2": inter_area_m2,
+            "intersection_area_ha": inter_area_ha,
+            "percent_overlap": percent_overlap_target,
+            "percent_overlap_layer": percent_overlap_layer,
+            "layer_area_ha": getattr(obj, "area_ha", None),
+            "target_area_ha": self.target_area_ha,
+            "intersection_geom": inter,
+        }
+
+    def _compute_with_usable_geometry(self, layer_model):
+        """
+        Caminho principal: usa `usable_geometry` e a função `Intersection` para
+        calcular intersecções diretamente via banco (PostGIS).
         """
         qs = (
             layer_model.objects
@@ -50,58 +137,21 @@ class OverlapService:
         )
 
         results = []
-
         for obj in qs:
             inter = obj.intersection
             if inter.empty:
                 continue
+            row = self._build_result_row(obj, inter, layer_model)
+            if row:
+                results.append(row)
+        return results
 
-            inter_utm = inter.transform(UTM_SRID, clone=True)
-            inter_area_m2 = inter_utm.area
-            inter_area_ha = inter_area_m2 / 10000
-
-            if inter_area_ha < 0.001:
-                continue
-
-            layer_area_m2 = None
-            if getattr(obj, "area_m2", None):
-                layer_area_m2 = obj.area_m2
-            elif getattr(obj, "area_ha", None):
-                layer_area_m2 = obj.area_ha * 10000
-            elif getattr(obj, "usable_geometry", None):
-                try:
-                    layer_area_m2 = obj.usable_geometry.transform(UTM_SRID, clone=True).area
-                except Exception:
-                    layer_area_m2 = None
-
-            percent_overlap_layer = (
-                (inter_area_m2 / layer_area_m2) * 100
-                if layer_area_m2 and layer_area_m2 > 0 else 0
-            )
-
-            if layer_model is SicarRecord and percent_overlap_layer >= 98:
-                continue
-
-            percent_overlap = (
-                (inter_area_m2 / self.target_area_m2) * 100
-                if self.target_area_m2 > 0 else 0
-            )
-
-            results.append({
-                "id": obj.id,
-                "intersection_area_m2": inter_area_m2,
-                "intersection_area_ha": inter_area_ha,
-                "percent_overlap": percent_overlap,
-                "percent_overlap_layer": percent_overlap_layer,
-                "layer_area_ha": getattr(obj, "area_ha", None),
-                "target_area_ha": self.target_area_ha,
-                "intersection_geom": inter,
-            })
-
-        if results:
-            return results
-
-        fallback_results = []
+    def _compute_with_fallback_geometry(self, layer_model):
+        """
+        Caminho de fallback: quando não há `usable_geometry`, utiliza `geometry`
+        em texto, normaliza SRID e calcula intersecção no app.
+        """
+        results = []
         for obj in layer_model.objects.exclude(geometry__isnull=True):
             try:
                 geom = GEOSGeometry(getattr(obj, "geometry"), srid=4674)
@@ -116,49 +166,22 @@ class OverlapService:
             if inter.empty:
                 continue
             try:
-                inter_utm = inter.transform(UTM_SRID, clone=True)
+                _ = inter.transform(UTM_SRID, clone=True)
             except Exception:
                 continue
-            inter_area_m2 = inter_utm.area
-            inter_area_ha = inter_area_m2 / 10000
-            if inter_area_ha < 0.001:
-                continue
-
-            layer_area_m2 = None
-            try:
-                layer_area_m2 = geom.transform(UTM_SRID, clone=True).area
-            except Exception:
-                layer_area_m2 = None
-
-            percent_overlap_layer = (
-                (inter_area_m2 / layer_area_m2) * 100
-                if layer_area_m2 and layer_area_m2 > 0 else 0
-            )
-
-            if layer_model is SicarRecord and percent_overlap_layer >= 98:
-                continue
-            percent_overlap = (
-                (inter_area_m2 / self.target_area_m2) * 100
-                if self.target_area_m2 > 0 else 0
-            )
-            fallback_results.append({
-                "id": obj.id,
-                "intersection_area_m2": inter_area_m2,
-                "intersection_area_ha": inter_area_ha,
-                "percent_overlap": percent_overlap,
-                "percent_overlap_layer": percent_overlap_layer,
-                "layer_area_ha": getattr(obj, "area_ha", None),
-                "target_area_ha": self.target_area_ha,
-                "intersection_geom": inter,
-            })
-
-        return fallback_results
+            row = self._build_result_row(obj, inter, layer_model, fallback_geom=geom)
+            if row:
+                results.append(row)
+        return results
 
     # -----------------------------------------------------------
     # Compute intersections across multiple layers
     # -----------------------------------------------------------
     def compute_all_layers(self, layers):
-        """Execute intersection analysis for all given layers."""
+        """
+        Executa a análise de intersecção para todas as camadas fornecidas.
+        Retorna um dicionário com os resultados por camada.
+        """
         results = {}
 
         for layer in layers:
