@@ -121,6 +121,18 @@
                     </p>
                     <p class="summary-detail">Extensão do polígono analisado</p>
                 </div>
+
+                <div class="summary-card">
+                    <p class="summary-label">Tempo de Análise</p>
+                    <p class="summary-value">
+                        {% if resultado.tempo_execucao_formatado %}
+                            {{ resultado.tempo_execucao_formatado }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </p>
+                    <p class="summary-detail">Duração total da execução</p>
+                </div>
             </div>
 
             <!-- RESULTADOS DETALHADOS POR BASE -->
