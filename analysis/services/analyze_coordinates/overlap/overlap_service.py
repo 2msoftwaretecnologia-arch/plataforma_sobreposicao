@@ -59,6 +59,9 @@ class OverlapService:
             inter_area_m2 = inter_utm.area
             inter_area_ha = inter_area_m2 / 10000
 
+            if inter_area_ha < 0.001:
+                continue
+
             percent_overlap = (
                 (inter_area_m2 / self.target_area_m2) * 100
                 if self.target_area_m2 > 0 else 0
@@ -97,6 +100,8 @@ class OverlapService:
                 continue
             inter_area_m2 = inter_utm.area
             inter_area_ha = inter_area_m2 / 10000
+            if inter_area_ha < 0.001:
+                continue
             percent_overlap = (
                 (inter_area_m2 / self.target_area_m2) * 100
                 if self.target_area_m2 > 0 else 0
