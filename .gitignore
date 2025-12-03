@@ -1,11 +1,15 @@
 # Ambientes virtuais Python
 venv/
+
+/library/
 # Ambiente virtual oculto
 .venv/
 # Ambiente virtual genérico
 env/
 # Variante em maiúsculas
 ENV/
+
+
 
 # Arquivos de variáveis de ambiente (segredos)
 .env

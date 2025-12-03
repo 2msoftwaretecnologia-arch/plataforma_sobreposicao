@@ -22,10 +22,10 @@ class SigefImporter:
     @staticmethod
     def format_data(row, user):
         return {
-            "name": row.get("nome_area") or "Sem Nome",
-            "installment_code": row.get("parcela_co") or "Sem Parcela",
-            "property_code": row.get("propriedade_co") or "Sem Propriedade" ,
-            "status": row.get("status") or "Sem Status",
+            "name": row.get("nome_area") if row.get("nome_area") else "Sem Nome",
+            "installment_code": row.get("parcela_co") if row.get("parcela_co") else "Sem Parcela",
+            "property_code": row.get("propriedade_co") if row.get("propriedade_co") else "Sem Propriedade" ,
+            "status": row.get("status") if row.get("status") else "Sem Status",
             "geometry": str(row.get("geometry")),
             "created_by": user,
             "source": "Base Sigef",
