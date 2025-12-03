@@ -50,5 +50,13 @@ class FinalResultBuilder:
             "PhytoecologyArea": "Base de Dados de Fitoecologias",
             "EnvironmentalProtectionArea": "Base de Dados de APAs",
             "IndigenousArea": "Base de Dados de Indígenas",
+            "Quilombolas": "Base de Dados de Quilombolas",
+            "Paths": "Base de Dados de Veredas",
+            "ConservationUnits": "Base de Dados de Unidades de Conservação",
+            "MunicipalBoundaries": "Base de Dados de Municípios",
+            "Sigef": "Base de Dados Sigef",
+            "Ruralsettlement": "Base de Dados de Assentamentos Rurais",
+            "SnicTotal": "Base de Dados SNIC Total",
+            "DeforestationMapbiomas": "Base de Deforestação Mapbiomas",
         }
         return mapping.get(layer.__name__, layer.__name__)

@@ -5,6 +5,6 @@ class PathsFormatter(BaseFormatter):
     def format(self, model_obj, intersec):
         return {
             "area": intersec["intersection_area_ha"],
-            "nome": model_obj.name,
-            "item_info": "Veredas: {}".format(model_obj.name)
+            "item_info": "Vereda",
+            "hash_id": getattr(model_obj, "hash_id", None),
         }
