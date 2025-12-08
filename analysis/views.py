@@ -73,7 +73,7 @@ class UploadZipCarView(View):
         context = {'car_input': car_input}
 
         # Modo demonstrativo não exige entradas
-        if mode == 'demo':
+        if mode == 'demostrativo':
             context['sucesso'] = True
             context['mensagem'] = 'Modo demonstrativo selecionado. Nenhuma entrada é necessária.'
             return render(request, self.template_upload, context)
