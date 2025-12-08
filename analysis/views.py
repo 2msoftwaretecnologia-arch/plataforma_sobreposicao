@@ -68,8 +68,15 @@ class UploadZipCarView(View):
     def post(self, request):
         zip_file = request.FILES.get('zip_file')
         car_input = request.POST.get('car_input', '').strip()
+        mode = request.POST.get('mode', '').strip()
 
         context = {'car_input': car_input}
+
+        # Modo demonstrativo não exige entradas
+        if mode == 'demo':
+            context['sucesso'] = True
+            context['mensagem'] = 'Modo demonstrativo selecionado. Nenhuma entrada é necessária.'
+            return render(request, self.template_upload, context)
 
         # --------------------------------------
         # 1) Caso só CAR informado (sem ZIP)
