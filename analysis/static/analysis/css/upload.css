@@ -554,3 +554,38 @@ label { display: block; margin-bottom: 8px; color: #555; font-weight: 500; }
 .customCheckBoxWrapper .customCheckBox:hover .inner {
   transform: translateY(-2px);
 }
+
+.drag-zone {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  width: 100%;
+  min-height: 190px;
+  border: 2px dashed #ccc;
+  padding: 12px;
+  color: #404040;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+  box-sizing: border-box;
+}
+
+.drag-zone.active {
+  border-color: #2d6737;
+  background-color: rgba(45, 103, 55, 0.08);
+}
+
+.drag-zone__icon {
+  display: inline-flex;
+  margin-bottom: 8px;
+}
+
+.drag-zone__icon svg {
+  display: block;
+}
+
+.demo-input-file {
+  display: none;
+}
