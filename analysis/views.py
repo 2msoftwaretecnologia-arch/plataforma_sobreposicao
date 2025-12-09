@@ -9,6 +9,9 @@ from kernel.utils import extract_geometry, locate_city_state
 
 from django.views import View
 from django.shortcuts import render
+from dataclasses import asdict
+from extract_text_from_pdf import extrair_texto_pdf_pdfplumber
+from extract_datas_demostrativo import parse_demonstrativo
 
 class AnswerspageView(View):
     template_name = 'analysis/index.html'
@@ -72,11 +75,41 @@ class UploadZipCarView(View):
 
         context = {'car_input': car_input}
 
-        # Modo demonstrativo não exige entradas
         if mode == 'demostrativo':
-            context['sucesso'] = True
-            context['mensagem'] = 'Modo demonstrativo selecionado. Nenhuma entrada é necessária.'
-            return render(request, self.template_upload, context)
+            demo_file = request.FILES.get('demo_file')
+            if not demo_file:
+                context['erro'] = 'Por favor, envie um arquivo PDF do demonstrativo.'
+                return render(request, self.template_upload, context)
+
+            try:
+                texto = extrair_texto_pdf_pdfplumber(demo_file)
+                info = parse_demonstrativo(texto)
+                car_extraido = (info.car or car_input or '').strip()
+
+                resultado = {}
+                municipio, state = None, None
+
+                if car_extraido:
+                    try:
+                        resultado = SearchForCar().execute(car_extraido) or {}
+                        qs = get_sicar_record(car_number__iexact=car_extraido)
+                        if qs.exists():
+                            geometry = qs.first().geometry
+                            municipio, state = locate_city_state(geometry)
+                    except Exception:
+                        pass
+
+                return render(request, self.template_index, {
+                    'resultado': resultado,
+                    'demonstrativo': asdict(info),
+                    'car_input': car_extraido,
+                    'municipio': municipio,
+                    'uf': state,
+                    'sucesso': True
+                })
+            except Exception as e:
+                context['erro'] = f'Erro ao processar o demonstrativo: {str(e)}'
+                return render(request, self.template_upload, context)
 
         # --------------------------------------
         # 1) Caso só CAR informado (sem ZIP)

@@ -96,11 +96,11 @@ def imprimir_info(info: DemonstrativoInfo) -> None:
     for k, v in asdict(info).items():
         print(f"{k}: {v}")
 
-if __name__ == "__main__":
-    import sys
-    caminhos = sys.argv[1:] or [r"C:\Users\2mbet\Downloads\Demonstrativo_TO-1718204-74EAC3D70B364C78B84EE5D2738C0A6D.pdf"]
-    for i, caminho in enumerate(caminhos, 1):
-        texto = extrair_texto_pdf_pdfplumber(caminho)
-        info = parse_demonstrativo(texto)
-        print(f"Arquivo {i}: {caminho}")
-        imprimir_info(info)
+# if __name__ == "__main__":
+#     import sys
+#     caminhos = sys.argv[1:] or [r"C:\Users\2mbet\Downloads\Demonstrativo_TO-1718204-74EAC3D70B364C78B84EE5D2738C0A6D.pdf"]
+#     for i, caminho in enumerate(caminhos, 1):
+#         texto = extrair_texto_pdf_pdfplumber(caminho)
+#         info = parse_demonstrativo(texto)
+#         print(f"Arquivo {i}: {caminho}")
+#         imprimir_info(info)

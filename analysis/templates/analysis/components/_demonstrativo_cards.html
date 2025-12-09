@@ -1,0 +1,140 @@
+{% load l10n %}
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <p class="eyebrow">Demonstrativo (PDF)</p>
+            <h2 class="panel-title">Informações do CAR e áreas</h2>
+        </div>
+        {% if car_input %}
+            <span class="badge">CAR: {{ car_input }}</span>
+        {% endif %}
+    </div>
+
+    <div class="summary-grid">
+        <div class="summary-card summary-card--compact">
+            <p class="summary-label">Data da Retificação</p>
+            <p class="summary-value">{{ demonstrativo.data_retificacao|default:"—" }}</p>
+            <p class="summary-detail">Última data encontrada</p>
+        </div>
+        <div class="summary-card summary-card--compact">
+            <p class="summary-label">Situação do Cadastro</p>
+            <p class="summary-value">{{ demonstrativo.registration_status|default:"—" }}</p>
+            <p class="summary-detail">Status do cadastro no demonstrativo</p>
+        </div>
+        <div class="summary-card summary-card--compact">
+            <p class="summary-label">Condição Externa</p>
+            <p class="summary-value">{{ demonstrativo.external_condicion|default:"—" }}</p>
+            <p class="summary-detail">Condição externa informada</p>
+        </div>
+        <div class="summary-card">
+            <p class="summary-label">Módulos Fiscais</p>
+            <p class="summary-value">{{ demonstrativo.tax_modules|default:"—" }}</p>
+            <p class="summary-detail">Quantidade declarada</p>
+        </div>
+    </div>
+
+    <div class="panel-header" style="margin-top:16px;">
+        <div>
+            <p class="eyebrow">Reserva Legal</p>
+            <h2 class="panel-title">Situação e Propostas</h2>
+        </div>
+    </div>
+
+    <div class="summary-grid">
+        <div class="summary-card">
+            <p class="summary-label">Averbada (Art. 30)</p>
+            <p class="summary-value">{{ demonstrativo.area_Reserva_Legal_Averbada_referente_Art_30_codigo_florestal|default:"—" }}</p>
+            <p class="summary-detail">Área averbada conforme legislação</p>
+        </div>
+        <div class="summary-card">
+            <p class="summary-label">Aprovada não Averbada</p>
+            <p class="summary-value">{{ demonstrativo.area_Reserva_Legal_Aprovada_nao_Averbada|default:"—" }}</p>
+            <p class="summary-detail">Área aprovada pendente de averbação</p>
+        </div>
+        <div class="summary-card">
+            <p class="summary-label">Proposta</p>
+            <p class="summary-value">{{ demonstrativo.area_reserva_legal_proposta|default:"—" }}</p>
+            <p class="summary-detail">Reserva Legal proposta</p>
+        </div>
+        <div class="summary-card">
+            <p class="summary-label">Total Declarado</p>
+            <p class="summary-value">{{ demonstrativo.total_reserva_legal_declarada_pelo_proprietario_possuidor|default:"—" }}</p>
+            <p class="summary-detail">Total de Reserva Legal declarada</p>
+        </div>
+    </div>
+
+    <div class="panel-header" style="margin-top:16px;">
+        <div>
+            <p class="eyebrow">APP</p>
+            <h2 class="panel-title">Áreas de Preservação Permanente</h2>
+        </div>
+    </div>
+
+    <div class="summary-grid">
+        <div class="summary-card">
+            <p class="summary-label">APP Total</p>
+            <p class="summary-value">{{ demonstrativo.area_app|default:"—" }}</p>
+            <p class="summary-detail">Área de APP</p>
+        </div>
+        <div class="summary-card">
+            <p class="summary-label">APP em Área Rural Consolidada</p>
+            <p class="summary-value">{{ demonstrativo.app_em_area_rural_consolidada|default:"—" }}</p>
+            <p class="summary-detail">Situação em ARC</p>
+        </div>
+        <div class="summary-card">
+            <p class="summary-label">APP em Remanescente de Vegetação Nativa</p>
+            <p class="summary-value">{{ demonstrativo.app_em_area_remanescente_vegetacao_nativa|default:"—" }}</p>
+            <p class="summary-detail">Situação em RVN</p>
+        </div>
+    </div>
+
+    <div class="panel-header" style="margin-top:16px;">
+        <div>
+            <p class="eyebrow">Recomposição</p>
+            <h2 class="panel-title">Passivos e Áreas a Recompor</h2>
+        </div>
+    </div>
+
+    <div class="summary-grid">
+        <div class="summary-card">
+            <p class="summary-label">Passivo / Excedente de RL</p>
+            <p class="summary-value">{{ demonstrativo.passivo_ou_excedente_de_reserva_legal|default:"—" }}</p>
+            <p class="summary-detail">Situação declarada</p>
+        </div>
+        <div class="summary-card">
+            <p class="summary-label">RL a Recompor</p>
+            <p class="summary-value">{{ demonstrativo.area_reserva_legal_a_recompor|default:"—" }}</p>
+            <p class="summary-detail">Área de Reserva Legal a recompor</p>
+        </div>
+        <div class="summary-card">
+            <p class="summary-label">APP a Recompor</p>
+            <p class="summary-value">{{ demonstrativo.area_de_preservacao_permanente_a_recompor|default:"—" }}</p>
+            <p class="summary-detail">Área de APP a recompor</p>
+        </div>
+    </div>
+
+    <div class="panel-header" style="margin-top:16px;">
+        <div>
+            <p class="eyebrow">Outras Áreas</p>
+            <h2 class="panel-title">Situações Complementares</h2>
+        </div>
+    </div>
+
+    <div class="summary-grid">
+        <div class="summary-card">
+            <p class="summary-label">Remanescente de Vegetação Nativa</p>
+            <p class="summary-value">{{ demonstrativo.native_vegetation_remmant_area|default:"—" }}</p>
+            <p class="summary-detail">Área remanescente</p>
+        </div>
+        <div class="summary-card">
+            <p class="summary-label">Área Rural Consolidada</p>
+            <p class="summary-value">{{ demonstrativo.area_rural_consolidada|default:"—" }}</p>
+            <p class="summary-detail">ARC declarada</p>
+        </div>
+        <div class="summary-card">
+            <p class="summary-label">Servidão Administrativa</p>
+            <p class="summary-value">{{ demonstrativo.area_servidao_admistrativa|default:"—" }}</p>
+            <p class="summary-detail">Servidões declaradas</p>
+        </div>
+    </div>
+</section>
