@@ -1,0 +1,93 @@
+{% load l10n %}
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <p class="eyebrow">Recibo (PDF)</p>
+            <h2 class="panel-title">Informações do CAR e áreas</h2>
+        </div>
+        {% if car_input %}
+            <span class="badge">CAR: {{ car_input }}</span>
+        {% endif %}
+    </div>
+
+    <div class="summary-grid">
+        <div class="summary-card summary-card--compact">
+            <p class="summary-label">Nome do Imóvel Rural</p>
+            <p class="summary-value summary-value--truncate" title="{{ recibo.nome_imovel_rural|default:"—" }}">{{ recibo.nome_imovel_rural|default:"—" }}</p>
+            <p class="summary-detail">Denominação informada</p>
+        </div>
+        <div class="summary-card summary-card--compact">
+            <p class="summary-label">Módulos Fiscais</p>
+            <p class="summary-value">{{ recibo.modulos_fiscais|default:"—" }}</p>
+            <p class="summary-detail">Quantidade declarada</p>
+        </div>
+        <div class="summary-card">
+            <p class="summary-label">Área Líquida do Imóvel</p>
+            <p class="summary-value">{{ recibo.area_liquida_do_imovel|default:"—" }}</p>
+            <p class="summary-detail">Área útil do imóvel</p>
+        </div>
+    </div>
+
+    <div class="panel-header" style="margin-top:16px;">
+        <div>
+            <p class="eyebrow">Áreas protegidas</p>
+            <h2 class="panel-title">Reserva Legal e APP</h2>
+        </div>
+    </div>
+
+    <div class="summary-grid">
+        <div class="summary-card">
+            <p class="summary-label">Reserva Legal</p>
+            <p class="summary-value">{{ recibo.area_reserva_legal|default:"—" }}</p>
+            <p class="summary-detail">Área de Reserva Legal</p>
+        </div>
+        <div class="summary-card">
+            <p class="summary-label">APP</p>
+            <p class="summary-value">{{ recibo.area_preservacao_permanente|default:"—" }}</p>
+            <p class="summary-detail">Área de Preservação Permanente</p>
+        </div>
+    </div>
+
+    <div class="panel-header" style="margin-top:16px;">
+        <div>
+            <p class="eyebrow">Outras Áreas</p>
+            <h2 class="panel-title">Situações Complementares</h2>
+        </div>
+    </div>
+
+    <div class="summary-grid">
+        <div class="summary-card">
+            <p class="summary-label">Remanescente de Vegetação Nativa</p>
+            <p class="summary-value">{{ recibo.remanescente_vegetacao_nativa|default:"—" }}</p>
+            <p class="summary-detail">Área remanescente</p>
+        </div>
+        <div class="summary-card">
+            <p class="summary-label">Área Rural Consolidada</p>
+            <p class="summary-value">{{ recibo.area_rural_consolidada|default:"—" }}</p>
+            <p class="summary-detail">ARC declarada</p>
+        </div>
+        <div class="summary-card">
+            <p class="summary-label">Servidão Administrativa</p>
+            <p class="summary-value">{{ recibo.area_servidao_administrativa|default:"—" }}</p>
+            <p class="summary-detail">Servidão existente na propriedade</p>
+        </div>
+    </div>
+
+    {% if recibo.proprietarios %}
+    <div class="panel-header" style="margin-top:16px;">
+        <div>
+            <p class="eyebrow">Proprietários</p>
+            <h2 class="panel-title">Nomes e documentos</h2>
+        </div>
+    </div>
+    <div class="summary-grid">
+        {% for p in recibo.proprietarios %}
+        <div class="summary-card summary-card--compact">
+            <p class="summary-label">{{ p.documento|default:"Documento" }}</p>
+            <p class="summary-value">{{ p.nome|default:"—" }}</p>
+            <p class="summary-detail">Vinculado ao CAR</p>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</section>

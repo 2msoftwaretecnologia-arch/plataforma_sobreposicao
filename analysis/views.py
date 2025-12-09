@@ -12,6 +12,7 @@ from django.shortcuts import render
 from dataclasses import asdict
 from extract_text_from_pdf import extrair_texto_pdf_pdfplumber
 from extract_datas_demostrativo import parse_demonstrativo
+from extract_datas_recibo import extrair_recibo_info
 
 class AnswerspageView(View):
     template_name = 'analysis/index.html'
@@ -109,6 +110,41 @@ class UploadZipCarView(View):
                 })
             except Exception as e:
                 context['erro'] = f'Erro ao processar o demonstrativo: {str(e)}'
+                return render(request, self.template_upload, context)
+
+        elif mode == 'recibo':
+            recibo_file = request.FILES.get('recibo_file')
+            if not recibo_file:
+                context['erro'] = 'Por favor, envie um arquivo PDF do recibo.'
+                return render(request, self.template_upload, context)
+
+            try:
+                info = extrair_recibo_info(recibo_file)
+                car_extraido = (info.car or car_input or '').strip()
+
+                resultado = {}
+                municipio, state = None, None
+
+                if car_extraido:
+                    try:
+                        resultado = SearchForCar().execute(car_extraido) or {}
+                        qs = get_sicar_record(car_number__iexact=car_extraido)
+                        if qs.exists():
+                            geometry = qs.first().geometry
+                            municipio, state = locate_city_state(geometry)
+                    except Exception:
+                        pass
+
+                return render(request, self.template_index, {
+                    'resultado': resultado,
+                    'recibo': asdict(info),
+                    'car_input': car_extraido,
+                    'municipio': municipio,
+                    'uf': state,
+                    'sucesso': True
+                })
+            except Exception as e:
+                context['erro'] = f'Erro ao processar o recibo: {str(e)}'
                 return render(request, self.template_upload, context)
 
         # --------------------------------------
