@@ -1,6 +1,40 @@
 import pdfplumber
 
-def extrair_texto_pdf_pdfplumber(caminho_arquivo):
+def _desduplicar_pares(texto: str) -> str:
+    if not texto:
+        return texto
+    linhas = texto.splitlines()
+    resultado = []
+    for linha in linhas:
+        n = len(linha)
+        if n < 2:
+            resultado.append(linha)
+            continue
+        total_pairs = n - 1
+        dup_pairs = 0
+        for i in range(total_pairs):
+            if linha[i] == linha[i + 1]:
+                dup_pairs += 1
+        if total_pairs > 0 and (dup_pairs / total_pairs) > 0.4:
+            out = []
+            i = 0
+            while i < n:
+                if i + 1 < n and linha[i] == linha[i + 1]:
+                    out.append(linha[i])
+                    i += 2
+                else:
+                    out.append(linha[i])
+                    i += 1
+            resultado.append("".join(out))
+        else:
+            resultado.append(linha)
+    return "\n".join(resultado)
+
+def _extrair_texto_sem_duplicacao(page):
+    bruto = page.extract_text() or ""
+    return _desduplicar_pares(bruto)
+
+def extrair_texto_pdf_pdfplumber(caminho_arquivo, pagina=None, deduplicar=False):
     """
     Extrai texto de um PDF usando pdfplumber (preserva melhor o layout).
     
@@ -11,15 +45,18 @@ def extrair_texto_pdf_pdfplumber(caminho_arquivo):
         str: Texto extraído do PDF
     """
     try:
-        texto_total = ""
-        
         with pdfplumber.open(caminho_arquivo) as pdf:
-            for pagina_num, pagina in enumerate(pdf.pages, 1):
-                #print(f"Processando página {pagina_num} de {len(pdf.pages)}...")
-                texto = pagina.extract_text()
+            if pagina is not None:
+                if pagina < 1 or pagina > len(pdf.pages):
+                    return ""
+                p = pdf.pages[pagina - 1]
+                texto = _extrair_texto_sem_duplicacao(p) if deduplicar else (p.extract_text() or "")
+                return texto
+            texto_total = ""
+            for pagina_num, p in enumerate(pdf.pages, 1):
+                texto = _extrair_texto_sem_duplicacao(p) if deduplicar else (p.extract_text() or "")
                 texto_total += f"\n--- Página {pagina_num} ---\n{texto}\n"
-        
-        return texto_total
+            return texto_total
         
     except FileNotFoundError:
         print(f"Erro: Arquivo '{caminho_arquivo}' não encontrado.")
@@ -28,4 +65,5 @@ def extrair_texto_pdf_pdfplumber(caminho_arquivo):
         print(f"Erro ao processar o PDF: {str(e)}")
         return ""
 
-
+# texto2 = extrair_texto_pdf_pdfplumber("recibo.pdf", pagina=3, deduplicar=True)
+# print(texto2)
