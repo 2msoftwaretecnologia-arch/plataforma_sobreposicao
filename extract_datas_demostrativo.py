@@ -63,6 +63,26 @@ class DemonstrativoInfo:
     passivo_ou_excedente_de_reserva_legal: Optional[str]
     area_reserva_legal_a_recompor: Optional[str]
     area_de_preservacao_permanente_a_recompor: Optional[str]
+    area_antropizada: Optional[str]
+
+def _parse_ha_value(s: Optional[str]) -> Optional[float]:
+    if not s:
+        return None
+    m = re.search(r"[\d.,]+", s)
+    if not m:
+        return None
+    num = m.group(0)
+    num = num.replace(".", "")
+    num = num.replace(",", ".")
+    try:
+        return float(num)
+    except Exception:
+        return None
+
+def _format_ha(v: Optional[float]) -> Optional[str]:
+    if v is None:
+        return None
+    return f"{v:.2f} ha"
 
 def parse_demonstrativo(text: str) -> DemonstrativoInfo:
     bloco = _get_block_reserva_legal_averbada(text) or text
@@ -71,25 +91,52 @@ def parse_demonstrativo(text: str) -> DemonstrativoInfo:
         if v is None:
             v = _get_value(text, inicio, fim, flags=re.IGNORECASE)
         return v
+    car_val = _get_car(text)
+    data_val = _get_last_retification_date(text)
+    ext_val = val("Condição Externa:", "Situação")
+    mod_val = val("Módulos Fiscais:", "Coordenadas")
+    reg_val = val("Situação do Cadastro:", "Informações")
+    nativa_val = val("Área de Remanescente de Vegetação Nativa", "Área Rural Consolidada")
+    arc_val = val("Área Rural Consolidada", "Área de Servidão Administrativa")
+    serv_val = val("Área de Servidão Administrativa", "CAR")
+    rl_averb_val = val("12.651/2012", "Informação")
+    rl_aprov_val = val("Área de Reserva Legal Aprovada não Averbada", "Área de Reserva Legal Proposta")
+    rl_prop_val = val("Área de Reserva Legal Proposta", "Total de Reserva Legal Declarada pelo Proprietário/Possuidor")
+    rl_total_val = val("Total de Reserva Legal Declarada pelo Proprietário/Possuidor", "Áreas de Preservação Permanente (APP)")
+    app_total_val = val("\nAPP", "APP em Área Rural Consolidada")
+    app_arc_val = val("APP em Área Rural Consolidada", "APP em Área de Remanescente de Vegetação Nativa")
+    app_nat_val = val("APP em Área de Remanescente de Vegetação Nativa", "Áreas de Uso Restrito")
+    passivo_val = val("Passivo / Excedente de Reserva Legal", "Área de Reserva Legal a recompor")
+    rl_recomp_val = val("Área de Reserva Legal a recompor", "Áreas de Preservação Permanente a recompor")
+    app_recomp_val = val("Áreas de Preservação Permanente a recompor", "Área de Uso Restrito a recompor")
+
+    a_apr = _parse_ha_value(app_total_val)
+    a_nat = _parse_ha_value(nativa_val)
+    a_arc = _parse_ha_value(arc_val)
+    antropizada_calc = None
+    if a_apr is not None and a_nat is not None and a_arc is not None:
+        antropizada_calc = _format_ha(max(a_apr - a_nat - a_arc, 0.0))
+
     return DemonstrativoInfo(
-        car=_get_car(text),
-        data_retificacao=_get_last_retification_date(text),
-        external_condicion=val("Condição Externa:", "Situação"),
-        tax_modules=val("Módulos Fiscais:", "Coordenadas"),
-        registration_status=val("Situação do Cadastro:", "Informações"),
-        native_vegetation_remmant_area=val("Área de Remanescente de Vegetação Nativa", "Área Rural Consolidada"),
-        area_rural_consolidada=val("Área Rural Consolidada", "Área de Servidão Administrativa"),
-        area_servidao_admistrativa=val("Área de Servidão Administrativa", "CAR"),
-        area_Reserva_Legal_Averbada_referente_Art_30_codigo_florestal=val("12.651/2012", "Informação"),
-        area_Reserva_Legal_Aprovada_nao_Averbada=val("Área de Reserva Legal Aprovada não Averbada", "Área de Reserva Legal Proposta"),
-        area_reserva_legal_proposta=val("Área de Reserva Legal Proposta", "Total de Reserva Legal Declarada pelo Proprietário/Possuidor"),
-        total_reserva_legal_declarada_pelo_proprietario_possuidor=val("Total de Reserva Legal Declarada pelo Proprietário/Possuidor", "Áreas de Preservação Permanente (APP)"),
-        area_app=val("\nAPP", "APP em Área Rural Consolidada"),
-        app_em_area_rural_consolidada=val("APP em Área Rural Consolidada", "APP em Área de Remanescente de Vegetação Nativa"),
-        app_em_area_remanescente_vegetacao_nativa=val("APP em Área de Remanescente de Vegetação Nativa", "Áreas de Uso Restrito"),
-        passivo_ou_excedente_de_reserva_legal=val("Passivo / Excedente de Reserva Legal", "Área de Reserva Legal a recompor"),
-        area_reserva_legal_a_recompor=val("Área de Reserva Legal a recompor", "Áreas de Preservação Permanente a recompor"),
-        area_de_preservacao_permanente_a_recompor=val("Áreas de Preservação Permanente a recompor", "Área de Uso Restrito a recompor"),
+        car=car_val,
+        data_retificacao=data_val,
+        external_condicion=ext_val,
+        tax_modules=mod_val,
+        registration_status=reg_val,
+        native_vegetation_remmant_area=nativa_val,
+        area_rural_consolidada=arc_val,
+        area_servidao_admistrativa=serv_val,
+        area_Reserva_Legal_Averbada_referente_Art_30_codigo_florestal=rl_averb_val,
+        area_Reserva_Legal_Aprovada_nao_Averbada=rl_aprov_val,
+        area_reserva_legal_proposta=rl_prop_val,
+        total_reserva_legal_declarada_pelo_proprietario_possuidor=rl_total_val,
+        area_app=app_total_val,
+        app_em_area_rural_consolidada=app_arc_val,
+        app_em_area_remanescente_vegetacao_nativa=app_nat_val,
+        passivo_ou_excedente_de_reserva_legal=passivo_val,
+        area_reserva_legal_a_recompor=rl_recomp_val,
+        area_de_preservacao_permanente_a_recompor=app_recomp_val,
+        area_antropizada=antropizada_calc,
     )
 
 def imprimir_info(info: DemonstrativoInfo) -> None:

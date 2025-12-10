@@ -50,7 +50,27 @@ class ReciboInfo:
     area_liquida_do_imovel: Optional[str]
     area_reserva_legal: Optional[str]
     area_preservacao_permanente: Optional[str]
+    area_antropizada: Optional[str]
     proprietarios: List[Dict[str, str]]
+
+def _parse_ha_value(s: Optional[str]) -> Optional[float]:
+    if not s:
+        return None
+    m = re.search(r"[\d.,]+", s)
+    if not m:
+        return None
+    num = m.group(0)
+    num = num.replace(".", "")
+    num = num.replace(",", ".")
+    try:
+        return float(num)
+    except Exception:
+        return None
+
+def _format_ha(v: Optional[float]) -> Optional[str]:
+    if v is None:
+        return None
+    return f"{v:.2f} ha"
 
 def parse_recibo(pagina2_texto: str, pagina3_texto: str, texto_total: Optional[str] = None) -> ReciboInfo:
     full_text = texto_total or ""
@@ -58,16 +78,33 @@ def parse_recibo(pagina2_texto: str, pagina3_texto: str, texto_total: Optional[s
         inicio_opts = [inicios] if isinstance(inicios, str) else inicios
         fim_opts = [fins] if isinstance(fins, str) else fins
         return _val_with_fallback(pagina3_texto or "", inicio_opts, fim_opts, [pagina2_texto or "", full_text])
+    car_val = val3("Registro no CAR:", "Data de Cadastro:")
+    nome_val = val3("Nome do Imóvel Rural:", "Município:")
+    mod_val = val3("Módulos Fiscais:", "Código")
+    arc_val = val3(["Área Rural Consolidada", "Consolidada"], ["Área de Servidão Administrativa", "Área de Servidão"])
+    serv_val = val3("Área de Servidão Administrativa", "Remanescente de Vegetação Nativa")
+    nativa_val = val3("Remanescente de Vegetação Nativa", "Área Líquida do Imóvel")
+    liquida_val = val3("Área Líquida do Imóvel", ["Reserva Legal", "Área de Reserva Legal"])
+    rl_val = val3("Área de Reserva Legal", "Área de Preservação Permanente")
+    app_val = val3("Área de Preservação Permanente", "Área de Uso Restrito")
+    a_apr = _parse_ha_value(liquida_val)
+    a_nat = _parse_ha_value(nativa_val)
+    a_arc = _parse_ha_value(arc_val)
+    antropizada_calc = None
+    if a_apr is not None and a_nat is not None and a_arc is not None:
+        antropizada_calc = _format_ha(max(a_apr - a_nat - a_arc, 0.0))
+
     return ReciboInfo(
-        car=val3("Registro no CAR:", "Data de Cadastro:").replace(".", ""),#tirando os pontos do car
-        nome_imovel_rural=val3("Nome do Imóvel Rural:", "Município:"),
-        modulos_fiscais=val3("Módulos Fiscais:", "Código"),
-        area_rural_consolidada=val3(["Área Rural Consolidada", "Consolidada"], ["Área de Servidão Administrativa", "Área de Servidão"]),
-        area_servidao_administrativa=val3("Área de Servidão Administrativa", "Remanescente de Vegetação Nativa"),
-        remanescente_vegetacao_nativa=val3("Remanescente de Vegetação Nativa", "Área Líquida do Imóvel"),
-        area_liquida_do_imovel=val3("Área Líquida do Imóvel", ["Reserva Legal", "Área de Reserva Legal"]),
-        area_reserva_legal=val3("Área de Reserva Legal", "Área de Preservação Permanente"),
-        area_preservacao_permanente=val3("Área de Preservação Permanente", "Área de Uso Restrito"),
+        car=(car_val or "").replace(".", ""),
+        nome_imovel_rural=nome_val,
+        modulos_fiscais=mod_val,
+        area_rural_consolidada=arc_val,
+        area_servidao_administrativa=serv_val,
+        remanescente_vegetacao_nativa=nativa_val,
+        area_liquida_do_imovel=liquida_val,
+        area_reserva_legal=rl_val,
+        area_preservacao_permanente=app_val,
+        area_antropizada=antropizada_calc,
         proprietarios=get_name_document(pagina2_texto or ""),
     )
 
