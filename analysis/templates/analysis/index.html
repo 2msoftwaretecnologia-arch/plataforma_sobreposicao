@@ -177,6 +177,14 @@
         <script>
             (function(){
                 var items = [];
+
+                items.push({
+                    gj: {{ resultado.alvo_geojson|safe }},
+                    label: "Área da Propriedade",
+                    color: "#000000",
+                    fonte: "Área da Propriedade"
+                });
+
                 {% for p in resultado.poligonos_imoveis %}
                     items.push({
                         gj: {{ p.polygon_geojson|safe }},

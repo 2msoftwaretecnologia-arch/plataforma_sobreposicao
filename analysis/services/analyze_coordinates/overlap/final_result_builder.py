@@ -45,6 +45,10 @@ class FinalResultBuilder:
 
         summary_counts = self._build_summary_counts(layers)
 
+        tg = getattr(target, "geometry", None)
+        alvo_geojson = getattr(tg, "geojson", None) if tg else None
+        alvo_wkt = tg.wkt if tg else None
+
         data = {
             "resultados_por_base": bases_output,
             "areas_encontradas": all_areas,
@@ -53,13 +57,17 @@ class FinalResultBuilder:
             "tamanho_area": target.area_ha,
             "resumo_bases": summary_counts,
             "poligonos_imoveis": property_polygons,
+            "alvo_geojson": alvo_geojson,
+            "alvo_wkt": alvo_wkt,
         }
 
-        """salve = 'saida.json'
+        """
+        salve = 'saida.json'
 
         with open(salve, 'w') as f:
             json.dump(data, f, indent=4)
         """
+        
         return data
 
     def _group_records(self, layer_name, records):
