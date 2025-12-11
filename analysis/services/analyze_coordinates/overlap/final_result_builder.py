@@ -55,11 +55,11 @@ class FinalResultBuilder:
             "poligonos_imoveis": property_polygons,
         }
 
-        salve = 'saida.json'
+        """salve = 'saida.json'
 
         with open(salve, 'w') as f:
             json.dump(data, f, indent=4)
-
+        """
         return data
 
     def _group_records(self, layer_name, records):
