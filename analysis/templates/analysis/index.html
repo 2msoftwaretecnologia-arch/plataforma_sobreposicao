@@ -124,7 +124,7 @@
                 <div class="summary-card">
                     <p class="summary-label">Tamanho da Área (ha)</p>
                     <p class="summary-value">
-                        {% if resultado.tamanho_area %}
+                        {% if resultado.tamanho_area != None %}
                             {% localize on %}
                                 {{ resultado.tamanho_area|floatformat:4 }}
                             {% endlocalize %}
@@ -158,8 +158,7 @@
         <section class="panel">
             <div class="panel-header">
                 <div>
-                    <p class="eyebrow">Resposta</p>
-                    <h2 class="panel-title">Polígonos dos Imóveis com Intersecção</h2>
+                    <h class="panel-title">Mapa</h>
                 </div>
             </div>
 
@@ -181,6 +180,7 @@
                 items.push({
                     gj: {{ resultado.alvo_geojson|safe }},
                     label: "Área da Propriedade",
+                    area: "{{ resultado.tamanho_area|floatformat:4 }} ha",
                     color: "#000000",
                     fonte: "Área da Propriedade"
                 });
@@ -189,7 +189,7 @@
                     items.push({
                         gj: {{ p.polygon_geojson|safe }},
                         label: "{{ p.item_info|escapejs }}",
-                        area: "{{ p.area|floatformat:4 }}",
+                        area: "{{ p.area|floatformat:4 }} ha",
                         color: "{{ p.color }}",
                         fonte: "{{ p.fonte|escapejs }}"
                     });
@@ -219,13 +219,14 @@
                             overlays[f] = layersByFonte[f];
                         }
                         var layer = L.geoJSON(geom,{style:{color:col,weight:2,fillColor:col,fillOpacity:0.35}});
+                        var tt = [lbl || f, area].filter(function(x){ return x && (''+x).trim() !== ''; }).join('<br> Área: ');
                         (function(tt){
                             layer.eachLayer(function(fl){
                                 if(tt){ fl.bindTooltip(tt,{sticky:true}); }
                                 fl.on('mouseover',function(e){ e.target.setStyle({weight:3,fillOpacity:0.5}); });
                                 fl.on('mouseout',function(e){ e.target.setStyle({weight:2,fillOpacity:0.35}); });
                             });
-                        })(lbl || f + ' · ' + area);
+                        })(tt);
                         layer.addTo(layersByFonte[f]);
                         allGroup.addLayer(layer);
                         if(f && col){ legend[f] = col; }

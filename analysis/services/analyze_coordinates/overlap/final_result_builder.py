@@ -38,6 +38,7 @@ class FinalResultBuilder:
                     property_polygons.append({
                         "fonte": self._base_name(layer),
                         "item_info": r.get("item_info"),
+                        "area": r.get("area"),
                         "polygon_wkt": wkt,
                         "polygon_geojson": gj,
                         "color": self._base_color(layer),
@@ -48,7 +49,7 @@ class FinalResultBuilder:
         tg = getattr(target, "geometry", None)
         alvo_geojson = getattr(tg, "geojson", None) if tg else None
         alvo_wkt = tg.wkt if tg else None
-
+        
         data = {
             "resultados_por_base": bases_output,
             "areas_encontradas": all_areas,

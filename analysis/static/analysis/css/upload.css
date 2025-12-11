@@ -54,6 +54,12 @@ label { display: block; margin-bottom: 8px; color: #555; font-weight: 500; }
   margin-top: 12px;
 }
 
+.termos-uso {
+  color: #ffffff;
+  text-decoration: none;
+}
+
+
 
 /* estilizando o input de file zip */ 
 /* From Uiverse.io by jamrockjones */ 
