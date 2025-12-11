@@ -6,5 +6,7 @@ class RuralsettlementFormatter(BaseFormatter):
         return {
             "area": intersec["intersection_area_ha"],
             "nome": model_obj.project_name,
-            "item_info": "Método de obtenção: {}".format(model_obj.method_obtaining)
+            "item_info": "Método de obtenção: {}".format(model_obj.method_obtaining),
+            "polygon_wkt": intersec["intersection_geom"].wkt,
+            "polygon_geojson": intersec["intersection_geom"].geojson,
         }

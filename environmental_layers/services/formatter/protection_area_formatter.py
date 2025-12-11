@@ -9,5 +9,7 @@ class ProtectionAreaFormatter(BaseFormatter):
             "dominios": model_obj.domains,
             "classe": model_obj.class_group,
             "fundo_legal": model_obj.legal_basis,
+            "polygon_wkt": intersec["intersection_geom"].wkt,
+            "polygon_geojson": intersec["intersection_geom"].geojson,
         }
 

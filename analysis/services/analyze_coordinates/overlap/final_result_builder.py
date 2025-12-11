@@ -1,3 +1,5 @@
+import json 
+
 class FinalResultBuilder:
 
     def build(self, target, results_by_layer, layers):
@@ -11,6 +13,7 @@ class FinalResultBuilder:
 
         bases_output = []
         all_areas = []
+        property_polygons = []
 
         for layer in layers:
             layer_name = layer.__name__
@@ -26,16 +29,38 @@ class FinalResultBuilder:
             # Acumular todas as áreas para somatório global
             all_areas.extend(records)
 
+            # Coletar polígonos dos imóveis
+            for r in records:
+                r["color"] = self._base_color(layer)
+                wkt = r.get("polygon_wkt")
+                gj = r.get("polygon_geojson")
+                if isinstance(gj, str) and gj.strip().startswith("{"):
+                    property_polygons.append({
+                        "fonte": self._base_name(layer),
+                        "item_info": r.get("item_info"),
+                        "polygon_wkt": wkt,
+                        "polygon_geojson": gj,
+                        "color": self._base_color(layer),
+                    })
+
         summary_counts = self._build_summary_counts(layers)
 
-        return {
+        data = {
             "resultados_por_base": bases_output,
             "areas_encontradas": all_areas,
             "quantidade_nao_avaliados": 0,
             "total_areas_com_sobreposicao": len(all_areas),
             "tamanho_area": target.area_ha,
             "resumo_bases": summary_counts,
+            "poligonos_imoveis": property_polygons,
         }
+
+        salve = 'saida.json'
+
+        with open(salve, 'w') as f:
+            json.dump(data, f, indent=4)
+
+        return data
 
     def _group_records(self, layer_name, records):
         """
@@ -106,3 +131,21 @@ class FinalResultBuilder:
             "DeforestationMapbiomas": "Base de Deforestação Mapbiomas",
         }
         return mapping.get(layer.__name__, layer.__name__)
+
+    def _base_color(self, layer):
+        mapping = {
+            "SicarRecord": "#2E7D32",
+            "ZoningArea": "#F57C00",
+            "PhytoecologyArea": "#6A1B9A",
+            "EnvironmentalProtectionArea": "#C62828",
+            "IndigenousArea": "#8E24AA",
+            "Quilombolas": "#5D4037",
+            "Paths": "#00897B",
+            "ConservationUnits": "#388E3C",
+            "MunicipalBoundaries": "#1976D2",
+            "Sigef": "#D81B60",
+            "Ruralsettlement": "#00ACC1",
+            "SnicTotal": "#EF6C00",
+            "DeforestationMapbiomas": "#4E342E",
+        }
+        return mapping.get(layer.__name__, "#9E9E9E")

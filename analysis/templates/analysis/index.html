@@ -9,6 +9,7 @@
 
     <!-- CSS principal -->
     <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/index.css' %}">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 
 <body>
@@ -152,6 +153,101 @@
         </section>
         {% endif %}
 
+
+        {% if resultado and resultado.poligonos_imoveis %}
+        <section class="panel">
+            <div class="panel-header">
+                <div>
+                    <p class="eyebrow">Resposta</p>
+                    <h2 class="panel-title">Polígonos dos Imóveis com Intersecção</h2>
+                </div>
+            </div>
+
+            <div id="map-imoveis"></div>
+            <div id="legend-imoveis"></div>
+        </section>
+        <style>
+            #map-imoveis{height:480px;border:1px solid var(--line);border-radius:var(--radius);}
+            #legend-imoveis{margin-top:8px;display:flex;flex-wrap:wrap;gap:8px}
+            .legend-item{display:flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--line);border-radius:12px;font-size:12px}
+            .legend-swatch{width:14px;height:14px;border-radius:3px;border:1px solid rgba(0,0,0,0.15)}
+            .legend-item.off{opacity:.5}
+        </style>
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <script>
+            (function(){
+                var items = [];
+                {% for p in resultado.poligonos_imoveis %}
+                    items.push({
+                        gj: {{ p.polygon_geojson|safe }},
+                        label: "{{ p.item_info|escapejs }}",
+                        color: "{{ p.color }}",
+                        fonte: "{{ p.fonte|escapejs }}"
+                    });
+
+                {% endfor %}
+                if(!items.length) return;
+                var map = L.map('map-imoveis');
+                var base = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19});
+                base.addTo(map);
+                var overlays = {};
+                var layersByFonte = {};
+                var allGroup = L.featureGroup().addTo(map);
+                var legend = {};
+                for(var i=0;i<items.length;i++){
+                    try{
+                        var gj = items[i].gj;
+                        if (!gj) continue;
+                        var geom = typeof gj === 'string' ? JSON.parse(gj) : gj;
+
+                        if(!geom) continue;
+                        var col = items[i].color || '#d9480f';
+                        var f = items[i].fonte || 'Fonte';
+                        if(!layersByFonte[f]){
+                            layersByFonte[f] = L.featureGroup().addTo(map);
+                            overlays[f] = layersByFonte[f];
+                        }
+                        var layer = L.geoJSON(geom,{style:{color:col,weight:2,fillColor:col,fillOpacity:0.35}});
+                        layer.addTo(layersByFonte[f]);
+                        allGroup.addLayer(layer);
+                        if(f && col){ legend[f] = col; }
+                    }catch(e){/* ignore parse errors */}
+                }
+                if(allGroup.getLayers().length){
+                    map.fitBounds(allGroup.getBounds(),{padding:[12,12]});
+                }
+                L.control.layers({'OpenStreetMap': base}, overlays, {collapsed:false}).addTo(map);
+                var legendEl = document.getElementById('legend-imoveis');
+                var keys = Object.keys(legend);
+                for(var j=0;j<keys.length;j++){
+                    var k = keys[j];
+                    var item = document.createElement('div');
+                    item.className = 'legend-item';
+                    var sw = document.createElement('span');
+                    sw.className = 'legend-swatch';
+                    sw.style.backgroundColor = legend[k];
+                    var lbl = document.createElement('span');
+                    lbl.textContent = k;
+                    item.appendChild(sw);
+                    item.appendChild(lbl);
+                    item.dataset.fonte = k;
+                    item.addEventListener('click', function(){
+                        var fonte = this.dataset.fonte;
+                        var grp = layersByFonte[fonte];
+                        if(!grp) return;
+                        if(map.hasLayer(grp)){
+                            map.removeLayer(grp);
+                            this.classList.add('off');
+                        }else{
+                            map.addLayer(grp);
+                            this.classList.remove('off');
+                        }
+                    });
+                    legendEl.appendChild(item);
+                }
+            })();
+        </script>
+        {% endif %}
 
         <!-- =============================== -->
         <!-- GUIA RÁPIDO -->

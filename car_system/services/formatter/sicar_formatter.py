@@ -16,4 +16,6 @@ class SicarFormatter(BaseFormatter):
             "area": intersec["intersection_area_ha"],
             "item_info": f"Sicar - CAR: {model_obj.car_number}",
             "status": label_status,
+            "polygon_wkt": intersec["intersection_geom"].wkt,
+            "polygon_geojson": intersec["intersection_geom"].geojson,
         }

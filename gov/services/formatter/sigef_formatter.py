@@ -15,4 +15,6 @@ class SigefFormatter(BaseFormatter):
             "nome": model_obj.name,
             "status": getattr(model_obj, "status", None),
             "item_info": "Sigef: " + " | ".join(details),
+            "polygon_wkt": intersec["intersection_geom"].wkt,
+            "polygon_geojson": intersec["intersection_geom"].geojson,
         }

@@ -6,5 +6,7 @@ class SnicTotalFormatter(BaseFormatter):
         return {
             "area": intersec["intersection_area_ha"],
             "nome": model_obj.property_name,
-            "item_info": f"Imóvel: {model_obj.property_name} | Código do imóvel: {model_obj.property_code}"
+            "item_info": f"Imóvel: {model_obj.property_name} | Código do imóvel: {model_obj.property_code}",
+            "polygon_wkt": intersec["intersection_geom"].wkt,
+            "polygon_geojson": intersec["intersection_geom"].geojson,
         }

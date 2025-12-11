@@ -6,5 +6,7 @@ class QuilombolasFormatter(BaseFormatter):
         return {
             "area": intersec["intersection_area_ha"],
             "nome": model_obj.name,
-            "item_info": "Quilombolas: {}".format(model_obj.name)
+            "item_info": "Quilombolas: {}".format(model_obj.name),
+            "polygon_wkt": intersec["intersection_geom"].wkt,
+            "polygon_geojson": intersec["intersection_geom"].geojson,
         }

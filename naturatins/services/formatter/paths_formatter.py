@@ -7,4 +7,6 @@ class PathsFormatter(BaseFormatter):
             "area": intersec["intersection_area_ha"],
             "item_info": "Vereda",
             "hash_id": getattr(model_obj, "hash_id", None),
+            "polygon_wkt": intersec["intersection_geom"].wkt,
+            "polygon_geojson": intersec["intersection_geom"].geojson,
         }

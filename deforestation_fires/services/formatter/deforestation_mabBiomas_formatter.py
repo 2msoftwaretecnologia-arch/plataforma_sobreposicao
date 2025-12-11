@@ -12,4 +12,6 @@ class DeforestationMapbiomasFormatter(BaseFormatter):
             "alert_code": model_obj.alert_code,
             "detection_year": model_obj.detection_year,
             "source": model_obj.source,
+            "polygon_wkt": intersec["intersection_geom"].wkt,
+            "polygon_geojson": intersec["intersection_geom"].geojson,
         }
