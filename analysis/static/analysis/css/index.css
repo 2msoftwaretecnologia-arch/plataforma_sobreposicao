@@ -330,6 +330,8 @@ body {
     display: flex;
     flex-direction: column;
     gap: 14px;
+    max-height: 380px;
+    overflow-y: auto;
 }
 
 /* -----------------------------------------------------
