@@ -189,6 +189,7 @@
                     items.push({
                         gj: {{ p.polygon_geojson|safe }},
                         label: "{{ p.item_info|escapejs }}",
+                        area: "{{ p.area|floatformat:4 }}",
                         color: "{{ p.color }}",
                         fonte: "{{ p.fonte|escapejs }}"
                     });
@@ -211,11 +212,20 @@
                         if(!geom) continue;
                         var col = items[i].color || '#d9480f';
                         var f = items[i].fonte || 'Fonte';
+                        var lbl = items[i].label || '';
+                        var area = items[i].area || '';
                         if(!layersByFonte[f]){
                             layersByFonte[f] = L.featureGroup().addTo(map);
                             overlays[f] = layersByFonte[f];
                         }
                         var layer = L.geoJSON(geom,{style:{color:col,weight:2,fillColor:col,fillOpacity:0.35}});
+                        (function(tt){
+                            layer.eachLayer(function(fl){
+                                if(tt){ fl.bindTooltip(tt,{sticky:true}); }
+                                fl.on('mouseover',function(e){ e.target.setStyle({weight:3,fillOpacity:0.5}); });
+                                fl.on('mouseout',function(e){ e.target.setStyle({weight:2,fillOpacity:0.35}); });
+                            });
+                        })(lbl || f + ' · ' + area);
                         layer.addTo(layersByFonte[f]);
                         allGroup.addLayer(layer);
                         if(f && col){ legend[f] = col; }
