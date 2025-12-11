@@ -219,6 +219,40 @@ body {
     gap: 18px;
 }
 
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.data-table tr {
+    border-bottom: 1px solid var(--line);
+}
+
+.data-table tr:last-child {
+    border-bottom: none;
+}
+
+.data-table th {
+    text-align: left;
+    padding: 12px 14px;
+    font-size: var(--label-size);
+    color: var(--muted);
+    width: 42%;
+    white-space: nowrap;
+}
+
+.data-table td {
+    padding: 12px 14px;
+    font-weight: 700;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+.data-table thead th {
+    color: var(--text);
+    font-weight: 600;
+}
+
 .info-block {
     background: var(--surface);
     padding: 20px;

@@ -9,23 +9,23 @@
             <span class="badge">CAR: {{ car_input }}</span>
         {% endif %}
     </div>
-
-    <div class="summary-grid">
-        <div class="summary-card summary-card--compact">
-            <p class="summary-label">Nome do Imóvel Rural</p>
-            <p class="summary-value summary-value--truncate" title="{{ recibo.nome_imovel_rural|default:"—" }}">{{ recibo.nome_imovel_rural|default:"—" }}</p>
-            <p class="summary-detail">Denominação informada</p>
-        </div>
-        <div class="summary-card summary-card--compact">
-            <p class="summary-label">Módulos Fiscais</p>
-            <p class="summary-value">{{ recibo.modulos_fiscais|default:"—" }}</p>
-            <p class="summary-detail">Quantidade declarada</p>
-        </div>
-        <div class="summary-card">
-            <p class="summary-label">Área Líquida do Imóvel</p>
-            <p class="summary-value">{{ recibo.area_liquida_do_imovel|default:"—" }}</p>
-            <p class="summary-detail">Área útil do imóvel</p>
-        </div>
+    <div>
+        <table class="data-table">
+            <tbody>
+                <tr>
+                    <th>Nome do Imóvel Rural</th>
+                    <td title="{{ recibo.nome_imovel_rural|default:"—" }}">{{ recibo.nome_imovel_rural|default:"—" }}</td>
+                </tr>
+                <tr>
+                    <th>Módulos Fiscais</th>
+                    <td>{{ recibo.modulos_fiscais|default:"—" }}</td>
+                </tr>
+                <tr>
+                    <th>Área Líquida do Imóvel</th>
+                    <td>{{ recibo.area_liquida_do_imovel|default:"—" }}</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 
     <div class="panel-header" style="margin-top:16px;">
@@ -35,22 +35,23 @@
         </div>
     </div>
 
-    <div class="summary-grid">
-        <div class="summary-card">
-            <p class="summary-label">Reserva Legal</p>
-            <p class="summary-value">{{ recibo.area_reserva_legal|default:"—" }}</p>
-            <p class="summary-detail">Área de Reserva Legal</p>
-        </div>
-        <div class="summary-card">
-            <p class="summary-label">APP</p>
-            <p class="summary-value">{{ recibo.area_preservacao_permanente|default:"—" }}</p>
-            <p class="summary-detail">Área de Preservação Permanente</p>
-        </div>
-        <div class="summary-card">
-            <p class="summary-label">Área Antropizada</p>
-            <p class="summary-value">{{ recibo.area_antropizada|default:"—" }}</p>
-            <p class="summary-detail">APR − Remanescente − ARC</p>
-        </div>
+    <div>
+        <table class="data-table">
+            <tbody>
+                <tr>
+                    <th>Reserva Legal</th>
+                    <td>{{ recibo.area_reserva_legal|default:"—" }}</td>
+                </tr>
+                <tr>
+                    <th>APP</th>
+                    <td>{{ recibo.area_preservacao_permanente|default:"—" }}</td>
+                </tr>
+                <tr>
+                    <th>Área Antropizada</th>
+                    <td>{{ recibo.area_antropizada|default:"—" }}</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 
     <div class="panel-header" style="margin-top:16px;">
@@ -60,22 +61,23 @@
         </div>
     </div>
 
-    <div class="summary-grid">
-        <div class="summary-card">
-            <p class="summary-label">Remanescente de Vegetação Nativa</p>
-            <p class="summary-value">{{ recibo.remanescente_vegetacao_nativa|default:"—" }}</p>
-            <p class="summary-detail">Área remanescente</p>
-        </div>
-        <div class="summary-card">
-            <p class="summary-label">Área Rural Consolidada</p>
-            <p class="summary-value">{{ recibo.area_rural_consolidada|default:"—" }}</p>
-            <p class="summary-detail">ARC declarada</p>
-        </div>
-        <div class="summary-card">
-            <p class="summary-label">Servidão Administrativa</p>
-            <p class="summary-value">{{ recibo.area_servidao_administrativa|default:"—" }}</p>
-            <p class="summary-detail">Servidão existente na propriedade</p>
-        </div>
+    <div>
+        <table class="data-table">
+            <tbody>
+                <tr>
+                    <th>Remanescente de Vegetação Nativa</th>
+                    <td>{{ recibo.remanescente_vegetacao_nativa|default:"—" }}</td>
+                </tr>
+                <tr>
+                    <th>Área Rural Consolidada</th>
+                    <td>{{ recibo.area_rural_consolidada|default:"—" }}</td>
+                </tr>
+                <tr>
+                    <th>Servidão Administrativa</th>
+                    <td>{{ recibo.area_servidao_administrativa|default:"—" }}</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 
     {% if recibo.proprietarios %}
@@ -85,14 +87,23 @@
             <h2 class="panel-title">Nomes e documentos</h2>
         </div>
     </div>
-    <div class="summary-grid">
-        {% for p in recibo.proprietarios %}
-        <div class="summary-card summary-card--compact">
-            <p class="summary-label">{{ p.documento|default:"Documento" }}</p>
-            <p class="summary-value">{{ p.nome|default:"—" }}</p>
-            <p class="summary-detail">Vinculado ao CAR</p>
-        </div>
-        {% endfor %}
+    <div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Documento</th>
+                    <th>Nome</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in recibo.proprietarios %}
+                <tr>
+                    <td>{{ p.documento|default:"—" }}</td>
+                    <td>{{ p.nome|default:"—" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
     {% endif %}
 </section>
