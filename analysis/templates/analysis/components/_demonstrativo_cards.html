@@ -9,28 +9,27 @@
             <span class="badge">CAR: {{ car_input }}</span>
         {% endif %}
     </div>
-
-    <div class="summary-grid">
-        <div class="summary-card summary-card--compact">
-            <p class="summary-label">Data da Retificação</p>
-            <p class="summary-value">{{ demonstrativo.data_retificacao|default:"—" }}</p>
-            <p class="summary-detail">Última data encontrada</p>
-        </div>
-        <div class="summary-card summary-card--compact">
-            <p class="summary-label">Situação do Cadastro</p>
-            <p class="summary-value">{{ demonstrativo.registration_status|default:"—" }}</p>
-            <p class="summary-detail">Status do cadastro no demonstrativo</p>
-        </div>
-        <div class="summary-card summary-card--compact">
-            <p class="summary-label">Condição Externa</p>
-            <p class="summary-value">{{ demonstrativo.external_condicion|default:"—" }}</p>
-            <p class="summary-detail">Condição externa informada</p>
-        </div>
-        <div class="summary-card">
-            <p class="summary-label">Módulos Fiscais</p>
-            <p class="summary-value">{{ demonstrativo.tax_modules|default:"—" }}</p>
-            <p class="summary-detail">Quantidade declarada</p>
-        </div>
+    <div>
+        <table class="data-table">
+            <tbody>
+                <tr>
+                    <th>Data da Retificação</th>
+                    <td>{{ demonstrativo.data_retificacao|default:"—" }}</td>
+                </tr>
+                <tr>
+                    <th>Situação do Cadastro</th>
+                    <td>{{ demonstrativo.registration_status|default:"—" }}</td>
+                </tr>
+                <tr>
+                    <th>Condição Externa</th>
+                    <td>{{ demonstrativo.external_condicion|default:"—" }}</td>
+                </tr>
+                <tr>
+                    <th>Módulos Fiscais</th>
+                    <td>{{ demonstrativo.tax_modules|default:"—" }}</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 
     <div class="panel-header" style="margin-top:16px;">
@@ -40,27 +39,27 @@
         </div>
     </div>
 
-    <div class="summary-grid">
-        <div class="summary-card">
-            <p class="summary-label">Averbada (Art. 30)</p>
-            <p class="summary-value">{{ demonstrativo.area_Reserva_Legal_Averbada_referente_Art_30_codigo_florestal|default:"—" }}</p>
-            <p class="summary-detail">Área de Reserva Legal Averbada, referente ao Art. 30 da Lei nº 12.651/2012</p>
-        </div>
-        <div class="summary-card">
-            <p class="summary-label">Aprovada não Averbada</p>
-            <p class="summary-value">{{ demonstrativo.area_Reserva_Legal_Aprovada_nao_Averbada|default:"—" }}</p>
-            <p class="summary-detail">Área aprovada pendente de averbação</p>
-        </div>
-        <div class="summary-card">
-            <p class="summary-label">Proposta</p>
-            <p class="summary-value">{{ demonstrativo.area_reserva_legal_proposta|default:"—" }}</p>
-            <p class="summary-detail">Reserva Legal proposta</p>
-        </div>
-        <div class="summary-card">
-            <p class="summary-label">Total Declarado</p>
-            <p class="summary-value">{{ demonstrativo.total_reserva_legal_declarada_pelo_proprietario_possuidor|default:"—" }}</p>
-            <p class="summary-detail">Total de Reserva Legal Declarada pelo Proprietário ou Possuidor</p>
-        </div>
+    <div>
+        <table class="data-table">
+            <tbody>
+                <tr>
+                    <th>Averbada (Art. 30)</th>
+                    <td>{{ demonstrativo.area_Reserva_Legal_Averbada_referente_Art_30_codigo_florestal|default:"—" }}</td>
+                </tr>
+                <tr>
+                    <th>Aprovada não Averbada</th>
+                    <td>{{ demonstrativo.area_Reserva_Legal_Aprovada_nao_Averbada|default:"—" }}</td>
+                </tr>
+                <tr>
+                    <th>Proposta</th>
+                    <td>{{ demonstrativo.area_reserva_legal_proposta|default:"—" }}</td>
+                </tr>
+                <tr>
+                    <th>Total Declarado</th>
+                    <td>{{ demonstrativo.total_reserva_legal_declarada_pelo_proprietario_possuidor|default:"—" }}</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 
     <div class="panel-header" style="margin-top:16px;">
@@ -70,27 +69,27 @@
         </div>
     </div>
 
-    <div class="summary-grid">
-        <div class="summary-card">
-            <p class="summary-label">APP Total</p>
-            <p class="summary-value">{{ demonstrativo.area_app|default:"—" }}</p>
-            <p class="summary-detail">Área de APP</p>
-        </div>
-        <div class="summary-card">
-            <p class="summary-label">APP em Área Rural Consolidada </p>
-            <p class="summary-value">{{ demonstrativo.app_em_area_rural_consolidada|default:"—" }}</p>
-            <p class="summary-detail">Área de APP em Área Rural Consolidada</p>
-        </div>
-        <div class="summary-card">
-            <p class="summary-label">APP em Remanescente de Vegetação Nativa</p>
-            <p class="summary-value">{{ demonstrativo.app_em_area_remanescente_vegetacao_nativa|default:"—" }}</p>
-            <p class="summary-detail">Área de APP em Remanescente de Vegetação Nativa</p>
-        </div>
-        <div class="summary-card">
-            <p class="summary-label">Área Antropizada</p>
-            <p class="summary-value">{{ demonstrativo.area_antropizada|default:"—" }}</p>
-            <p class="summary-detail">APR − Remanescente − ARC</p>
-        </div>
+    <div>
+        <table class="data-table">
+            <tbody>
+                <tr>
+                    <th>APP Total</th>
+                    <td>{{ demonstrativo.area_app|default:"—" }}</td>
+                </tr>
+                <tr>
+                    <th>APP em Área Rural Consolidada</th>
+                    <td>{{ demonstrativo.app_em_area_rural_consolidada|default:"—" }}</td>
+                </tr>
+                <tr>
+                    <th>APP em Remanescente de Vegetação Nativa</th>
+                    <td>{{ demonstrativo.app_em_area_remanescente_vegetacao_nativa|default:"—" }}</td>
+                </tr>
+                <tr>
+                    <th>Área Antropizada</th>
+                    <td>{{ demonstrativo.area_antropizada|default:"—" }}</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 
     <div class="panel-header" style="margin-top:16px;">
@@ -100,22 +99,23 @@
         </div>
     </div>
 
-    <div class="summary-grid">
-        <div class="summary-card">
-            <p class="summary-label">Passivo / Excedente de RL</p>
-            <p class="summary-value">{{ demonstrativo.passivo_ou_excedente_de_reserva_legal|default:"—" }}</p>
-            <p class="summary-detail">Situação declarada</p>
-        </div>
-        <div class="summary-card">
-            <p class="summary-label">RL a Recompor</p>
-            <p class="summary-value">{{ demonstrativo.area_reserva_legal_a_recompor|default:"—" }}</p>
-            <p class="summary-detail">Área que precisa regenerar na reserva legal</p>
-        </div>
-        <div class="summary-card">
-            <p class="summary-label">APP a Recompor</p>
-            <p class="summary-value">{{ demonstrativo.area_de_preservacao_permanente_a_recompor|default:"—" }}</p>
-            <p class="summary-detail">Área de APP que precisa regenerar</p>
-        </div>
+    <div>
+        <table class="data-table">
+            <tbody>
+                <tr>
+                    <th>Passivo / Excedente de RL</th>
+                    <td>{{ demonstrativo.passivo_ou_excedente_de_reserva_legal|default:"—" }}</td>
+                </tr>
+                <tr>
+                    <th>RL a Recompor</th>
+                    <td>{{ demonstrativo.area_reserva_legal_a_recompor|default:"—" }}</td>
+                </tr>
+                <tr>
+                    <th>APP a Recompor</th>
+                    <td>{{ demonstrativo.area_de_preservacao_permanente_a_recompor|default:"—" }}</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 
     <div class="panel-header" style="margin-top:16px;">
@@ -125,21 +125,22 @@
         </div>
     </div>
 
-    <div class="summary-grid">
-        <div class="summary-card">
-            <p class="summary-label">Remanescente de Vegetação Nativa</p>
-            <p class="summary-value">{{ demonstrativo.native_vegetation_remmant_area|default:"—" }}</p>
-            <p class="summary-detail">Área remanescente</p>
-        </div>
-        <div class="summary-card">
-            <p class="summary-label">Área Rural Consolidada</p>
-            <p class="summary-value">{{ demonstrativo.area_rural_consolidada|default:"—" }}</p>
-            <p class="summary-detail">ARC declarada</p>
-        </div>
-        <div class="summary-card">
-            <p class="summary-label">Servidão Administrativa</p>
-            <p class="summary-value">{{ demonstrativo.area_servidao_admistrativa|default:"—" }}</p>
-            <p class="summary-detail">Quando passa uma linha de transmissão dentro da propriedade</p>
-        </div>
+    <div>
+        <table class="data-table">
+            <tbody>
+                <tr>
+                    <th>Remanescente de Vegetação Nativa</th>
+                    <td>{{ demonstrativo.native_vegetation_remmant_area|default:"—" }}</td>
+                </tr>
+                <tr>
+                    <th>Área Rural Consolidada</th>
+                    <td>{{ demonstrativo.area_rural_consolidada|default:"—" }}</td>
+                </tr>
+                <tr>
+                    <th>Servidão Administrativa</th>
+                    <td>{{ demonstrativo.area_servidao_admistrativa|default:"—" }}</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 </section>
