@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from analysis.services.analyze_coordinates.search_all import SearchAll
 from analysis.services.analyze_coordinates.search_for_car import SearchForCar
 from analysis.services.view_services.zip_upload_service import ZipUploadService
@@ -18,8 +18,9 @@ class AnswerspageView(View):
     template_name = 'analysis/index.html'
 
     def get(self, request):
-        """Exibe a página inicial."""
-        return render(request, self.template_name)
+        """Exibe a página inicial, reidratando último resultado se disponível."""
+        data = request.session.get('last_analysis') or {}
+        return render(request, self.template_name, data)
 
     def post(self, request):
         """Processa o envio das coordenadas via POST."""
@@ -36,24 +37,36 @@ class AnswerspageView(View):
     # =====================================================================
 
     def _process_coordinates(self, request, coordenadas_input, car_input):
-        """Executa a pesquisa nas bases e retorna o resultado."""
+        """Executa a pesquisa nas bases, persiste na sessão e redireciona para GET."""
         try:
-            resultado = SearchAll().execute(coordenadas_input, car_input)
+            resultado = SearchAll().execute(coordenadas_input)
 
-            return render(request, self.template_name, {
+            municipio, uf = None, None
+            try:
+                municipio, uf = locate_city_state(coordenadas_input)
+            except Exception:
+                pass
+
+            data = {
                 'resultado': resultado,
                 'coordenadas_recebidas': coordenadas_input,
                 'car_input': car_input,
+                'municipio': municipio,
+                'uf': uf,
                 'sucesso': True
-            })
+            }
+            request.session['last_analysis'] = data
+            return redirect('homepage')
 
         except Exception as e:
-            return render(request, self.template_name, {
+            data = {
                 'erro': f'Erro ao processar coordenadas: {str(e)}',
                 'coordenadas_recebidas': coordenadas_input,
                 'car_input': car_input,
                 'sucesso': False
-            })
+            }
+            request.session['last_analysis'] = data
+            return redirect('homepage')
 
     def _render_error(self, request, message, car_input=None):
         return render(request, self.template_name, {
@@ -100,14 +113,16 @@ class UploadZipCarView(View):
                     except Exception:
                         pass
 
-                return render(request, self.template_index, {
+                data = {
                     'resultado': resultado,
                     'demonstrativo': asdict(info),
                     'car_input': car_extraido,
                     'municipio': municipio,
                     'uf': state,
                     'sucesso': True
-                })
+                }
+                request.session['last_analysis'] = data
+                return redirect('homepage')
             except Exception as e:
                 context['erro'] = f'Erro ao processar o demonstrativo: {str(e)}'
                 return render(request, self.template_upload, context)
@@ -135,14 +150,16 @@ class UploadZipCarView(View):
                     except Exception:
                         pass
 
-                return render(request, self.template_index, {
+                data = {
                     'resultado': resultado,
                     'recibo': asdict(info),
                     'car_input': car_extraido,
                     'municipio': municipio,
                     'uf': state,
                     'sucesso': True
-                })
+                }
+                request.session['last_analysis'] = data
+                return redirect('homepage')
             except Exception as e:
                 context['erro'] = f'Erro ao processar o recibo: {str(e)}'
                 return render(request, self.template_upload, context)
@@ -202,13 +219,15 @@ class UploadZipCarView(View):
                 geometry = wkt_car.first().geometry
                 municipality, state = locate_city_state(geometry)
 
-            return render(request, self.template_index, {
+            data = {
                 'resultado': resultado,
                 'car_input': car_input,
                 'municipio': municipality,
                 'uf': state,
                 'sucesso': True
-            })
+            }
+            request.session['last_analysis'] = data
+            return redirect('homepage')
 
         except Exception as e:
             context['erro'] = f'Erro ao analisar pelo CAR: {str(e)}'
