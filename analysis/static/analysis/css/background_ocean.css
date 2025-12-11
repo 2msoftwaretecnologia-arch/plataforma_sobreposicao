@@ -1,0 +1,128 @@
+.ocean-backdrop {
+  --ocean-deep: #0b3a57;
+  --ocean: #0f4e72;
+  --shallow: #3ec7cf;
+  --foam: #ffffffcc;
+  --sand: #f6e7b4;
+  --dune: #ecd899;
+  --land: #93c66b;
+  --land-dark: #79ab4f;
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(180deg, var(--ocean) 75%, var(--ocean-deep) 100%);
+  background-repeat: no-repeat;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.island-backdrop {
+  filter: url(#handDrawnNoise);
+  --ocean-deep: #194f71;
+  --ocean: #216a94;
+  --shallow: #3ec8cfb1;
+  --foam: #ffffffa3;
+  --sand: #f6e7b4;
+  --dune: #ecd899;
+  --land: #93c66b;
+  --land-dark: #79ab4f;
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(
+      ellipse 8vmin 10vmin at 20% 25%,
+      var(--land-dark, #2a3d26) 0 70%,
+      transparent 71%
+    ),
+    radial-gradient(
+      ellipse 16vmin 12vmin at 20% 25%,
+      var(--land, #3d5c38) 0 70%,
+      transparent 71%
+    ),
+    radial-gradient(
+      ellipse 18vmin 14vmin at 20% 25%,
+      var(--dune, #d2b48c) 0 70%,
+      transparent 71%
+    ),
+    radial-gradient(
+      ellipse 20vmin 16vmin at 20% 25%,
+      var(--sand, #f2e2b2) 0 70%,
+      transparent 71%
+    ),
+    radial-gradient(
+      ellipse 22vmin 18vmin at 20% 25%,
+      var(--foam, #ffffff88) 0 70%,
+      transparent 71%
+    ),
+    radial-gradient(
+      ellipse 24vmin 20vmin at 20% 25%,
+      var(--shallowwater, #4ca3af) 0 70%,
+      transparent 71%
+    ),
+    radial-gradient(
+      ellipse 6vmin 11vmin at 75% 30%,
+      var(--land-dark, #2a3d26) 0 70%,
+      transparent 71%
+    ),
+    radial-gradient(
+      ellipse 17vmin 13vmin at 75% 30%,
+      var(--land, #3d5c38) 0 70%,
+      transparent 71%
+    ),
+    radial-gradient(
+      ellipse 19vmin 15vmin at 75% 30%,
+      var(--dune, #d2b48c) 0 70%,
+      transparent 71%
+    ),
+    radial-gradient(
+      ellipse 21vmin 17vmin at 75% 30%,
+      var(--sand, #f2e2b2) 0 70%,
+      transparent 71%
+    ),
+    radial-gradient(
+      ellipse 23vmin 19vmin at 75% 30%,
+      var(--foam, #ffffff88) 0 70%,
+      transparent 71%
+    ),
+    radial-gradient(
+      ellipse 25vmin 21vmin at 75% 30%,
+      var(--shallowwater, #4ca3af) 0 70%,
+      transparent 71%
+    ),
+    radial-gradient(
+      ellipse 6vmin 10vmin at 50% 75%,
+      var(--land-dark, #2a3d26) 0 70%,
+      transparent 71%
+    ),
+    radial-gradient(
+      ellipse 15vmin 12vmin at 50% 75%,
+      var(--land, #3d5c38) 0 70%,
+      transparent 71%
+    ),
+    radial-gradient(
+      ellipse 17vmin 14vmin at 50% 75%,
+      var(--dune, #d2b48c) 0 70%,
+      transparent 71%
+    ),
+    radial-gradient(
+      ellipse 19vmin 16vmin at 50% 75%,
+      var(--sand, #f2e2b2) 0 70%,
+      transparent 71%
+    ),
+    radial-gradient(
+      ellipse 21vmin 18vmin at 50% 75%,
+      var(--foam, #ffffff88) 0 70%,
+      transparent 71%
+    ),
+    radial-gradient(
+      ellipse 23vmin 20vmin at 50% 75%,
+      var(--shallowwater, #4ca3af) 0 70%,
+      transparent 71%
+    ),
+    linear-gradient(180deg, var(--ocean) 0%, var(--ocean-deep) 80%);
+  background-repeat: repeat;
+}
+
+.page {
+  position: relative;
+  z-index: 1;
+}

@@ -9,10 +9,18 @@
 
     <!-- CSS principal -->
     <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/index.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/background_ocean.css' %}">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 
 <body>
+    <div class="ocean-backdrop"><div class="island-backdrop"></div></div>
+    <svg height="0" width="0">
+        <filter id="handDrawnNoise">
+            <feTurbulence result="noise" numOctaves="5" baseFrequency="0.0065" type="fractalNoise" />
+            <feDisplacementMap yChannelSelector="G" xChannelSelector="R" scale="900" in2="noise" in="SourceGraphic" />
+        </filter>
+    </svg>
     <div class="page">
 
         <!-- =============================== -->
