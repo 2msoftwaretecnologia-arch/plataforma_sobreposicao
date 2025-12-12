@@ -17,20 +17,16 @@ class FinalResultBuilder:
 
         for layer in layers:
             layer_name = layer.__name__
-            records = results_by_layer.get(layer_name, [])
+            original_records = results_by_layer.get(layer_name, [])
 
-            # Agrupar registros quando aplicável (ex.: Fitoecologia)
-            records = self._group_records(layer_name, records)
+            grouped_records = self._group_records(layer_name, original_records)
 
-            # Construir entrada da base
-            base_entry = self._build_base_entry(layer, records)
+            base_entry = self._build_base_entry(layer, grouped_records)
             bases_output.append(base_entry)
 
-            # Acumular todas as áreas para somatório global
-            all_areas.extend(records)
+            all_areas.extend(grouped_records)
 
-            # Coletar polígonos dos imóveis
-            for r in records:
+            for r in original_records:
                 r["color"] = self._base_color(layer)
                 wkt = r.get("polygon_wkt")
                 gj = r.get("polygon_geojson")
