@@ -13,6 +13,7 @@ from dataclasses import asdict
 from extract_text_from_pdf import extrair_texto_pdf_pdfplumber
 from extract_datas_demostrativo import parse_demonstrativo
 from extract_datas_recibo import extrair_recibo_info
+from django.conf import settings
 
 class HomePageView(View):
     template_name = 'analysis/home.html'
@@ -25,6 +26,7 @@ class ResultsPageView(View):
 
     def get(self, request):
         data = request.session.get('last_analysis') or {}
+        data['planet_tiles_url'] = self._planet_tiles_url()
         return render(request, self.template_name, data)
 
     def post(self, request):
@@ -74,8 +76,19 @@ class ResultsPageView(View):
         return render(request, self.template_name, {
             'erro': message,
             'car_input': car_input,
-            'sucesso': False
+            'sucesso': False,
+            'planet_tiles_url': self._planet_tiles_url()
         })
+
+    def _planet_tiles_url(self):
+        try:
+            mosaic = getattr(settings, 'PLANET_BASEMAP_MOSAIC', '')
+            key = getattr(settings, 'PLANET_API_KEY', '')
+            if mosaic and key:
+                return f"https://tiles.planet.com/basemaps/v1/planet-tiles/{mosaic}/gmap/{{z}}/{{x}}/{{y}}.png?api_key={key}"
+        except Exception:
+            pass
+        return ''
 
 class UploadZipCarView(View):
     template_upload = 'analysis/upload.html'

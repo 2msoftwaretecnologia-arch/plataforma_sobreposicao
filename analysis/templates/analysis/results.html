@@ -168,6 +168,9 @@
                 var baseEsriSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19});
                 var baseCartoLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:20});
                 var baseTopo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',{maxZoom:17});
+                {% if planet_tiles_url %}
+                var basePlanet = L.tileLayer('{{ planet_tiles_url }}',{maxZoom:19, attribution:'Planet'});
+                {% endif %}
                 baseOSM.addTo(map);
                 var overlays = {};
                 var layersByFonte = {};
@@ -210,6 +213,7 @@
                     'Satélite (Esri)': baseEsriSat,
                     'Carto Light': baseCartoLight,
                     'OpenTopoMap': baseTopo
+                    {% if planet_tiles_url %}, 'Satélite (Planet)': basePlanet{% endif %}
                 }, overlays, {collapsed:false}).addTo(map);
                 var legendEl = document.getElementById('legend-imoveis');
                 var keys = Object.keys(legend);
