@@ -5,13 +5,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Análise de Sobreposição de Áreas</title>
+    <title>Resultados da Análise</title>
 
-    <!-- CSS principal -->
     <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/index.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/background_ocean.css' %}">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-</head>
+    </head>
 
 <body>
     <div class="ocean-backdrop"><div class="island-backdrop"></div></div>
@@ -23,9 +22,6 @@
     </svg>
     <div class="page">
 
-        <!-- =============================== -->
-        <!-- HEADER -->
-        <!-- =============================== -->
         <header class="header">
             <div class="brand">
                 <div class="brand-icon">🧭</div>
@@ -40,29 +36,10 @@
             </a>
         </header>
 
-
-        <!-- =============================== -->
-        <!-- HERO -->
-        <!-- =============================== -->
-        <section class="hero">
-            <p class="eyebrow">Monitoramento de áreas</p>
-
-            <h2 class="hero-title">Verifique intersecções de polígonos com bases oficiais em segundos.</h2>
-
-            <p class="hero-subtitle">
-                Cole as coordenadas WKT do polígono ou faça o upload de um shapefile/CAR. Os resultados são organizados por base consultada para facilitar sua análise.
-            </p>
-        </section>
-
-
-        <!-- =============================== -->
-        <!-- LOCALIZAÇÃO -->
-        <!-- =============================== -->
         {% if municipio or uf %}
         <section class="panel">
             <div class="panel-header">
                 <span class="pill">Localização</span>
-
                 <div class="location-summary">
                     {% if municipio %}
                         <span class="badge badge-strong">{{ municipio }}</span>
@@ -72,17 +49,12 @@
                     {% endif %}
                 </div>
             </div>
-
             <p class="panel-description">
                 Identificamos automaticamente o município e estado pertencentes ao polígono informado.
             </p>
         </section>
         {% endif %}
 
-
-        <!-- =============================== -->
-        <!-- DEMONSTRATIVO -->
-        <!-- =============================== -->
         {% if demonstrativo %}
             {% include "analysis/components/_demonstrativo_cards.html" %}
         {% endif %}
@@ -91,10 +63,6 @@
             {% include "analysis/components/_recibo_cards.html" %}
         {% endif %}
 
-
-        <!-- =============================== -->
-        <!-- ERRO -->
-        <!-- =============================== -->
         {% if erro %}
         <section class="alert">
             <div class="alert-icon">⚠️</div>
@@ -105,23 +73,16 @@
         </section>
         {% endif %}
 
-
-        <!-- =============================== -->
-        <!-- RESULTADOS -->
-        <!-- =============================== -->
         {% if resultado %}
         <section class="panel">
-
             <div class="panel-header">
                 <div>
                     <p class="eyebrow">Resumo da execução</p>
                     <h2 class="panel-title">Resultados da Análise</h2>
                 </div>
-
                 <span class="badge">Consulta concluída</span>
             </div>
 
-            <!-- RESUMO -->
             <div class="summary-grid">
                 <div class="summary-card">
                     <p class="summary-label">Áreas com Sobreposição</p>
@@ -156,11 +117,9 @@
                 </div>
             </div>
 
-            <!-- RESULTADOS DETALHADOS POR BASE -->
             {% include "analysis/components/_resultados_por_base.html" %}
         </section>
         {% endif %}
-
 
         {% if resultado and resultado.poligonos_imoveis %}
         <section class="panel">
@@ -238,7 +197,7 @@
                         layer.addTo(layersByFonte[f]);
                         allGroup.addLayer(layer);
                         if(f && col){ legend[f] = col; }
-                    }catch(e){/* ignore parse errors */}
+                    }catch(e){}
                 }
                 if(allGroup.getLayers().length){
                     map.fitBounds(allGroup.getBounds(),{padding:[12,12]});
@@ -276,9 +235,6 @@
         </script>
         {% endif %}
 
-        <!-- =============================== -->
-        <!-- GUIA RÁPIDO -->
-        <!-- =============================== -->
         <section class="panel">
             <div class="panel-header">
                 <div>
@@ -288,7 +244,6 @@
             </div>
 
             <div class="info-grid">
-
                 <div class="info-block">
                     <p class="info-title">Preparação</p>
                     <ul>
@@ -296,7 +251,6 @@
                         <li>Verifique se a geometria é válida e fechada.</li>
                     </ul>
                 </div>
-
                 <div class="info-block">
                     <p class="info-title">Bases consultadas</p>
                     <ul>
@@ -306,7 +260,6 @@
                         <li>APAs</li>
                     </ul>
                 </div>
-
                 <div class="info-block">
                     <p class="info-title">Interpretação</p>
                     <ul>
@@ -314,10 +267,8 @@
                         <li>Use os valores e status para priorizar ações.</li>
                     </ul>
                 </div>
-
             </div>
         </section>
-
     </div>
 </body>
 </html>

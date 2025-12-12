@@ -51,7 +51,7 @@ def clean_pycache(directory="."):
             removed_count += 1
         except Exception as e:
             print(f"{RED}Erro ao remover {pyc_file}: {e}{RESET}")
-    
+
     # Procurar por arquivos .pyo (Python optimized)
     for pyo_file in directory.rglob("*.pyo"):
         try:
@@ -60,7 +60,7 @@ def clean_pycache(directory="."):
             removed_count += 1
         except Exception as e:
             print(f"{RED}Erro ao remover {pyo_file}: {e}{RESET}")
-    
+
     print(f"{GRAY}{'-' * 50}{RESET}")
     if removed_count > 0:
         print(f"{GREEN}✅ Limpeza concluída! {removed_count} item(s) removido(s).{RESET}")

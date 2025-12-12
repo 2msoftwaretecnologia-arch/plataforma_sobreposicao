@@ -14,22 +14,24 @@ from extract_text_from_pdf import extrair_texto_pdf_pdfplumber
 from extract_datas_demostrativo import parse_demonstrativo
 from extract_datas_recibo import extrair_recibo_info
 
-class AnswerspageView(View):
-    template_name = 'analysis/index.html'
+class HomePageView(View):
+    template_name = 'analysis/home.html'
 
     def get(self, request):
-        """Exibe a página inicial, reidratando último resultado se disponível."""
+        return render(request, self.template_name)
+
+class ResultsPageView(View):
+    template_name = 'analysis/results.html'
+
+    def get(self, request):
         data = request.session.get('last_analysis') or {}
         return render(request, self.template_name, data)
 
     def post(self, request):
-        """Processa o envio das coordenadas via POST."""
         coordenadas_input = extract_geometry()
         car_input = request.POST.get('car_input', '').strip()
-
         if not coordenadas_input or not str(coordenadas_input).strip():
             return self._render_error(request, 'Por favor, insira coordenadas válidas.', car_input)
-
         return self._process_coordinates(request, coordenadas_input, car_input)
 
     # =====================================================================
@@ -56,7 +58,7 @@ class AnswerspageView(View):
                 'sucesso': True
             }
             request.session['last_analysis'] = data
-            return redirect('homepage')
+            return redirect('results')
 
         except Exception as e:
             data = {
@@ -66,7 +68,7 @@ class AnswerspageView(View):
                 'sucesso': False
             }
             request.session['last_analysis'] = data
-            return redirect('homepage')
+            return redirect('results')
 
     def _render_error(self, request, message, car_input=None):
         return render(request, self.template_name, {
@@ -77,7 +79,7 @@ class AnswerspageView(View):
 
 class UploadZipCarView(View):
     template_upload = 'analysis/upload.html'
-    template_index = 'analysis/index.html'
+    template_index = 'analysis/results.html'
     
     def get(self, request):
         return render(request, self.template_upload)
@@ -122,7 +124,7 @@ class UploadZipCarView(View):
                     'sucesso': True
                 }
                 request.session['last_analysis'] = data
-                return redirect('homepage')
+                return redirect('results')
             except Exception as e:
                 context['erro'] = f'Erro ao processar o demonstrativo: {str(e)}'
                 return render(request, self.template_upload, context)
@@ -159,7 +161,7 @@ class UploadZipCarView(View):
                     'sucesso': True
                 }
                 request.session['last_analysis'] = data
-                return redirect('homepage')
+                return redirect('results')
             except Exception as e:
                 context['erro'] = f'Erro ao processar o recibo: {str(e)}'
                 return render(request, self.template_upload, context)
@@ -227,7 +229,7 @@ class UploadZipCarView(View):
                 'sucesso': True
             }
             request.session['last_analysis'] = data
-            return redirect('homepage')
+            return redirect('results')
 
         except Exception as e:
             context['erro'] = f'Erro ao analisar pelo CAR: {str(e)}'
@@ -237,29 +239,30 @@ class UploadZipCarView(View):
         """Processa os dados extraídos do shapefile."""
         try:
             resultado = SearchAll().execute(coordenadas_input)
-
             municipio, uf = None, None
             try:
                 municipio, uf = locate_city_state(coordenadas_input)
             except Exception:
                 pass
-
-            return render(request, self.template_index, {
+            data = {
                 'resultado': resultado,
                 'coordenadas_recebidas': coordenadas_input,
                 'car_input': car_input,
                 'municipio': municipio,
                 'uf': uf,
                 'sucesso': True
-            })
-
+            }
+            request.session['last_analysis'] = data
+            return redirect('results')
         except Exception as e:
-            return render(request, self.template_index, {
+            data = {
                 'erro': f'Erro ao processar coordenadas: {str(e)}',
                 'coordenadas_recebidas': coordenadas_input,
                 'car_input': car_input,
                 'sucesso': False
-            })
+            }
+            request.session['last_analysis'] = data
+            return redirect('results')
 
 def termos(request):
     return render(request, 'analysis/termos_de_uso.html')

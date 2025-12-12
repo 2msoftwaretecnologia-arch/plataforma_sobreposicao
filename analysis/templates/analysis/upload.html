@@ -6,6 +6,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Upload de ZIP e CAR</title>
+    <icon type="image/x-icon" href="{% static 'analysis/images/icon_page.svg' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/upload.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/loader.css' %}">
 </head>
@@ -139,7 +140,9 @@
                             fill-rule="evenodd"></path>
                     </svg>
                 </button>
-                <a href="{% url 'termos_de_uso' %}"><h5 class="termos-uso">Termos de Uso</h5></a>
+
+                
+                <a class="termos-uso" href="{% url 'termos_de_uso' %}">Termos de Uso</a>
 
             </form>
 
@@ -152,10 +155,6 @@
             {% if erro %}
             <div class="status-error">❌ {{ erro }}</div>
             {% endif %}
-
-            <div style="margin-top:12px">
-              <a href="{% url 'login' %}" class="btn btn-secondary">Inicio</a>
-            </div>
         </div>
     </div>
     {% include 'analysis/loader.html' %}
