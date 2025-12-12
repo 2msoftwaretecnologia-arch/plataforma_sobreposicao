@@ -164,8 +164,11 @@
                 {% endfor %}
                 if(!items.length) return;
                 var map = L.map('map-imoveis');
-                var base = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19});
-                base.addTo(map);
+                var baseOSM = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19});
+                var baseEsriSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19});
+                var baseCartoLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:20});
+                var baseTopo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',{maxZoom:17});
+                baseOSM.addTo(map);
                 var overlays = {};
                 var layersByFonte = {};
                 var allGroup = L.featureGroup().addTo(map);
@@ -202,7 +205,12 @@
                 if(allGroup.getLayers().length){
                     map.fitBounds(allGroup.getBounds(),{padding:[12,12]});
                 }
-                L.control.layers({'OpenStreetMap': base}, overlays, {collapsed:false}).addTo(map);
+                L.control.layers({
+                    'OpenStreetMap': baseOSM,
+                    'Satélite (Esri)': baseEsriSat,
+                    'Carto Light': baseCartoLight,
+                    'OpenTopoMap': baseTopo
+                }, overlays, {collapsed:false}).addTo(map);
                 var legendEl = document.getElementById('legend-imoveis');
                 var keys = Object.keys(legend);
                 for(var j=0;j<keys.length;j++){
