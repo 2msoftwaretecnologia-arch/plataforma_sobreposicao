@@ -130,10 +130,13 @@
             </div>
 
             <div id="map-imoveis"></div>
+            <div id="legend-controls"><button id="toggle-all-layers" type="button">Desmarcar todas as bases</button></div>
             <div id="legend-imoveis"></div>
         </section>
         <style>
             #map-imoveis{height:480px;border:1px solid var(--line);border-radius:var(--radius);}
+            #legend-controls{margin-top:8px}
+            #legend-controls button{padding:6px 10px;border:1px solid var(--line);border-radius:12px;background:transparent;cursor:pointer}
             #legend-imoveis{margin-top:8px;display:flex;flex-wrap:wrap;gap:8px}
             .legend-item{display:flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--line);border-radius:12px;font-size:12px}
             .legend-swatch{width:14px;height:14px;border-radius:3px;border:1px solid rgba(0,0,0,0.15)}
@@ -216,6 +219,7 @@
                     {% if planet_tiles_url %}, 'Satélite (Planet)': basePlanet{% endif %}
                 }, overlays, {collapsed:false}).addTo(map);
                 var legendEl = document.getElementById('legend-imoveis');
+                var toggleAllBtn = document.getElementById('toggle-all-layers');
                 var keys = Object.keys(legend);
                 for(var j=0;j<keys.length;j++){
                     var k = keys[j];
@@ -242,6 +246,29 @@
                         }
                     });
                     legendEl.appendChild(item);
+                }
+                var allOn = true;
+                if(toggleAllBtn){
+                    toggleAllBtn.addEventListener('click', function(){
+                        var fontes = Object.keys(layersByFonte);
+                        for(var i=0;i<fontes.length;i++){
+                            var f = fontes[i];
+                            var grp = layersByFonte[f];
+                            if(!grp) continue;
+                            if(allOn){
+                                if(map.hasLayer(grp)){ map.removeLayer(grp); }
+                            }else{
+                                if(!map.hasLayer(grp)){ map.addLayer(grp); }
+                            }
+                        }
+                        var legendItems = legendEl.querySelectorAll('.legend-item');
+                        for(var i=0;i<legendItems.length;i++){
+                            if(allOn){ legendItems[i].classList.add('off'); }
+                            else { legendItems[i].classList.remove('off'); }
+                        }
+                        allOn = !allOn;
+                        this.textContent = allOn ? 'Desmarcar todas as bases' : 'Marcar todas as bases';
+                    });
                 }
             })();
         </script>
