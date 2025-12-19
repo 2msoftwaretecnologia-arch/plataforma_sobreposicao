@@ -10,8 +10,8 @@
     <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/index.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/background_ocean.css' %}">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    </head>
-
+    <link href='https://unpkg.com/leaflet-fullscreen@1.0.2/dist/leaflet.fullscreen.css' rel='stylesheet' />
+</head>
 <body>
     <div class="ocean-backdrop"><div class="island-backdrop"></div></div>
     <svg height="0" width="0">
@@ -143,6 +143,7 @@
             .legend-item.off{opacity:.5}
         </style>
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <script src='https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/Leaflet.fullscreen.min.js'></script>
         <script>
             (function(){
                 var items = [];
@@ -166,7 +167,9 @@
 
                 {% endfor %}
                 if(!items.length) return;
-                var map = L.map('map-imoveis');
+                var map = L.map('map-imoveis', {
+                    fullscreenControl: true,
+                });
                 var baseOSM = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19});
                 var baseEsriSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19});
                 var baseCartoLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:20});
