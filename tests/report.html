@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Análise de Imóvel Rural</title>
+  <link rel="stylesheet" href="report.css" />
+</head>
+<body>
+
+<div class="container">
+
+  <!-- RESUMO GERAL -->
+  <section class="summary">
+    <div class="summary-status ok">
+      ✔ IMÓVEL EM CONFORMIDADE
+    </div>
+    <div class="summary-sub">
+      Fazenda Boa Esperança • Palmas / TO
+    </div>
+  </section>
+
+  <!-- INFORMAÇÕES GERAIS -->
+  <section class="card">
+    <h2>📍 Informações do Imóvel</h2>
+    <div class="info-list">
+      <div><strong>Nome do imóvel</strong><span>Fazenda Boa Esperança</span></div>
+      <div><strong>Proprietário</strong><span>João da Silva</span></div>
+      <div><strong>Área total</strong><span>850 ha</span></div>
+      <div><strong>Módulos fiscais</strong><span>12</span></div>
+      <div><strong>Município / UF</strong><span>Palmas - TO</span></div>
+    </div>
+  </section>
+
+  <!-- ANÁLISE -->
+  <section class="card">
+    <h2>🧪 Resultado da Análise Automática</h2>
+    <div class="pill-group">
+      <span class="pill green">Situação: Regular</span>
+      <span class="pill blue">Condição: Ativo</span>
+      <span class="pill green">Emite Cota de RL</span>
+    </div>
+  </section>
+
+  <!-- CRITÉRIO AMBIENTAL -->
+  <section class="card">
+    <h2>🌱 Critério Ambiental <small>(autodeclarado)</small></h2>
+    <div class="env-grid">
+      <div class="env-box">
+        <span class="env-title">Reserva Legal</span>
+        <span class="env-value">170 ha</span>
+      </div>
+
+      <div class="env-box">
+        <span class="env-title">Déficit de RL</span>
+        <span class="badge no">Não</span>
+      </div>
+
+      <div class="env-box">
+        <span class="env-title">APP Antropizada</span>
+        <span class="badge yes">Sim</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- SOBREPOSIÇÕES -->
+  <section class="card">
+    <h2>🗺️ Sobreposições Ativas</h2>
+
+    <div class="alert warning">
+      ⚠ Existem áreas com sobreposição ambiental
+    </div>
+
+    <ul class="overlay-list">
+      <li>APP em curso d’água</li>
+      <li>Zona de amortecimento de Unidade de Conservação</li>
+      <li>Área consolidada anterior a 2008</li>
+    </ul>
+  </section>
+
+  <footer class="footer">
+    Relatório automático • Sistema de Análise Ambiental
+  </footer>
+
+</div>
+
+</body>
+</html>
