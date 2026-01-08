@@ -1,4 +1,4 @@
-<div class="area-item area-item--imoveis" title="{% if area.item_info %}{{ area.item_info }}{% endif %}{% if area.status %}{% if area.item_info %} · {% endif %}Status: {{ area.status }}{% endif %}">
+<div class="area-item area-item--imoveis" data-area="{{ area.area|stringformat:'f' }}" title="{% if area.item_info %}{{ area.item_info }}{% endif %}{% if area.status %}{% if area.item_info %} · {% endif %}Status: {{ area.status }}{% endif %}">
     <div class="area-item__icon" aria-hidden="true">🏠</div>
     <div class="area-item__content">
         <p class="area-item__label">Área sobreposta</p>

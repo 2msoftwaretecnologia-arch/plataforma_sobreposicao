@@ -8,14 +8,19 @@
         </p>
     </div>
 
-    <div class="base-grid">
+    <div class="base-grid" id="base-grid-container">
         
         {% for base in resultado.resultados_por_base %}
-        <article class="base-card">
+        <article class="base-card" data-total-area="{{ base.total_area|stringformat:'f' }}">
             
             <header class="base-card__header">
-                <div>
+                <div style="display: flex; align-items: center; gap: 8px;">
                     <p class="base-card__title">{{ base.nome_base }}</p>
+                    {% if base.areas_encontradas|length > 1 %}
+                    <button type="button" class="local-sort-btn" title="Inverter ordem (maior/menor área)" data-sort-dir="desc">
+                        ⇅
+                    </button>
+                    {% endif %}
                 </div>
 
                 <span class="pill">
@@ -71,3 +76,67 @@
 {% else %}
     {% include "analysis/components/_sem_sobreposicao_global.html" %}
 {% endif %}
+
+<style>
+    .panel-subheader {
+        margin-bottom: 24px;
+    }
+    .local-sort-btn {
+        background: transparent;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        width: 24px;
+        height: 24px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        cursor: pointer;
+        color: var(--text-secondary);
+        transition: all 0.2s;
+        padding: 0;
+        line-height: 1;
+    }
+    .local-sort-btn:hover {
+        background: var(--surface-hover);
+        color: var(--text-primary);
+        border-color: var(--text-secondary);
+    }
+    .local-sort-btn[data-sort-dir="asc"] {
+        background: var(--surface-active);
+        color: var(--primary);
+        border-color: var(--primary-light);
+        transform: rotate(180deg);
+    }
+</style>
+
+<script>
+    (function() {
+        const btns = document.querySelectorAll('.local-sort-btn');
+        
+        btns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                // Find parent card and list
+                const card = this.closest('.base-card');
+                const list = card.querySelector('.area-list');
+                if (!list) return;
+
+                // Toggle direction
+                const currentDir = this.dataset.sortDir || 'desc';
+                const newDir = currentDir === 'desc' ? 'asc' : 'desc';
+                this.dataset.sortDir = newDir;
+
+                // Sort items
+                const items = Array.from(list.querySelectorAll('.area-item'));
+                items.sort((a, b) => {
+                    const valA = parseFloat(a.dataset.area || 0);
+                    const valB = parseFloat(b.dataset.area || 0);
+                    return newDir === 'desc' ? valB - valA : valA - valB;
+                });
+
+                // Re-append sorted items
+                items.forEach(item => list.appendChild(item));
+            });
+        });
+    })();
+</script>

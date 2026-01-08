@@ -21,6 +21,9 @@ class FinalResultBuilder:
 
             grouped_records = self._group_records(layer_name, original_records)
 
+            # Ordena os registros da maior área para a menor
+            grouped_records.sort(key=lambda x: float(x.get("area") or 0), reverse=True)
+
             base_entry = self._build_base_entry(layer, grouped_records)
             bases_output.append(base_entry)
 
@@ -39,6 +42,12 @@ class FinalResultBuilder:
                         "polygon_geojson": gj,
                         "color": self._base_color(layer),
                     })
+
+        # Ordena as bases para exibir primeiro aquelas com maior área total sobreposta
+        bases_output.sort(
+            key=lambda b: sum(float(r.get("area") or 0) for r in b.get("areas_encontradas", [])),
+            reverse=True
+        )
 
         summary_counts = self._build_summary_counts(layers)
 
@@ -100,11 +109,13 @@ class FinalResultBuilder:
 
         Inclui nome da base, itens encontrados e contagem de sobreposições.
         """
+        total_area = sum(float(r.get("area") or 0) for r in records)
         return {
             "nome_base": self._base_name(layer),
             "areas_encontradas": records,
             "quantidade_nao_avaliados": 0,
             "total_areas_com_sobreposicao": len(records),
+            "total_area": total_area,
         }
 
     def _build_summary_counts(self, layers):
