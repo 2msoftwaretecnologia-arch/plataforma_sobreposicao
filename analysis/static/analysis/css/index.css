@@ -426,7 +426,7 @@ body {
     font-size: 14px;
     color: var(--muted);
     line-height: 1.4;
-
+    margin-bottom: 4px;
     overflow-wrap: break-word;
 }
 
