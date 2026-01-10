@@ -10,9 +10,11 @@ from kernel.utils import extract_geometry, locate_city_state
 from django.views import View
 from django.shortcuts import render
 from dataclasses import asdict
-from extract_text_from_pdf import extrair_texto_pdf_pdfplumber
-from extract_datas_demostrativo import parse_demonstrativo
-from extract_datas_recibo import extrair_recibo_info
+from doc_extractor.services.parsers.implement.parcer_document.statement_parser import StatementParser
+from doc_extractor.services.parsers.implement.extract_text.extract_pdf_plumber import ExtractDocumentPdfPlumber
+from doc_extractor.services.parsers.context.extract_data_context import DocumentDataContext
+from doc_extractor.services.parsers.demonstrativo import parse_demonstrativo
+from doc_extractor.services.parsers.recibo import extrair_recibo_info
 from django.conf import settings
 
 class HomePageView(View):
@@ -111,8 +113,10 @@ class UploadZipCarView(View):
                 return render(request, self.template_upload, context)
 
             try:
-                texto = extrair_texto_pdf_pdfplumber(demo_file)
-                info = parse_demonstrativo(texto)
+                extractor = ExtractDocumentPdfPlumber()
+                parser = StatementParser()
+                context = DocumentDataContext(extractor, parser)
+                info = context.extract_data(demo_file)
                 car_extraido = (info.car or car_input or '').strip()
 
                 resultado = {}

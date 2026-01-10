@@ -3,9 +3,8 @@ import pdfplumber
 def _desduplicar_pares(texto: str) -> str:
     if not texto:
         return texto
-    linhas = texto.splitlines()
     resultado = []
-    for linha in linhas:
+    for linha in texto.splitlines():
         n = len(linha)
         if n < 2:
             resultado.append(linha)
@@ -30,7 +29,7 @@ def _desduplicar_pares(texto: str) -> str:
             resultado.append(linha)
     return "\n".join(resultado)
 
-def _extrair_texto_sem_duplicacao(page):
+def extrair_texto_sem_duplicacao(page):
     bruto = page.extract_text() or ""
     return _desduplicar_pares(bruto)
 
@@ -50,11 +49,12 @@ def extrair_texto_pdf_pdfplumber(caminho_arquivo, pagina=None, deduplicar=False)
                 if pagina < 1 or pagina > len(pdf.pages):
                     return ""
                 p = pdf.pages[pagina - 1]
-                texto = _extrair_texto_sem_duplicacao(p) if deduplicar else (p.extract_text() or "")
+                texto = extrair_texto_sem_duplicacao(p) if deduplicar else (p.extract_text() or "")
                 return texto
+
             texto_total = ""
             for pagina_num, p in enumerate(pdf.pages, 1):
-                texto = _extrair_texto_sem_duplicacao(p) if deduplicar else (p.extract_text() or "")
+                texto = extrair_texto_sem_duplicacao(p) if deduplicar else (p.extract_text() or "")
                 texto_total += f"\n--- Página {pagina_num} ---\n{texto}\n"
             return texto_total
         
@@ -64,6 +64,3 @@ def extrair_texto_pdf_pdfplumber(caminho_arquivo, pagina=None, deduplicar=False)
     except Exception as e:
         print(f"Erro ao processar o PDF: {str(e)}")
         return ""
-
-# texto2 = extrair_texto_pdf_pdfplumber("recibo.pdf", pagina=3, deduplicar=True)
-# print(texto2)

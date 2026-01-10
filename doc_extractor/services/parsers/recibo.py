@@ -1,7 +1,9 @@
 import re
 from dataclasses import dataclass, asdict
 from typing import List, Dict, Optional, Union
-from extract_text_from_pdf import extrair_texto_pdf_pdfplumber
+from doc_extractor.services.parsers.contract.extract_document_contract import ExtractDocumentBase
+from doc_extractor.services.pdf_engine import extrair_texto_pdf_pdfplumber
+from doc_extractor.services.parsers.database.receipt_info import ReceiptInfo
 
 def get_name_document(texto: str) -> List[Dict[str, str]]:
     CPF_CNPJ_PATTERN = re.compile(r'(?:CPF|CNPJ)[:\s]*([\d./-]+)', re.IGNORECASE)
@@ -39,20 +41,6 @@ def _val_with_fallback(primary_text: str, inicio_opts: List[str], fim_opts: List
                     return v
     return None
 
-@dataclass
-class ReciboInfo:
-    car: Optional[str]
-    nome_imovel_rural: Optional[str]
-    modulos_fiscais: Optional[str]
-    area_rural_consolidada: Optional[str]
-    area_servidao_administrativa: Optional[str]
-    remanescente_vegetacao_nativa: Optional[str]
-    area_liquida_do_imovel: Optional[str]
-    area_reserva_legal: Optional[str]
-    area_preservacao_permanente: Optional[str]
-    area_antropizada: Optional[str]
-    proprietarios: List[Dict[str, str]]
-
 def _parse_ha_value(s: Optional[str]) -> Optional[float]:
     if not s:
         return None
@@ -72,8 +60,9 @@ def _format_ha(v: Optional[float]) -> Optional[str]:
         return None
     return f"{v:.2f} ha"
 
-def parse_recibo(pagina2_texto: str, pagina3_texto: str, texto_total: Optional[str] = None) -> ReciboInfo:
+def parse_recibo(pagina2_texto: str, pagina3_texto: str, texto_total: Optional[str] = None) -> ReceiptInfo:
     full_text = texto_total or ""
+    print(full_text)
     def val3(inicios: Union[str, List[str]], fins: Union[str, List[str]]) -> Optional[str]:
         inicio_opts = [inicios] if isinstance(inicios, str) else inicios
         fim_opts = [fins] if isinstance(fins, str) else fins
@@ -94,7 +83,7 @@ def parse_recibo(pagina2_texto: str, pagina3_texto: str, texto_total: Optional[s
     if a_apr is not None and a_nat is not None and a_arc is not None:
         antropizada_calc = _format_ha(max(a_apr - a_nat - a_arc, 0.0))
 
-    return ReciboInfo(
+    return ReceiptInfo(
         car=(car_val or "").replace(".", ""),
         nome_imovel_rural=nome_val,
         modulos_fiscais=mod_val,
@@ -108,13 +97,13 @@ def parse_recibo(pagina2_texto: str, pagina3_texto: str, texto_total: Optional[s
         proprietarios=get_name_document(pagina2_texto or ""),
     )
 
-def extrair_recibo_info(arquivo_pdf: Union[str, object]) -> ReciboInfo:
-    texto_p2 = extrair_texto_pdf_pdfplumber(arquivo_pdf, pagina=2, deduplicar=True)
-    texto_p3 = extrair_texto_pdf_pdfplumber(arquivo_pdf, pagina=3, deduplicar=True)
-    texto_full = extrair_texto_pdf_pdfplumber(arquivo_pdf)
+def extrair_recibo_info(arquivo_pdf: Union[str, object], extractor: ExtractDocumentBase) -> ReceiptInfo:
+    texto_p2 = extractor.extract_text(arquivo_pdf, page=2, deduplicate=True)
+    texto_p3 = extractor.extract_text(arquivo_pdf, page=3, deduplicate=True)
+    texto_full = extractor.extract_text(arquivo_pdf, deduplicate=True)
     return parse_recibo(texto_p2, texto_p3, texto_full)
 
-def imprimir_info(info: ReciboInfo) -> None:
+def imprimir_info(info: ReceiptInfo) -> None:
     for k, v in asdict(info).items():
         print(f"{k}: {v}")
 
@@ -122,4 +111,3 @@ def imprimir_info(info: ReciboInfo) -> None:
 #     caminho = r"recibo.pdf"
 #     info = extrair_recibo_info(caminho)
 #     imprimir_info(info)
-

@@ -11,7 +11,7 @@ class Command(BaseCommand):
     )
 
     def handle(self, *args, **options):
-        table_name = "tb_area_deforestation_mapbiomas"
+        table_name = "tb_area_fitoecologia"
 
         with connection.cursor() as cursor:
 

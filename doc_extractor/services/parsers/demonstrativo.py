@@ -1,7 +1,6 @@
 import re
-from dataclasses import dataclass, asdict
 from typing import Optional
-from extract_text_from_pdf import extrair_texto_pdf_pdfplumber
+from doc_extractor.services.parsers.database.statement_info import StatementInfo
 
 def _get_car(text: str) -> Optional[str]:
     pat = re.compile(r"\b[A-Z]{2}-\d{1,15}-[A-F0-9]{32}\b")
@@ -43,27 +42,6 @@ def _get_value(texto: str, inicio: str, fim: str, flags=0) -> Optional[str]:
         return conteudo
     return None
 
-@dataclass
-class DemonstrativoInfo:
-    car: Optional[str]
-    data_retificacao: Optional[str]
-    external_condicion: Optional[str]
-    tax_modules: Optional[str]
-    registration_status: Optional[str]
-    native_vegetation_remmant_area: Optional[str]
-    area_rural_consolidada: Optional[str]
-    area_servidao_admistrativa: Optional[str]
-    area_Reserva_Legal_Averbada_referente_Art_30_codigo_florestal: Optional[str]
-    area_Reserva_Legal_Aprovada_nao_Averbada: Optional[str]
-    area_reserva_legal_proposta: Optional[str]
-    total_reserva_legal_declarada_pelo_proprietario_possuidor: Optional[str]
-    area_app: Optional[str]
-    app_em_area_rural_consolidada: Optional[str]
-    app_em_area_remanescente_vegetacao_nativa: Optional[str]
-    passivo_ou_excedente_de_reserva_legal: Optional[str]
-    area_reserva_legal_a_recompor: Optional[str]
-    area_de_preservacao_permanente_a_recompor: Optional[str]
-    area_antropizada: Optional[str]
 
 def _parse_ha_value(s: Optional[str]) -> Optional[float]:
     if not s:
@@ -84,13 +62,14 @@ def _format_ha(v: Optional[float]) -> Optional[str]:
         return None
     return f"{v:.2f} ha"
 
-def parse_demonstrativo(text: str) -> DemonstrativoInfo:
+def parse_demonstrativo(text: str) -> StatementInfo:
     bloco = _get_block_reserva_legal_averbada(text) or text
     def val(inicio: str, fim: str) -> Optional[str]:
         v = _get_value(bloco, inicio, fim, flags=re.IGNORECASE)
         if v is None:
             v = _get_value(text, inicio, fim, flags=re.IGNORECASE)
         return v
+        
     car_val = _get_car(text)
     data_val = _get_last_retification_date(text)
     ext_val = val("Condição Externa:", "Situação")
@@ -117,7 +96,7 @@ def parse_demonstrativo(text: str) -> DemonstrativoInfo:
     if a_apr is not None and a_nat is not None and a_arc is not None:
         antropizada_calc = _format_ha(max(a_apr - a_nat - a_arc, 0.0))
 
-    return DemonstrativoInfo(
+    return StatementInfo(
         car=car_val,
         data_retificacao=data_val,
         external_condicion=ext_val,
@@ -139,15 +118,7 @@ def parse_demonstrativo(text: str) -> DemonstrativoInfo:
         area_antropizada=antropizada_calc,
     )
 
-def imprimir_info(info: DemonstrativoInfo) -> None:
+def imprimir_info(info: StatementInfo) -> None:
     for k, v in asdict(info).items():
         print(f"{k}: {v}")
 
-# if __name__ == "__main__":
-#     import sys
-#     caminhos = sys.argv[1:] or [r"C:\\Users\\2mbet\\Downloads\\Demonstrativo_TO-1718881-D8474C7E5E21442498F19552C19A4465.pdf"]
-#     for i, caminho in enumerate(caminhos, 1):
-#         texto = extrair_texto_pdf_pdfplumber(caminho)
-#         info = parse_demonstrativo(texto)
-#         print(f"Arquivo {i}: {caminho}")
-#         imprimir_info(info)

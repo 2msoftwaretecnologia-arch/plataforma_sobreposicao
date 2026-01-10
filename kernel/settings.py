@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     'naturatins',
     'gov',
     'deforestation_fires',
+    'doc_extractor',
 ]
 
 MIDDLEWARE = [
