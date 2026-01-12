@@ -1,5 +1,5 @@
 import enum
 
-class TYPE_DOCUMENT(enum.Enum):
+class TypeDocument(enum.Enum):
     STATEMENT = "statement"
     RECEIPT = "receipt"

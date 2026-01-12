@@ -7,6 +7,6 @@ class DocumentDataContext:
         self.extractor = extractor
         self.parser = parser
     
-    def extract_data(self, pdf_path: str, deduplicate: bool = False, page: int = None) -> Any:
+    def extract_data(self, pdf_path: str, deduplicate: bool = True, page: int = None) -> Any:
         text = self.extractor.extract_text(pdf_path, deduplicate, page)
         return self.parser.parse(text)

@@ -62,7 +62,7 @@ def _format_ha(v: Optional[float]) -> Optional[str]:
 
 def parse_recibo(pagina2_texto: str, pagina3_texto: str, texto_total: Optional[str] = None) -> ReceiptInfo:
     full_text = texto_total or ""
-    print(full_text)
+    # print(full_text)
     def val3(inicios: Union[str, List[str]], fins: Union[str, List[str]]) -> Optional[str]:
         inicio_opts = [inicios] if isinstance(inicios, str) else inicios
         fim_opts = [fins] if isinstance(fins, str) else fins

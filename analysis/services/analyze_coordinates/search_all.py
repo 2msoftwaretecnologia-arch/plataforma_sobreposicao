@@ -53,6 +53,10 @@ class SearchAll:
         # 5) Persistir log de performance para depuração
         self._save_performance_log(performance)
 
+        if final_output:
+            with open("final_output.json", "w") as f:
+                json.dump(final_output, f, indent=2, ensure_ascii=False)
+                
         return final_output
 
     def _create_target_and_type(self, geometry_or_car):

@@ -55,6 +55,14 @@
         </section>
         {% endif %}
 
+        {% if demonstrativo or recibo %}
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 16px;">
+            <a href="{% url 'report_print' %}" target="_blank" class="ghost-button" style="background: #fff; border: 1px solid #cbd5e1; color: #334155;">
+                🖨️ Imprimir Relatório
+            </a>
+        </div>
+        {% endif %}
+
         {% if demonstrativo %}
             {% include "analysis/components/_demonstrativo_cards.html" %}
         {% endif %}

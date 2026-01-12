@@ -10,11 +10,10 @@ from kernel.utils import extract_geometry, locate_city_state
 from django.views import View
 from django.shortcuts import render
 from dataclasses import asdict
-from doc_extractor.services.parsers.implement.parcer_document.statement_parser import StatementParser
 from doc_extractor.services.parsers.implement.extract_text.extract_pdf_plumber import ExtractDocumentPdfPlumber
 from doc_extractor.services.parsers.context.extract_data_context import DocumentDataContext
-from doc_extractor.services.parsers.demonstrativo import parse_demonstrativo
-from doc_extractor.services.parsers.recibo import extrair_recibo_info
+from doc_extractor.services.parsers.factory.documents_parser_factory import DocumentsParserFactory
+from doc_extractor.services.parsers.constants import TypeDocument
 from django.conf import settings
 
 class HomePageView(View):
@@ -92,6 +91,13 @@ class ResultsPageView(View):
             pass
         return ''
 
+class ReportPrintView(View):
+    template_name = 'analysis/report_print.html'
+
+    def get(self, request):
+        data = request.session.get('last_analysis') or {}
+        return render(request, self.template_name, data)
+
 class UploadZipCarView(View):
     template_upload = 'analysis/upload.html'
     template_index = 'analysis/results.html'
@@ -107,81 +113,28 @@ class UploadZipCarView(View):
         context = {'car_input': car_input}
 
         if mode == 'demostrativo':
-            demo_file = request.FILES.get('demo_file')
-            if not demo_file:
-                context['erro'] = 'Por favor, envie um arquivo PDF do demonstrativo.'
-                return render(request, self.template_upload, context)
-
-            try:
-                extractor = ExtractDocumentPdfPlumber()
-                parser = StatementParser()
-                context = DocumentDataContext(extractor, parser)
-                info = context.extract_data(demo_file)
-                car_extraido = (info.car or car_input or '').strip()
-
-                resultado = {}
-                municipio, state = None, None
-
-                if car_extraido:
-                    try:
-                        resultado = SearchForCar().execute(car_extraido) or {}
-                        qs = get_sicar_record(car_number__iexact=car_extraido)
-                        if qs.exists():
-                            geometry = qs.first().geometry
-                            municipio, state = locate_city_state(geometry)
-                    except Exception:
-                        pass
-
-                data = {
-                    'resultado': resultado,
-                    'demonstrativo': asdict(info),
-                    'car_input': car_extraido,
-                    'municipio': municipio,
-                    'uf': state,
-                    'sucesso': True
-                }
-                request.session['last_analysis'] = data
-                return redirect('results')
-            except Exception as e:
-                context['erro'] = f'Erro ao processar o demonstrativo: {str(e)}'
-                return render(request, self.template_upload, context)
+            return self._handle_document_upload(
+                request,
+                request.FILES.get('demo_file'),
+                TypeDocument.STATEMENT,
+                'demonstrativo',
+                car_input,
+                'Por favor, envie um arquivo PDF do demonstrativo.',
+                'Erro ao processar o demonstrativo',
+                context
+            )
 
         elif mode == 'recibo':
-            recibo_file = request.FILES.get('recibo_file')
-            if not recibo_file:
-                context['erro'] = 'Por favor, envie um arquivo PDF do recibo.'
-                return render(request, self.template_upload, context)
-
-            try:
-                info = extrair_recibo_info(recibo_file)
-                car_extraido = (info.car or car_input or '').strip()
-
-                resultado = {}
-                municipio, state = None, None
-
-                if car_extraido:
-                    try:
-                        resultado = SearchForCar().execute(car_extraido) or {}
-                        qs = get_sicar_record(car_number__iexact=car_extraido)
-                        if qs.exists():
-                            geometry = qs.first().geometry
-                            municipio, state = locate_city_state(geometry)
-                    except Exception:
-                        pass
-
-                data = {
-                    'resultado': resultado,
-                    'recibo': asdict(info),
-                    'car_input': car_extraido,
-                    'municipio': municipio,
-                    'uf': state,
-                    'sucesso': True
-                }
-                request.session['last_analysis'] = data
-                return redirect('results')
-            except Exception as e:
-                context['erro'] = f'Erro ao processar o recibo: {str(e)}'
-                return render(request, self.template_upload, context)
+            return self._handle_document_upload(
+                request,
+                request.FILES.get('recibo_file'),
+                TypeDocument.RECEIPT,
+                'recibo',
+                car_input,
+                'Por favor, envie um arquivo PDF do recibo.',
+                'Erro ao processar o recibo',
+                context
+            )
 
         # --------------------------------------
         # 1) Caso só CAR informado (sem ZIP)
@@ -226,17 +179,58 @@ class UploadZipCarView(View):
     # Métodos auxiliares
     # =====================================================================
 
+    def _get_car_data(self, car_number):
+        """Busca dados do CAR e localidade."""
+        resultado = {}
+        municipio, state = None, None
+        
+        if car_number:
+            try:
+                resultado = SearchForCar().execute(car_number) or {}
+                qs = get_sicar_record(car_number__iexact=car_number)
+                if qs.exists():
+                    geometry = qs.first().geometry
+                    municipio, state = locate_city_state(geometry)
+            except Exception:
+                pass
+        return resultado, municipio, state
+
+    def _handle_document_upload(self, request, file_obj, doc_type, result_key, car_input, missing_msg, error_prefix, context):
+        """Processa upload de documentos (Recibo ou Demonstrativo)."""
+        if not file_obj:
+            context['erro'] = missing_msg
+            return render(request, self.template_upload, context)
+
+        try:
+            parser = DocumentsParserFactory.create_parser(doc_type)
+            extractor = ExtractDocumentPdfPlumber()
+            ctx = DocumentDataContext(extractor, parser)
+            info = ctx.extract_data(file_obj)
+            
+            print(info)
+            car_extraido = (info.car or car_input or '').strip()
+
+            resultado, municipio, state = self._get_car_data(car_extraido)
+
+            #esultado, municipio, state = {}, "Palmas", "TO"
+            data = {
+                'resultado': resultado,
+                result_key: asdict(info),
+                'car_input': car_extraido,
+                'municipio': municipio,
+                'uf': state,
+                'sucesso': True
+            }
+            request.session['last_analysis'] = data
+            return redirect('results')
+        except Exception as e:
+            context['erro'] = f'{error_prefix}: {str(e)}'
+            return render(request, self.template_upload, context)
+
     def _handle_only_car(self, request, car_input, context):
         """Processa requisição apenas com o CAR (sem ZIP)."""
         try:
-            resultado = SearchForCar().execute(car_input)
-
-            municipality, state = None, None
-            wkt_car = get_sicar_record(car_number__iexact=car_input)
-
-            if wkt_car.exists():
-                geometry = wkt_car.first().geometry
-                municipality, state = locate_city_state(geometry)
+            resultado, municipality, state = self._get_car_data(car_input)
 
             data = {
                 'resultado': resultado,

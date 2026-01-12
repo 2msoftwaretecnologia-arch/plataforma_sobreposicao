@@ -1,0 +1,186 @@
+{% load static %}
+{% load l10n %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Análise de Imóvel Rural</title>
+  <link rel="stylesheet" href="{% static 'analysis/css/report.css' %}" />
+  <script>
+    window.onload = function() {
+        // Automatically open print dialog
+        setTimeout(function() {
+            window.print();
+        }, 500);
+    }
+  </script>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- RESUMO GERAL -->
+  <section class="summary">
+    <div class="summary-status ok">
+        {% if resultado.total_areas_com_sobreposicao == 0 %}
+            ✔ IMÓVEL EM CONFORMIDADE
+        {% else %}
+            ⚠ IMÓVEL COM SOBREPOSIÇÕES
+        {% endif %}
+    </div>
+    <div class="summary-sub">
+        {% if recibo and recibo.nome_imovel_rural %}
+            {{ recibo.nome_imovel_rural }}
+        {% elif demonstrativo and demonstrativo.car %}
+            Imóvel CAR {{ demonstrativo.car }}
+        {% else %}
+            Imóvel Rural
+        {% endif %}
+        
+        {% if municipio or uf %}
+            • {{ municipio }} / {{ uf }}
+        {% endif %}
+    </div>
+  </section>
+
+  <!-- INFORMAÇÕES GERAIS -->
+  <section class="card">
+    <h2>📍 Informações do Imóvel</h2>
+    <div class="info-list">
+      <div><strong>Nome do imóvel</strong><span>
+          {% if recibo and recibo.nome_imovel_rural %}
+              {{ recibo.nome_imovel_rural }}
+          {% else %}
+              —
+          {% endif %}
+      </span></div>
+      <div><strong>Proprietário</strong><span>
+          {% if recibo and recibo.proprietarios %}
+              {{ recibo.proprietarios.0.nome }}
+          {% else %}
+              —
+          {% endif %}
+      </span></div>
+      <div><strong>Área total</strong><span>
+          {% if recibo and recibo.area_liquida_do_imovel %}
+              {{ recibo.area_liquida_do_imovel }}
+          {% elif resultado.tamanho_area %}
+              {{ resultado.tamanho_area|floatformat:4 }} ha
+          {% else %}
+              —
+          {% endif %}
+      </span></div>
+      <div><strong>Módulos fiscais</strong><span>
+          {% if recibo and recibo.modulos_fiscais %}
+              {{ recibo.modulos_fiscais }}
+          {% elif demonstrativo and demonstrativo.tax_modules %}
+              {{ demonstrativo.tax_modules }}
+          {% else %}
+              —
+          {% endif %}
+      </span></div>
+      <div><strong>Município / UF</strong><span>
+          {% if municipio %}{{ municipio }}{% endif %}{% if municipio and uf %} - {% endif %}{% if uf %}{{ uf }}{% endif %}
+      </span></div>
+    </div>
+  </section>
+
+  <!-- ANÁLISE -->
+  <section class="card">
+    <h2>🧪 Resultado da Análise Automática</h2>
+    <div class="pill-group">
+      {% if demonstrativo %}
+          <span class="pill green">Situação: {{ demonstrativo.registration_status|default:"Não informado" }}</span>
+          <span class="pill blue">Condição: {{ demonstrativo.external_condicion|default:"Não informado" }}</span>
+      {% endif %}
+      
+      {% if recibo %}
+          <span class="pill green">CAR: {{ recibo.car }}</span>
+      {% elif demonstrativo %}
+           <span class="pill green">CAR: {{ demonstrativo.car }}</span>
+      {% elif car_input %}
+           <span class="pill green">CAR: {{ car_input }}</span>
+      {% endif %}
+
+      {% if resultado.total_areas_com_sobreposicao == 0 %}
+        <span class="pill green">Sem sobreposições</span>
+      {% else %}
+        <span class="pill" style="background:#fee2e2; color:#991b1b;">{{ resultado.total_areas_com_sobreposicao }} Sobreposições</span>
+      {% endif %}
+    </div>
+  </section>
+
+  <!-- CRITÉRIO AMBIENTAL -->
+  <section class="card">
+    <h2>🌱 Critério Ambiental <small>(autodeclarado)</small></h2>
+    <div class="env-grid">
+      <div class="env-box">
+        <span class="env-title">Reserva Legal</span>
+        <span class="env-value">
+            {% if recibo and recibo.area_reserva_legal %}
+                {{ recibo.area_reserva_legal }}
+            {% elif demonstrativo and demonstrativo.total_reserva_legal_declarada_pelo_proprietario_possuidor %}
+                {{ demonstrativo.total_reserva_legal_declarada_pelo_proprietario_possuidor }}
+            {% else %}
+                —
+            {% endif %}
+        </span>
+      </div>
+
+      <div class="env-box">
+        <span class="env-title">Déficit de RL</span>
+        {# Lógica simplificada: Se houver valor de passivo, exibe, senão 'Não' #}
+        {% if demonstrativo and demonstrativo.passivo_ou_excedente_de_reserva_legal and "0,0000" not in demonstrativo.passivo_ou_excedente_de_reserva_legal %}
+            <span class="badge no" title="{{ demonstrativo.passivo_ou_excedente_de_reserva_legal }}">Sim</span>
+            <div style="font-size:12px; margin-top:4px; color:#64748b;">{{ demonstrativo.passivo_ou_excedente_de_reserva_legal }}</div>
+        {% else %}
+            <span class="badge yes">Não</span>
+        {% endif %}
+      </div>
+
+      <div class="env-box">
+        <span class="env-title">APP Antropizada</span>
+        {% if recibo and recibo.area_antropizada and "0,0000" not in recibo.area_antropizada and "0.0000" not in recibo.area_antropizada %}
+             <span class="badge no">Sim</span>
+             <div style="font-size:12px; margin-top:4px; color:#64748b;">{{ recibo.area_antropizada }}</div>
+        {% elif demonstrativo and demonstrativo.area_antropizada and "0,0000" not in demonstrativo.area_antropizada and "0.0000" not in demonstrativo.area_antropizada %}
+             <span class="badge no">Sim</span>
+             <div style="font-size:12px; margin-top:4px; color:#64748b;">{{ demonstrativo.area_antropizada }}</div>
+        {% else %}
+             <span class="badge yes">Não</span>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
+  <!-- SOBREPOSIÇÕES -->
+  <section class="card">
+    <h2>🗺️ Sobreposições Ativas</h2>
+
+    {% if resultado.total_areas_com_sobreposicao > 0 %}
+        <div class="alert warning">
+          ⚠ Existem áreas com sobreposição ambiental
+        </div>
+
+        <ul class="overlay-list">
+        {% for base in resultado.resultados_por_base %}
+            {% if base.areas_encontradas %}
+                <li><strong>{{ base.nome_base }}</strong>: {{ base.areas_encontradas|length }} ocorrência(s)</li>
+            {% endif %}
+        {% endfor %}
+        </ul>
+    {% else %}
+        <div class="alert" style="background: #dcfce7; color: #166534;">
+          ✔ Nenhuma sobreposição identificada nas bases consultadas
+        </div>
+    {% endif %}
+  </section>
+
+  <footer class="footer">
+    Relatório automático • Sistema de Análise Ambiental • {{ "now"|date:"d/m/Y H:i" }}
+  </footer>
+
+</div>
+
+</body>
+</html>
