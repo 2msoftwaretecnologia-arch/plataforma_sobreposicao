@@ -6,6 +6,7 @@ from car_system.utils import get_sicar_record
 import zipfile
 from kernel.utils import extract_geometry, locate_city_state
 
+from decimal import Decimal, InvalidOperation
 
 from django.views import View
 from django.shortcuts import render
@@ -96,8 +97,17 @@ class ReportPrintView(View):
 
     def get(self, request):
         data = request.session.get('last_analysis') or {}
+                                           
         return render(request, self.template_name, data)
 
+    def format_data(data: dict) -> dict:
+        """Formata dados para exibição no relatório."""
+        demonstrativo = data.get('demonstrativo')
+        if demonstrativo:
+            if demonstrativo.get('area_reserva_legal_proposta_num') is not None:
+                demonstrativo['has_deficit_rl'] = demonstrativo.get('has_deficit_rl', False)
+        return data
+        
 class UploadZipCarView(View):
     template_upload = 'analysis/upload.html'
     template_index = 'analysis/results.html'
@@ -207,14 +217,9 @@ class UploadZipCarView(View):
             ctx = DocumentDataContext(extractor, parser)
             info = ctx.extract_data(file_obj)
             
-            print(info)
             car_extraido = (info.car or car_input or '').strip()
 
             resultado, municipio, state = self._get_car_data(car_extraido)
-
-            import json
-            with open("car_data.json", "w") as f:
-                json.dump(info, indent=2, ensure_ascii=False)
 
             #esultado, municipio, state = {}, "Palmas", "TO"
             data = {
@@ -225,6 +230,12 @@ class UploadZipCarView(View):
                 'uf': state,
                 'sucesso': True
             }
+
+            import json
+
+            with open("car_data.json", "w") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+
             request.session['last_analysis'] = data
             return redirect('results')
         except Exception as e:

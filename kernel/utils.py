@@ -5,6 +5,7 @@ from shapely.geometry import Polygon, MultiPolygon
 from typing import Any, Callable, Dict, List, Optional
 from kernel.service.city_state_locator_service import CityStateLocatorService
 from django.contrib.gis.geos import GEOSGeometry
+from decimal import Decimal, InvalidOperation
 
 def base_result(
     base_name: str,
@@ -112,3 +113,11 @@ def should_include_by_percentage(
 
     except Exception:
         return True
+
+def parse_decimal_br(valor: str) -> Decimal:
+    if not valor:
+        return Decimal("0")
+    try:
+        return Decimal(valor.replace(".", "").replace(",", ".").replace(" ", "").replace("ha", ""))
+    except InvalidOperation:
+        return Decimal("0")

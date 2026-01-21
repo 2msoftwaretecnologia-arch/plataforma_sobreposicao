@@ -1,8 +1,10 @@
+from decimal import Decimal
 import re
 from typing import Optional
 
 from doc_extractor.services.parsers.database.statement_info import StatementInfo
 from doc_extractor.services.parsers.contract.parser_document_contract import ParserDocumentBase
+from kernel.utils import parse_decimal_br
 
 class StatementParser(ParserDocumentBase):
 
@@ -100,6 +102,12 @@ class StatementParser(ParserDocumentBase):
         if a_apr is not None and a_nat is not None and a_arc is not None:
             antropizada_calc = self._format_ha(max(a_apr - a_nat - a_arc, 0.0))
 
+        has_deficit_rl = parse_decimal_br(passivo_val) is not None and parse_decimal_br(passivo_val) < Decimal("0")
+
+        app_to_restore = parse_decimal_br(antropizada_calc) is not None and parse_decimal_br(antropizada_calc) > Decimal("0")
+
+        area_reserva_legal_proposta_num= self._parse_ha_value(rl_prop_val)
+
         return StatementInfo(
             car=car_val,
             data_retificacao=data_val,
@@ -120,4 +128,7 @@ class StatementParser(ParserDocumentBase):
             area_reserva_legal_a_recompor=rl_recomp_val,
             area_de_preservacao_permanente_a_recompor=app_recomp_val,
             area_antropizada=antropizada_calc,
+            has_deficit_rl=has_deficit_rl,
+            app_to_restore=app_to_restore,
+            area_reserva_legal_proposta_num=area_reserva_legal_proposta_num,
         )

@@ -3,6 +3,7 @@
     <div class="area-item__content">
         <p class="area-item__label">Área sobreposta</p>
         <p class="area-item__value">{{ area.area|floatformat:4 }} ha</p>
+        <p class="area-item__meta">Área preservada: {{ area.preserved_area|floatformat:4 }} ha</p>
         {% if area.item_info %}
         <p class="area-item__meta">{{ area.item_info }}</p>
         {% endif %}

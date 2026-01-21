@@ -60,21 +60,21 @@ class FinalResultBuilder:
             "areas_encontradas": all_areas,
             "quantidade_nao_avaliados": 0,
             "total_areas_com_sobreposicao": len(all_areas),
+            "area_preservada_total": self._get_fitoecologia_preserved_area(bases_output),
             "tamanho_area": target.area_ha,
             "resumo_bases": summary_counts,
             "poligonos_imoveis": property_polygons,
             "alvo_geojson": alvo_geojson,
             "alvo_wkt": alvo_wkt,
         }
-
-        """
-        salve = 'saida.json'
-
-        with open(salve, 'w') as f:
-            json.dump(data, f, indent=4)
-        """
         
         return data
+
+    def _get_fitoecologia_preserved_area(self, bases_output):
+        for base in bases_output:
+            if base.get("nome_base") == "Base de Dados de Fitoecologias":
+                return base.get("total_preserved_area", 0)
+        return 0
 
     def _group_records(self, layer_name, records):
         """
@@ -97,10 +97,13 @@ class FinalResultBuilder:
                     "nome": key,
                     "area": r.get("area", 0) or 0,
                     "item_info": "Regioões FitoEcologicas: {}".format(key),
+                    "preserved_area": r.get("preserved_area", 0),
                 }
             else:
                 acc["area"] = (acc.get("area", 0) or 0) + (r.get("area", 0) or 0)
-
+                acc["preserved_area"] = (acc.get("preserved_area", 0) or 0) + (r.get("preserved_area", 0) or 0)
+        
+        print(grouped)
         return list(grouped.values())
 
     def _build_base_entry(self, layer, records):
@@ -110,13 +113,18 @@ class FinalResultBuilder:
         Inclui nome da base, itens encontrados e contagem de sobreposições.
         """
         total_area = sum(float(r.get("area") or 0) for r in records)
-        return {
+        data = {
             "nome_base": self._base_name(layer),
             "areas_encontradas": records,
             "quantidade_nao_avaliados": 0,
             "total_areas_com_sobreposicao": len(records),
             "total_area": total_area,
         }
+
+        if layer.__name__ == "PhytoecologyArea":
+            data["total_preserved_area"] = sum(float(r.get("preserved_area") or 0) for r in records)
+
+        return data
 
     def _build_summary_counts(self, layers):
         """

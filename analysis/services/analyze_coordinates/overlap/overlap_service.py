@@ -1,7 +1,6 @@
 from django.contrib.gis.geos import GEOSGeometry
 from django.contrib.gis.db.models.functions import Intersection
 from django.db.models import F
-import pandas as pd
 from car_system.models import SicarRecord
 
 UTM_SRID = 31982  # SIRGAS 2000 / UTM 22S

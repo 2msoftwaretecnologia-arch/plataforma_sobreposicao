@@ -14,3 +14,4 @@ class ReceiptInfo:
     area_preservacao_permanente: Optional[str]
     area_antropizada: Optional[str]
     proprietarios: List[Dict[str, str]]
+    app_to_restore: Optional[bool] = None
