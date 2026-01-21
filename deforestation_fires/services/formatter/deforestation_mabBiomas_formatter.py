@@ -1,8 +1,10 @@
+from typing import Dict
+from django.db import models
 from kernel.service.abstract.base_formatter import BaseFormatter
 
 
 class DeforestationMapbiomasFormatter(BaseFormatter):
-    def format(self, model_obj, intersec):
+    def format(self, model_obj: models.Model, intersec: Dict) -> Dict:
         nome = f"Alerta {model_obj.alert_code}" if getattr(model_obj, "alert_code", None) else "Alerta"
         item_info = f"MapBiomas: Alerta {model_obj.alert_code} | Ano: {model_obj.detection_year}"
         return {

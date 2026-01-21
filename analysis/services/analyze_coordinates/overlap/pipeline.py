@@ -97,6 +97,7 @@ class OverlapPipeline:
         # ----------------------------------------------------------
         pipeline_end = time.perf_counter()
         print(f"\n===== OVERLAP PIPELINE FINISHED in {pipeline_end - pipeline_start:.4f}s =====\n")
+        
         print(
             f"[LOG] Processamento concluído: bases={len(layers)}, registros_totais={total_registros}, "
             f"com_geometria_util={total_usavel}, sem_geometria_util={total_sem_usavel}, intersecoes_totais={total_intersecoes}"

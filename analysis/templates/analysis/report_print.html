@@ -162,13 +162,92 @@
           ⚠ Existem áreas com sobreposição ambiental
         </div>
 
-        <ul class="overlay-list">
         {% for base in resultado.resultados_por_base %}
             {% if base.areas_encontradas %}
-                <li><strong>{{ base.nome_base }}</strong>: {{ base.areas_encontradas|length }} ocorrência(s)</li>
+                <div class="base-section">
+                    <h3>{{ base.nome_base }}</h3>
+                    <span class="base-count">{{ base.areas_encontradas|length }} ocorrência(s)</span>
+
+                    <table class="report-table">
+                        <thead>
+                            <tr>
+                                <th>Área (ha)</th>
+                                {% if "Sigef" in base.nome_base %}
+                                    <th>Nome</th>
+                                    <th>Status</th>
+                                {% elif "Zoneamento" in base.nome_base %}
+                                    <th>Zona</th>
+                                    <th>Sigla</th>
+                                {% elif "Municípios" in base.nome_base or "Municipios" in base.nome_base or "Municpios" in base.nome_base %}
+                                    <th>Município</th>
+                                {% elif "APAs" in base.nome_base %}
+                                    <th>Unidade</th>
+                                    <th>Domínios</th>
+                                    <th>Classe</th>
+                                {% elif "Terras Indígenas" in base.nome_base or "Indigenas" in base.nome_base %}
+                                    <th>Terra Indígena</th>
+                                    <th>Etnia</th>
+                                    <th>Fase</th>
+                                {% elif "Quilombolas" in base.nome_base %}
+                                    <th>Comunidade</th>
+                                    <th>Fase</th>
+                                {% elif "Embargos" in base.nome_base %}
+                                    <th>Código</th>
+                                    <th>Data</th>
+                                {% elif "Assentamentos" in base.nome_base %}
+                                    <th>Projeto</th>
+                                    <th>Fase</th>
+                                {% elif "CAR" in base.nome_base %}
+                                    <th>Recibo</th>
+                                    <th>Status</th>
+                                {% else %}
+                                    <th>Detalhes</th>
+                                {% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in base.areas_encontradas %}
+                            <tr>
+                                <td>{{ item.area|floatformat:4 }}</td>
+                                {% if "Sigef" in base.nome_base %}
+                                    <td>{{ item.nome }}</td>
+                                    <td>{{ item.status }}</td>
+                                {% elif "Zoneamento" in base.nome_base %}
+                                    <td>{{ item.zona }}</td>
+                                    <td>{{ item.sigla }}</td>
+                                {% elif "Municípios" in base.nome_base or "Municipios" in base.nome_base or "Municpios" in base.nome_base %}
+                                    <td>{{ item.name }}</td>
+                                {% elif "APAs" in base.nome_base %}
+                                    <td>{{ item.unidade }}</td>
+                                    <td>{{ item.dominios }}</td>
+                                    <td>{{ item.classe }}</td>
+                                {% elif "Terras Indígenas" in base.nome_base or "Indigenas" in base.nome_base %}
+                                    <td>{{ item.terras_indigenas }}</td>
+                                    <td>{{ item.etnia }}</td>
+                                    <td>{{ item.fase }}</td>
+                                {% elif "Quilombolas" in base.nome_base %}
+                                    <td>{{ item.comunidade }}</td>
+                                    <td>{{ item.fase }}</td>
+                                {% elif "Embargos" in base.nome_base %}
+                                    <td>{{ item.codigo_embargo }}</td>
+                                    <td>{{ item.data_autuacao }}</td>
+                                {% elif "Assentamentos" in base.nome_base %}
+                                    <td>{{ item.nome_projeto }}</td>
+                                    <td>{{ item.fase }}</td>
+                                {% elif "CAR" in base.nome_base %}
+                                    <td>{{ item.cod_imovel }}</td>
+                                    <td>{{ item.ind_status_imovel }}</td>
+                                {% else %}
+                                    <td>{{ item.item_info|default:"-" }}</td>
+                                {% endif %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             {% endif %}
         {% endfor %}
-        </ul>
+
     {% else %}
         <div class="alert" style="background: #dcfce7; color: #166534;">
           ✔ Nenhuma sobreposição identificada nas bases consultadas

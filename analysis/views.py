@@ -212,6 +212,10 @@ class UploadZipCarView(View):
 
             resultado, municipio, state = self._get_car_data(car_extraido)
 
+            import json
+            with open("car_data.json", "w") as f:
+                json.dump(info, indent=2, ensure_ascii=False)
+
             #esultado, municipio, state = {}, "Palmas", "TO"
             data = {
                 'resultado': resultado,
