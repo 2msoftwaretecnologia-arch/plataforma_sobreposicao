@@ -22,6 +22,6 @@ class StatementInfo:
     area_reserva_legal_a_recompor: Optional[str]
     area_de_preservacao_permanente_a_recompor: Optional[str]
     area_antropizada: Optional[str]
-    has_deficit_rl: Optional[bool] = None
+    issue_rl_quote: Optional[bool] = None
     app_to_restore: Optional[bool] = None
     area_reserva_legal_proposta_num: Optional[float] = None

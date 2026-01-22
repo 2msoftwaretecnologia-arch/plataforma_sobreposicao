@@ -1,21 +1,29 @@
-from django.shortcuts import render, redirect
+# Standard library
+import zipfile
+from dataclasses import asdict
+
+# Django
+from django.conf import settings
+from django.shortcuts import redirect, render
+from django.views import View
+
+# Local apps – analysis
 from analysis.services.analyze_coordinates.search_all import SearchAll
 from analysis.services.analyze_coordinates.search_for_car import SearchForCar
 from analysis.services.view_services.zip_upload_service import ZipUploadService
+
+# Local apps – car_system / kernel
 from car_system.utils import get_sicar_record
-import zipfile
 from kernel.utils import extract_geometry, locate_city_state
 
-from decimal import Decimal, InvalidOperation
-
-from django.views import View
-from django.shortcuts import render
-from dataclasses import asdict
-from doc_extractor.services.parsers.implement.extract_text.extract_pdf_plumber import ExtractDocumentPdfPlumber
+# Local apps – doc_extractor
+from doc_extractor.services.parsers.constants import TypeDocument
 from doc_extractor.services.parsers.context.extract_data_context import DocumentDataContext
 from doc_extractor.services.parsers.factory.documents_parser_factory import DocumentsParserFactory
-from doc_extractor.services.parsers.constants import TypeDocument
-from django.conf import settings
+from doc_extractor.services.parsers.implement.extract_text.extract_pdf_plumber import (
+    ExtractDocumentPdfPlumber,
+)
+
 
 class HomePageView(View):
     template_name = 'analysis/home.html'
@@ -97,17 +105,26 @@ class ReportPrintView(View):
 
     def get(self, request):
         data = request.session.get('last_analysis') or {}
-                                           
+        data = self.format_data(data)
         return render(request, self.template_name, data)
 
-    def format_data(data: dict) -> dict:
-        """Formata dados para exibição no relatório."""
+    def format_data(self, data: dict) -> dict:
+        resultado = data.get('resultado')
         demonstrativo = data.get('demonstrativo')
-        if demonstrativo:
-            if demonstrativo.get('area_reserva_legal_proposta_num') is not None:
-                demonstrativo['has_deficit_rl'] = demonstrativo.get('has_deficit_rl', False)
+
+        if not demonstrativo:
+            return data
+
+        area_rl_proposta = demonstrativo.get('area_reserva_legal_proposta_num', 0)
+        area_preservada_calculada = resultado.get('area_preservada_total', 0)
+
+        deficit_rl = area_rl_proposta - area_preservada_calculada
+
+        data['has_deficit_rl'] = deficit_rl < 0
+        data['deficit_rl_value'] = f"{(deficit_rl):.4f} ha"
+
         return data
-        
+
 class UploadZipCarView(View):
     template_upload = 'analysis/upload.html'
     template_index = 'analysis/results.html'

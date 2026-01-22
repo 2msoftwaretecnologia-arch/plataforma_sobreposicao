@@ -102,7 +102,7 @@ class StatementParser(ParserDocumentBase):
         if a_apr is not None and a_nat is not None and a_arc is not None:
             antropizada_calc = self._format_ha(max(a_apr - a_nat - a_arc, 0.0))
 
-        has_deficit_rl = parse_decimal_br(passivo_val) is not None and parse_decimal_br(passivo_val) < Decimal("0")
+        issue_rl_quote = parse_decimal_br(passivo_val) is not None and parse_decimal_br(passivo_val) < Decimal("0")
 
         app_to_restore = parse_decimal_br(antropizada_calc) is not None and parse_decimal_br(antropizada_calc) > Decimal("0")
 
@@ -128,7 +128,7 @@ class StatementParser(ParserDocumentBase):
             area_reserva_legal_a_recompor=rl_recomp_val,
             area_de_preservacao_permanente_a_recompor=app_recomp_val,
             area_antropizada=antropizada_calc,
-            has_deficit_rl=has_deficit_rl,
+            issue_rl_quote=issue_rl_quote,
             app_to_restore=app_to_restore,
             area_reserva_legal_proposta_num=area_reserva_legal_proposta_num,
         )

@@ -6,14 +6,6 @@
   <meta charset="UTF-8" />
   <title>Análise de Imóvel Rural</title>
   <link rel="stylesheet" href="{% static 'analysis/css/report.css' %}" />
-  <script>
-    window.onload = function() {
-        // Automatically open print dialog
-        setTimeout(function() {
-            window.print();
-        }, 500);
-    }
-  </script>
 </head>
 <body>
 
@@ -55,13 +47,17 @@
         {% endif %}
 
         {% if recibo and recibo.proprietarios %}
-            <div>
-                <strong>Proprietário</strong>
-                <span>
-                    {{ recibo.proprietarios.0.nome }}
-                </span>
+            <div style="text-align: right; align-self: start;">
+                <strong>Proprietário(s)</strong>
+
+                {% for proprietario in recibo.proprietarios %}
+                    {{ proprietario.nome }}
+                    <br/>
+                {% endfor %}
             </div>
         {% endif %}
+
+
     
         {% if resultado.tamanho_area %}
             <div>
@@ -103,7 +99,7 @@
           <span class="pill blue">Condição: {{ demonstrativo.external_condicion|default:"Não informado" }}</span>
       {% endif %}
       
-        {% if demonstrativo and demonstrativo.has_deficit_rl %}
+        {% if demonstrativo and demonstrativo.issue_rl_quote %}
             <span class="pill" style="background:#fee2e2; color:#991b1b;">Emite cota RL: {{ demonstrativo.passivo_ou_excedente_de_reserva_legal }}</span>
         {% else %}
             <span class="pill green">Emite cota RL: Não</span>
@@ -132,21 +128,21 @@
                 {{ resultado.area_preservada_total|floatformat:4|default:"0.0000" }} ha
             {% endif %}
         </span>
-      </div>''
+      </div>
 
       {% if demonstrativo %}
         <div class="env-box">
             <span class="env-title">Déficit de RL</span>
-            {% if 0 > (demonstrativo.area_reserva_legal_proposta_num - resultado.area_preservada_total) %}
-                <span class="badge no" title="{{ (demonstrativo.area_reserva_legal_proposta_num - resultado.area_preservada_total)}}">Não</span>
+            {% if has_deficit_rl %}
+                <span class="badge no" title="Déficit de RL">Sim</span>
                 <div style="font-size:12px; margin-top:4px; color:#64748b;">
-                    {{ demonstrativo.passivo_ou_excedente_de_reserva_legal }}
+                    {{ deficit_rl_value }}
                 </div>
             {% else %}
                 <span class="badge yes">Não</span>
             {% endif %}
         </div>
-        {% endif %}
+    {% endif %}
 
       <div class="env-box">
         <span class="env-title">APP Antropizada</span>
