@@ -5,11 +5,11 @@
 <head>
   <meta charset="UTF-8" />
   <title>Análise de Imóvel Rural</title>
-  <link rel="stylesheet" href="{% static 'analysis/css/report.css' %}" />
   
   <!-- Leaflet & Maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link href='https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/leaflet.fullscreen.css' rel='stylesheet' />
+  <link rel="stylesheet" href="{% static 'analysis/css/report.css' %}" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src='https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/Leaflet.fullscreen.min.js'></script>
   <script src="{% static 'analysis/js/maps.js' %}"></script>
@@ -29,33 +29,12 @@
 <div class="container">
 
   <!-- RESUMO GERAL -->
-  <section class="summary">
-    <div class="summary-status ok">
-        {% if resultado.total_areas_com_sobreposicao == 0 %}
-            ✔ IMÓVEL EM CONFORMIDADE
-        {% else %}
-            ⚠ IMÓVEL COM SOBREPOSIÇÕES
-        {% endif %}
-    </div>
-    
-    <div class="summary-sub">
-        {% if recibo and recibo.nome_imovel_rural %}
-            {{ recibo.nome_imovel_rural }}
-        {% elif demonstrativo and demonstrativo.car %}
-            Imóvel CAR {{ demonstrativo.car }}
-        {% else %}
-            Imóvel Rural
-        {% endif %}
-        
-        {% if municipio or uf %}
-            • {{ municipio }} / {{ uf }}
-        {% endif %}
-    </div>
-  </section>
 
   <!-- INFORMAÇÕES GERAIS -->
   <section class="card">
-    <h2>📍 Informações do Imóvel</h2>
+    <h1 style="margin-bottom: 2rem;">Relatório de Análise de Imóvel Rural</h1>
+
+    <h2>Informações do Imóvel</h2>
     <div class="info-list" style="margin-bottom: 1rem;">
         {% if resultado.tamanho_area %}
             <div>
@@ -87,7 +66,7 @@
 
   <!-- ANÁLISE -->
   <section class="card">
-    <h2>🧪 Resultado da Análise Automática</h2>
+    <h2>Resultado da Análise Automática</h2>
     <div class="pill-group">
       {% if demonstrativo %}
           <span class="pill green">Situação: {{ demonstrativo.registration_status|default:"Não informado" }}</span>
@@ -112,7 +91,7 @@
 
   <!-- CRITÉRIO AMBIENTAL -->
   <section class="card">
-    <h2>🌱 Critério Ambiental <small>(autodeclarado)</small></h2>
+    <h2>Critério Ambiental <small>(autodeclarado)</small></h2>
     <div class="env-grid">
       <div class="env-box">
         <span class="env-title">Reserva Legal</span>
@@ -156,7 +135,7 @@
 
   <!-- SOBREPOSIÇÕES -->
   <section class="card">
-    <h2>🗺️ Sobreposições Ativas</h2>
+    <h2>Sobreposições Ativas</h2>
 
     {% if resultado.total_areas_com_sobreposicao > 0 %}
         <div class="alert warning">
@@ -256,9 +235,3 @@
 
   <footer class="footer">
     Relatório automático • Sistema de Análise Ambiental • {{ "now"|date:"d/m/Y H:i" }}
-  </footer>
-
-</div>
-
-</body>
-</html>

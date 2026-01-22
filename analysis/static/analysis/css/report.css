@@ -6,7 +6,7 @@
 }
 
 body {
-  background: #f1f5f9;
+  background: #ffffff;
   color: #1f2937;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
@@ -20,7 +20,7 @@ body {
 
 /* RESUMO */
 .summary {
-  background: linear-gradient(135deg, #16a34a, #22c55e);
+  background: #000;
   color: #fff;
   padding: 25px;
   border-radius: 14px;
@@ -44,7 +44,6 @@ body {
   border-radius: 14px;
   padding: 22px;
   margin-bottom: 20px;
-  box-shadow: 0 8px 20px rgba(0,0,0,0.06);
   page-break-inside: avoid;
 }
 
@@ -209,6 +208,12 @@ body {
 }
 
 @media print {
+    /* Força a impressão de cores de fundo e imagens */
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
     body {
         background: white;
     }
@@ -219,8 +224,10 @@ body {
         padding: 0;
     }
     .summary {
-        background: #16a34a !important; /* Force background for print if supported */
-        color: white !important;
+        /* background: #16a34a !important;  <-- Removido para usar a cor definida acima */
+        /* color: white !important; */
+        box-shadow: none;
+        border: 1px solid #000; /* Adicionado borda para garantir visibilidade em P&B se necessário */
     }
     .ghost-button, .local-sort-btn {
         display: none;

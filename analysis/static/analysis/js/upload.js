@@ -210,4 +210,11 @@
             loader.classList.add('visible');
         }
     });
+
+    // Garante que o loader suma se o usuário clicar em "Voltar" (bfcache)
+    window.addEventListener('pageshow', function (event) {
+        if (loader) {
+            loader.classList.remove('visible');
+        }
+    });
 })();
