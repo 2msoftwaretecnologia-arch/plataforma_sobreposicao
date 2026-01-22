@@ -37,6 +37,7 @@ class ResultsPageView(View):
     def get(self, request):
         data = request.session.get('last_analysis') or {}
         data['planet_tiles_url'] = self._planet_tiles_url()
+        data = self._format_data_map(data)
         return render(request, self.template_name, data)
 
     def post(self, request):
@@ -100,6 +101,29 @@ class ResultsPageView(View):
             pass
         return ''
 
+    def _format_data_map(self, data):
+        resultado = data.get('resultado')
+        items = [
+            {
+                "gj": resultado["alvo_geojson"],
+                "label": "Área da Propriedade",
+                "area": f'{resultado["tamanho_area"]:.4f} ha',
+                "color": "#000000",
+                "fonte": "Área da Propriedade",
+            }
+        ]
+
+        for p in resultado["poligonos_imoveis"]:
+            items.append({
+                "gj": p["polygon_geojson"],
+                "label": p["item_info"],
+                "area": f'{p["area"]:.4f} ha',
+                "color": p["color"],
+                "fonte": p["fonte"],
+            })
+
+        data['map_items'] = items
+        return data
 class ReportPrintView(View):
     template_name = 'analysis/report_print.html'
 

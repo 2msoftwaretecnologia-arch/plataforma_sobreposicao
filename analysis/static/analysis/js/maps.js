@@ -2,11 +2,18 @@
     global.initImoveisMap = function (items, options) {
         options = options || {};
         var planetTilesUrl = options.planet_tiles_url;
+        var elementId = options.elementId || 'map-imoveis';
 
         if (!items || !items.length) return;
+        
+        if (!document.getElementById(elementId)) {
+            console.warn('Map element not found:', elementId);
+            return;
+        }
 
-        var map = L.map('map-imoveis', {
+        var map = L.map(elementId, {
             fullscreenControl: true,
+            scrollWheelZoom: false // Geralmente melhor para relatórios/scroll pages
         });
 
         var baseOSM = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 });
