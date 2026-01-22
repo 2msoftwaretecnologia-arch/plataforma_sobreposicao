@@ -37,6 +37,7 @@
             ⚠ IMÓVEL COM SOBREPOSIÇÕES
         {% endif %}
     </div>
+    
     <div class="summary-sub">
         {% if recibo and recibo.nome_imovel_rural %}
             {{ recibo.nome_imovel_rural }}
@@ -219,13 +220,13 @@
                             // Sobreposições
                             {% for item in base.areas_encontradas %}
                                 {% if item.polygon_geojson %}
-                                items.push({
-                                    gj: {{ item.polygon_geojson|safe }},
-                                    label: "{{ item.item_info|escapejs }}",
-                                    area: "{{ item.area|default:'' }}",
-                                    color: "#ef4444",
-                                    fonte: "{{ base.nome_base|escapejs }}"
-                                });
+                                    items.push({
+                                        gj: {{ item.polygon_geojson|safe }},
+                                        label: "{{ item.item_info|escapejs }}",
+                                        area: "{{ item.area|default:'' }}",
+                                        color: "{{ item.color|default:'#ef4444' }}",
+                                        fonte: "{{ base.nome_base|escapejs }}"
+                                    });
                                 {% endif %}
                             {% endfor %}
                 

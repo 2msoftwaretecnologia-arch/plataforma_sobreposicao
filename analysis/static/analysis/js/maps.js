@@ -22,8 +22,8 @@
         var baseTopo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17 });
 
         var baseLayers = {
-            'OpenStreetMap': baseOSM,
             'Satélite (Esri)': baseEsriSat,
+            'OpenStreetMap': baseOSM,
             'Carto Light': baseCartoLight,
             'OpenTopoMap': baseTopo
         };
@@ -33,7 +33,7 @@
             baseLayers['Satélite (Planet)'] = basePlanet;
         }
 
-        baseOSM.addTo(map);
+        baseEsriSat.addTo(map);
 
         var overlays = {};
         var layersByFonte = {};
