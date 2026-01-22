@@ -1,0 +1,22 @@
+<table class="report-table">
+    <thead>
+        <tr>
+            <th>Área (ha)</th>
+            <th>Nome</th>
+            <th>Área à Preservar (ha)</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in items %}
+        <tr>
+            <td>{{ item.area|floatformat:4 }}</td>
+            <td>{{ item.nome|default:"-" }}</td>
+            <td>{{ item.preserved_area|floatformat:4|default:"-" }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="3">Nenhum registro encontrado.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>

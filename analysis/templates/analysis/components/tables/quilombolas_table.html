@@ -1,0 +1,20 @@
+<table class="report-table">
+    <thead>
+        <tr>
+            <th>Área (ha)</th>
+            <th>Comunidade</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in items %}
+        <tr>
+            <td>{{ item.area|floatformat:4 }}</td>
+            <td>{{ item.nome|default:"-" }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="2">Nenhum registro encontrado.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>

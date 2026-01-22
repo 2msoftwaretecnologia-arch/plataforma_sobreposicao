@@ -1,0 +1,68 @@
+<div class="table-container">
+    <h4>Informações do Recibo</h4>
+    <table class="report-table">
+        <tbody>
+            <tr>
+                <td>CAR</td>
+                <td>{{ receipt.car|default:"-" }}</td>
+            </tr>
+            <tr>
+                <td>Nome do Imóvel Rural</td>
+                <td>{{ receipt.nome_imovel_rural|default:"-" }}</td>
+            </tr>
+            <tr>
+                <td>Módulos Fiscais</td>
+                <td>{{ receipt.modulos_fiscais|default:"-" }}</td>
+            </tr>
+            <tr>
+                <td>Área Rural Consolidada</td>
+                <td>{{ receipt.area_rural_consolidada|default:"-" }}</td>
+            </tr>
+            <tr>
+                <td>Área de Servidão Administrativa</td>
+                <td>{{ receipt.area_servidao_administrativa|default:"-" }}</td>
+            </tr>
+            <tr>
+                <td>Remanescente de Vegetação Nativa</td>
+                <td>{{ receipt.remanescente_vegetacao_nativa|default:"-" }}</td>
+            </tr>
+            <tr>
+                <td>Área Líquida do Imóvel</td>
+                <td>{{ receipt.area_liquida_do_imovel|default:"-" }}</td>
+            </tr>
+            <tr>
+                <td>Área de Reserva Legal</td>
+                <td>{{ receipt.area_reserva_legal|default:"-" }}</td>
+            </tr>
+            <tr>
+                <td>Área de Preservação Permanente</td>
+                <td>{{ receipt.area_preservacao_permanente|default:"-" }}</td>
+            </tr>
+            <tr>
+                <td>Área Antropizada</td>
+                <td>{{ receipt.area_antropizada|default:"-" }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    {% if receipt.proprietarios %}
+    <br/>
+    <h4>Proprietários</h4>
+    <table class="report-table">
+        <thead>
+            <tr>
+                <th>Nome</th>
+                <th>CPF/CNPJ</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in receipt.proprietarios %}
+            <tr>
+                <td>{{ p.nome|default:"-" }}</td>
+                <td>{{ p.documento|default:"-" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+</div>

@@ -38,27 +38,7 @@
   <!-- INFORMAÇÕES GERAIS -->
   <section class="card">
     <h2>📍 Informações do Imóvel</h2>
-    <div class="info-list">
-        {% if recibo and recibo.nome_imovel_rural %}
-            <div>
-                <strong>Nome do imóvel</strong>
-                <span>{{ recibo.nome_imovel_rural }}</span>
-            </div>
-        {% endif %}
-
-        {% if recibo and recibo.proprietarios %}
-            <div style="text-align: right; align-self: start;">
-                <strong>Proprietário(s)</strong>
-
-                {% for proprietario in recibo.proprietarios %}
-                    {{ proprietario.nome }}
-                    <br/>
-                {% endfor %}
-            </div>
-        {% endif %}
-
-
-    
+    <div class="info-list" style="margin-bottom: 1rem;">
         {% if resultado.tamanho_area %}
             <div>
                 <strong>Área total</strong>
@@ -67,17 +47,6 @@
                 </span>
             </div>
         {% endif %}
-
-        <div>
-            <strong>Módulos fiscais</strong>
-            <span>
-                {% if recibo and recibo.modulos_fiscais %}
-                    {{ recibo.modulos_fiscais }}
-                {% elif demonstrativo and demonstrativo.tax_modules %}
-                    {{ demonstrativo.tax_modules }}
-                {% endif %}
-            </span>
-        </div>
 
         {% if municipio and uf %}
             <div>
@@ -88,6 +57,14 @@
             </div>
         {% endif %}
     </div>
+
+    {% if recibo %}
+        {% include "analysis/components/tables/receipt_table.html" with receipt=recibo %}
+    {% endif %}
+
+    {% if demonstrativo %}
+        {% include "analysis/components/tables/statement_table.html" with statement=demonstrativo %}
+    {% endif %}
   </section>
 
   <!-- ANÁLISE -->
@@ -174,82 +151,48 @@
                     <h3>{{ base.nome_base }}</h3>
                     <span class="base-count">{{ base.areas_encontradas|length }} ocorrência(s)</span>
 
-                    <table class="report-table">
-                        <thead>
-                            <tr>
-                                <th>Área (ha)</th>
-                                {% if "Sigef" in base.nome_base %}
-                                    <th>Nome</th>
-                                    <th>Status</th>
-                                {% elif "Zoneamento" in base.nome_base %}
-                                    <th>Zona</th>
-                                    <th>Sigla</th>
-                                {% elif "Municípios" in base.nome_base or "Municipios" in base.nome_base or "Municpios" in base.nome_base %}
-                                    <th>Município</th>
-                                {% elif "APAs" in base.nome_base %}
-                                    <th>Unidade</th>
-                                    <th>Domínios</th>
-                                    <th>Classe</th>
-                                {% elif "Terras Indígenas" in base.nome_base or "Indigenas" in base.nome_base %}
-                                    <th>Terra Indígena</th>
-                                    <th>Etnia</th>
-                                    <th>Fase</th>
-                                {% elif "Quilombolas" in base.nome_base %}
-                                    <th>Comunidade</th>
-                                    <th>Fase</th>
-                                {% elif "Embargos" in base.nome_base %}
-                                    <th>Código</th>
-                                    <th>Data</th>
-                                {% elif "Assentamentos" in base.nome_base %}
-                                    <th>Projeto</th>
-                                    <th>Fase</th>
-                                {% elif "CAR" in base.nome_base %}
-                                    <th>Recibo</th>
-                                    <th>Status</th>
-                                {% else %}
+                    {% if "Sigef" in base.nome_base %}
+                        {% include "analysis/components/tables/sigef_table.html" with items=base.areas_encontradas %}
+                    {% elif "Zoneamento" in base.nome_base %}
+                        {% include "analysis/components/tables/zoning_table.html" with items=base.areas_encontradas %}
+                    {% elif "Municípios" in base.nome_base or "Municipios" in base.nome_base or "Municpios" in base.nome_base %}
+                        {% include "analysis/components/tables/municipal_boundaries_table.html" with items=base.areas_encontradas %}
+                    {% elif "APAs" in base.nome_base %}
+                        {% include "analysis/components/tables/environmental_protection_table.html" with items=base.areas_encontradas %}
+                    {% elif "Indígenas" in base.nome_base or "Indigenas" in base.nome_base %}
+                        {% include "analysis/components/tables/indigenous_table.html" with items=base.areas_encontradas %}
+                    {% elif "Quilombolas" in base.nome_base %}
+                        {% include "analysis/components/tables/quilombolas_table.html" with items=base.areas_encontradas %}
+                    {% elif "Assentamentos" in base.nome_base %}
+                        {% include "analysis/components/tables/rural_settlement_table.html" with items=base.areas_encontradas %}
+                    {% elif "Sicar" in base.nome_base or "CAR" in base.nome_base %}
+                        {% include "analysis/components/tables/sicar_table.html" with items=base.areas_encontradas %}
+                    {% elif "Fitoecologias" in base.nome_base %}
+                        {% include "analysis/components/tables/phytoecology_table.html" with items=base.areas_encontradas %}
+                    {% elif "Veredas" in base.nome_base %}
+                        {% include "analysis/components/tables/paths_table.html" with items=base.areas_encontradas %}
+                    {% elif "Unidades de Conservação" in base.nome_base %}
+                        {% include "analysis/components/tables/conservation_units_table.html" with items=base.areas_encontradas %}
+                    {% elif "SNIC" in base.nome_base %}
+                        {% include "analysis/components/tables/snic_total_table.html" with items=base.areas_encontradas %}
+                    {% elif "Deforestação" in base.nome_base or "Mapbiomas" in base.nome_base %}
+                        {% include "analysis/components/tables/deforestation_mapbiomas_table.html" with items=base.areas_encontradas %}
+                    {% else %}
+                        <table class="report-table">
+                            <thead>
+                                <tr>
                                     <th>Detalhes</th>
-                                {% endif %}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for item in base.areas_encontradas %}
-                            <tr>
-                                <td>{{ item.area|floatformat:4 }}</td>
-                                {% if "Sigef" in base.nome_base %}
-                                    <td>{{ item.nome }}</td>
-                                    <td>{{ item.status }}</td>
-                                {% elif "Zoneamento" in base.nome_base %}
-                                    <td>{{ item.zona }}</td>
-                                    <td>{{ item.sigla }}</td>
-                                {% elif "Municípios" in base.nome_base or "Municipios" in base.nome_base or "Municpios" in base.nome_base %}
-                                    <td>{{ item.name }}</td>
-                                {% elif "APAs" in base.nome_base %}
-                                    <td>{{ item.unidade }}</td>
-                                    <td>{{ item.dominios }}</td>
-                                    <td>{{ item.classe }}</td>
-                                {% elif "Terras Indígenas" in base.nome_base or "Indigenas" in base.nome_base %}
-                                    <td>{{ item.terras_indigenas }}</td>
-                                    <td>{{ item.etnia }}</td>
-                                    <td>{{ item.fase }}</td>
-                                {% elif "Quilombolas" in base.nome_base %}
-                                    <td>{{ item.comunidade }}</td>
-                                    <td>{{ item.fase }}</td>
-                                {% elif "Embargos" in base.nome_base %}
-                                    <td>{{ item.codigo_embargo }}</td>
-                                    <td>{{ item.data_autuacao }}</td>
-                                {% elif "Assentamentos" in base.nome_base %}
-                                    <td>{{ item.nome_projeto }}</td>
-                                    <td>{{ item.fase }}</td>
-                                {% elif "CAR" in base.nome_base %}
-                                    <td>{{ item.cod_imovel }}</td>
-                                    <td>{{ item.ind_status_imovel }}</td>
-                                {% else %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in base.areas_encontradas %}
+                                <tr>
                                     <td>{{ item.item_info|default:"-" }}</td>
-                                {% endif %}
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% endif %}
                 </div>
             {% endif %}
         {% endfor %}

@@ -1,0 +1,26 @@
+<table class="report-table">
+    <thead>
+        <tr>
+            <th>Área (ha)</th>
+            <th>Unidade</th>
+            <th>Domínios</th>
+            <th>Classe</th>
+            <th>Fundo Legal</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in items %}
+        <tr>
+            <td>{{ item.area|floatformat:4 }}</td>
+            <td>{{ item.unidade|default:"-" }}</td>
+            <td>{{ item.dominios|default:"-" }}</td>
+            <td>{{ item.classe|default:"-" }}</td>
+            <td>{{ item.fundo_legal|default:"-" }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="5">Nenhum registro encontrado.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
