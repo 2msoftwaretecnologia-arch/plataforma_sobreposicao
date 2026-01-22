@@ -215,17 +215,7 @@
                     <script>
                         (function(){
                             var items = [];
-                            
-                            // Imóvel alvo
-                            {% if resultado.alvo_geojson %}
-                            items.push({
-                                gj: {{ resultado.alvo_geojson|safe }},
-                                label: "Imóvel Analisado",
-                                color: "#3b82f6", 
-                                fonte: "Imóvel"
-                            });
-                            {% endif %}
-                
+                        
                             // Sobreposições
                             {% for item in base.areas_encontradas %}
                                 {% if item.polygon_geojson %}

@@ -102,18 +102,25 @@ class ResultsPageView(View):
         return ''
 
     def _format_data_map(self, data):
-        resultado = data.get('resultado')
+        resultado = data.get('resultado') or {}
+        alvo_geojson = resultado.get('alvo_geojson')
+        tamanho_area = resultado.get('tamanho_area', 0)
+        poligonos_imoveis = resultado.get('poligonos_imoveis', [])
+
+        if not alvo_geojson:
+            return data
+
         items = [
             {
-                "gj": resultado["alvo_geojson"],
+                "gj": alvo_geojson,
                 "label": "Área da Propriedade",
-                "area": f'{resultado["tamanho_area"]:.4f} ha',
+                "area": f'{tamanho_area:.4f} ha',
                 "color": "#000000",
                 "fonte": "Área da Propriedade",
             }
         ]
 
-        for p in resultado["poligonos_imoveis"]:
+        for p in poligonos_imoveis:
             items.append({
                 "gj": p["polygon_geojson"],
                 "label": p["item_info"],
