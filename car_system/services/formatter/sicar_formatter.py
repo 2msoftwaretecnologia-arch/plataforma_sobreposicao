@@ -3,10 +3,10 @@ from kernel.service.abstract.base_formatter import BaseFormatter
 class SicarFormatter(BaseFormatter):
     def format(self, model_obj, intersec):
         status_map = {
-            "at": "ativo",
-            "ca": "cancelado",
-            "pe": "pendente",
-            "su": "suspenso",
+            "at": "ATIVO",
+            "ca": "CANCELADO",
+            "pe": "PENDENTE",
+            "su": "SUSPENSO",
         }
 
         raw_status = (model_obj.status or "").strip().lower()

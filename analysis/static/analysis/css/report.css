@@ -1,3 +1,9 @@
+@page {
+  size: A4;
+  margin-top: 20mm;
+  margin-bottom: 10mm;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -10,12 +16,7 @@ body {
   color: #1f2937;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
-}
-
-.container {
-  max-width: 900px;
-  margin: 30px auto;
-  padding: 20px;
+  padding: 5mm;
 }
 
 /* RESUMO */
@@ -38,11 +39,47 @@ body {
   opacity: 0.95;
 }
 
+/* REPORT HEADER */
+.report-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+}
+
+.report-header h1 {
+  margin-bottom: 0;
+}
+
+.print-btn {
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.print-btn:hover {
+  background: #f1f5f9;
+}
+
+/* CONTAINER */
+.container {
+  max-width: 210mm;
+  margin: 0 auto;
+  padding: 0;
+}
+
 /* CARDS */
 .card {
-  background: #fff;
-  border-radius: 14px;
-  padding: 22px;
+  /* background: #fff; */
+  /* border-radius: 14px; */
+  /* padding: 22px; */
   margin-bottom: 20px;
   page-break-inside: avoid;
 }
@@ -158,7 +195,8 @@ body {
 .base-section {
     margin-top: 20px;
     margin-bottom: 30px;
-    page-break-inside: avoid;
+    /* page-break-inside: avoid; <--- Opcional: remover se quiser permitir que tabela e mapa fiquem em páginas diferentes */
+    /* break-inside: avoid; */
 }
 
 .base-section h3 {
@@ -204,7 +242,7 @@ body {
   text-align: center;
   margin-top: 30px;
   font-size: 13px;
-  color: #64748b;
+  color: #ffffff;
 }
 
 @media print {
@@ -217,23 +255,24 @@ body {
     body {
         background: white;
     }
-    .container {
-        width: 100%;
-        max-width: none;
-        margin: 0;
-        padding: 0;
-    }
+ 
     .summary {
         /* background: #16a34a !important;  <-- Removido para usar a cor definida acima */
         /* color: white !important; */
         box-shadow: none;
         border: 1px solid #000; /* Adicionado borda para garantir visibilidade em P&B se necessário */
     }
-    .ghost-button, .local-sort-btn {
-        display: none;
+    .ghost-button, .local-sort-btn, .print-btn {
+        display: none !important;
     }
     .card {
         box-shadow: none;
-        border: 1px solid #e5e7eb;
+        /* break-inside: avoid; <--- REMOVIDO para permitir que o conteúdo (várias sobreposições) flua entre páginas */
+    }
+
+    .report-map {
+        page-break-inside: avoid;
+        break-inside: avoid;
+        display: block; /* Garante que o container do mapa seja tratado como bloco */
     }
 }

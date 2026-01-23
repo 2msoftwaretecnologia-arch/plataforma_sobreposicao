@@ -32,18 +32,19 @@
 
   <!-- INFORMAÇÕES GERAIS -->
   <section class="card">
-    <h1 style="margin-bottom: 2rem;">Relatório de Análise de Imóvel Rural</h1>
-
-     <button type="button" onclick="printReport()" style="background: #fff; border: 1px solid #cbd5e1; color: #334155; cursor: pointer;">
-        🖨️ Imprimir PDF
-    </button>
+    <div class="report-header">
+        <h1>Relatório de Análise de Imóvel Rural</h1>
+        <button type="button" class="print-btn" onclick="printReport()">
+            🖨️ Imprimir PDF
+        </button>
+    </div>
     <h2>Detalhes</h2>
     <div class="info-list" style="margin-bottom: 1rem;">
         {% if resultado.tamanho_area %}
             <div>
-                <strong>Área total</strong>
+                <strong>Área total (ha)</strong>
                 <span>
-                    {{ resultado.tamanho_area|floatformat:4 }} ha
+                    {{ resultado.tamanho_area|floatformat:4 }}
                 </span>
             </div>
 
@@ -52,7 +53,7 @@
 
                 <span>
                     {% if resultado.total_areas_com_sobreposicao == 0 %}
-                        {{ resultado.total_areas_com_sobreposicao|floatformat:4 }} ha
+                        {{ resultado.total_areas_com_sobreposicao|floatformat:4 }}
                     {% else %}
                         Sem sobreposições
                     {% endif %}
@@ -95,6 +96,42 @@
             {% else %}
                 <span>Não</span>
             {% endif %}
+            
+            {% if has_deficit_rl %}
+                <div>
+                    <strong>Déficit de RL</strong>
+                    <span>
+                        {{ deficit_rl_value }}                    
+                    </span>
+                </div>
+            {% else %}
+                <div>
+                    <strong>Déficit de RL</strong>
+                    <span>Não</span>
+                </div>
+            {% endif %}
+            
+            <div>
+                <strong>Reserva Legal (ha)</strong>
+                <span>
+                    {% if recibo and recibo.area_reserva_legal %}
+                        {{ recibo.area_reserva_legal }}
+                    {% else %}
+                        {{ resultado.area_preservada_total|floatformat:4|default:"0.0000" }}
+                    {% endif %}
+                </span>
+            </div>
+
+            <div>
+                <strong>APP Antropizada</strong>
+                {% if recibo and recibo.area_antropizada and recibo.app_to_restore %}
+                    <span>{{ recibo.area_antropizada }}</span>
+                {% elif demonstrativo and demonstrativo.area_antropizada and demonstrativo.app_to_restore %}
+                    <span>{{ demonstrativo.area_antropizada }}</span>
+                {% else %}
+                    <span>Não</span>
+                {% endif %}
+            </div>
 
         {% endif %}
         
@@ -109,58 +146,11 @@
     {% endif %}
   </section>
 
-  <!-- CRITÉRIO AMBIENTAL -->
-  <section class="card">
-    <h2>Critério Ambiental <small>(autodeclarado)</small></h2>
-    <div class="env-grid">
-      <div class="env-box">
-        <span class="env-title">Reserva Legal</span>
-        <span class="env-value">
-            {% if recibo and recibo.area_reserva_legal %}
-                {{ recibo.area_reserva_legal }} ha
-            {% else %}
-                {{ resultado.area_preservada_total|floatformat:4|default:"0.0000" }} ha
-            {% endif %}
-        </span>
-      </div>
-
-      {% if demonstrativo %}
-        <div class="env-box">
-            <span class="env-title">Déficit de RL</span>
-            {% if has_deficit_rl %}
-                <span class="badge no" title="Déficit de RL">Sim</span>
-                <div style="font-size:12px; margin-top:4px; color:#64748b;">
-                    {{ deficit_rl_value }}
-                </div>
-            {% else %}
-                <span class="badge yes">Não</span>
-            {% endif %}
-        </div>
-    {% endif %}
-
-      <div class="env-box">
-        <span class="env-title">APP Antropizada</span>
-        {% if recibo and recibo.area_antropizada and recibo.app_to_restore %}
-             <span class="badge no">Sim</span>
-             <div style="font-size:12px; margin-top:4px; color:#64748b;">{{ recibo.area_antropizada }}</div>
-        {% elif demonstrativo and demonstrativo.area_antropizada and demonstrativo.app_to_restore %}
-             <span class="badge no">Sim</span>
-             <div style="font-size:12px; margin-top:4px; color:#64748b;">{{ demonstrativo.area_antropizada }}</div>
-        {% else %}
-             <span class="badge yes">Não</span>
-        {% endif %}
-      </div>
-    </div>
-  </section>
-
   <!-- SOBREPOSIÇÕES -->
   <section class="card">
     <h2>Sobreposições Ativas</h2>
 
     {% if resultado.total_areas_com_sobreposicao > 0 %}
-        <div class="alert warning">
-          ⚠ Existem áreas com sobreposição ambiental
-        </div>
 
         {% for base in resultado.resultados_por_base %}
             {% if base.areas_encontradas %}
@@ -233,7 +223,10 @@
                             if(items.length > 0){
                                 initImoveisMap(items, {
                                     elementId: 'map-base-{{ forloop.counter }}',
-                                    planet_tiles_url: '{{ planet_tiles_url|default:"" }}'
+                                    planet_tiles_url: '{{ planet_tiles_url|default:"" }}',
+                                    isStatic: true,
+                                    scrollWheelZoom: false,
+                                    fullscreenControl: false
                                 });
                             } else {
                                 // Se não tiver geometria para mostrar, remove o container do mapa para não ficar espaço em branco
@@ -254,8 +247,20 @@
   </section>
 
   <footer class="footer">
-    Relatório automático • Sistema de Análise Ambiental • {{ "now"|date:"d/m/Y H:i" }}
+    {{ "now"|date:"d/m/Y H:i" }}
   </footer>
+
+            </td>
+        </tr>
+    </tbody>
+    <tfoot>
+        <tr>
+            <td>
+                <div class="footer-space">&nbsp;</div>
+            </td>
+        </tr>
+    </tfoot>
+  </table>
 </div>
 
 <script>
@@ -264,7 +269,7 @@
         // Aguarda renderização dos mapas (tiles)
         setTimeout(function() {
             window.print();
-        }, 1500);
+        }, 2500);
     });
 
     function printReport() {
