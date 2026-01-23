@@ -59,17 +59,45 @@
 
                 var isSicar = (f === 'Base de Dados Sicar');
                 var isPropriedade = (f === 'Área da Propriedade');
+                var isMapBiomas = (f && f.toString().toLowerCase().indexOf('mapbiomas') !== -1);
+                var isVeredas = (f && f.toString().toLowerCase().indexOf('veredas') !== -1);
                 var baseFillOpacity = (isSicar || isPropriedade) ? 0 : 0.35;
                 var baseWeight = 2;
 
-                var layer = L.geoJSON(geom, { style: { color: col, weight: baseWeight, fillColor: col, fillOpacity: baseFillOpacity } });
+                var layer = L.geoJSON(geom, {
+                    style: function (feature) {
+                        var finalColor = col;
+                        // Gera cor aleatória para sobreposições (não-Sicar, não-Propriedade, não-MapBiomas e não-Veredas)
+                        if (!isSicar && !isPropriedade && !isMapBiomas && !isVeredas) {
+                            var letters = '0123456789ABCDEF';
+                            finalColor = '#';
+                            for (var k = 0; k < 6; k++) {
+                                finalColor += letters[Math.floor(Math.random() * 16)];
+                            }
+                        }
+                        // Força cor vermelha para MapBiomas
+                        if (isMapBiomas) {
+                            finalColor = '#FF0000';
+                        }
+                        // Força cor verde para Veredas
+                        if (isVeredas) {
+                            finalColor = '#00FF00';
+                        }
+                        return {
+                            color: finalColor,
+                            weight: baseWeight,
+                            fillColor: finalColor,
+                            fillOpacity: baseFillOpacity
+                        };
+                    }
+                });
                 var tt = [lbl || f, area].filter(function (x) { return x && ('' + x).trim() !== ''; }).join('<br> Área: ');
 
                 (function (tt, isOutlineOnly, baseFillOpacity, baseWeight) {
                     layer.eachLayer(function (fl) {
-                        if (tt) { fl.bindTooltip(tt, { sticky: true }); }
-                        fl.on('mouseover', function (e) { e.target.setStyle({ weight: 3, fillOpacity: isOutlineOnly ? 0.1 : 0.5 }); });
-                        fl.on('mouseout', function (e) { e.target.setStyle({ weight: baseWeight, fillOpacity: baseFillOpacity }); });
+                           if (tt) { fl.bindTooltip(tt, { sticky: true }); }
+                        // fl.on('mouseover', function (e) { e.target.setStyle({ weight: 3, fillOpacity: isOutlineOnly ? 0.1 : 0.5 }); });
+                        // fl.on('mouseout', function (e) { e.target.setStyle({ weight: baseWeight, fillOpacity: baseFillOpacity }); });
                     });
                 })(tt, (isSicar || isPropriedade), baseFillOpacity, baseWeight);
 
