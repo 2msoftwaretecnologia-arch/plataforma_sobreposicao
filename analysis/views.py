@@ -24,7 +24,6 @@ from doc_extractor.services.parsers.implement.extract_text.extract_pdf_plumber i
     ExtractDocumentPdfPlumber,
 )
 
-
 class HomePageView(View):
     template_name = 'analysis/home.html'
 
@@ -70,6 +69,7 @@ class ResultsPageView(View):
                 'uf': uf,
                 'sucesso': True
             }
+            print(data)
             request.session['last_analysis'] = data
             return redirect('results')
 
@@ -286,6 +286,7 @@ class UploadZipCarView(View):
 
             request.session['last_analysis'] = data
             return redirect('results')
+            
         except Exception as e:
             context['erro'] = f'{error_prefix}: {str(e)}'
             return render(request, self.template_upload, context)
