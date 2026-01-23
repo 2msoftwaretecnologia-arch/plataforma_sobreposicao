@@ -57,10 +57,22 @@
 
         {% if demonstrativo or recibo %}
         <div style="display: flex; justify-content: flex-end; margin-bottom: 16px;">
-            <a href="{% url 'report_print' %}" target="_blank" class="ghost-button" style="background: #fff; border: 1px solid #cbd5e1; color: #334155;">
-                🖨️ Imprimir Relatório
-            </a>
+            <button type="button" onclick="printReport()" class="ghost-button" style="background: #fff; border: 1px solid #cbd5e1; color: #334155; cursor: pointer;">
+                🖨️ Download em PDF
+            </button>
         </div>
+
+        <script>
+            function printReport() {
+                const url = "{% url 'report_print' %}";
+                const win = window.open(url, '_blank');
+                if (win) {
+                    win.focus();
+                } else {
+                    alert('Por favor, permita popups para este site para visualizar o relatório.');
+                }
+            }
+        </script>
         {% endif %}
 
         {% if demonstrativo %}

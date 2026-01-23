@@ -140,7 +140,7 @@ class ReportPrintView(View):
         return render(request, self.template_name, data)
 
     def format_data(self, data: dict) -> dict:
-        resultado = data.get('resultado')
+        resultado = data.get('resultado') or {}
         demonstrativo = data.get('demonstrativo')
 
         if not demonstrativo:

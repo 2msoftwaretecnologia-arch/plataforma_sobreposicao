@@ -235,3 +235,17 @@
 
   <footer class="footer">
     Relatório automático • Sistema de Análise Ambiental • {{ "now"|date:"d/m/Y H:i" }}
+  </footer>
+</div>
+
+<script>
+    window.addEventListener('load', function() {
+        // Aguarda renderização dos mapas (tiles)
+        setTimeout(function() {
+            window.print();
+        }, 1500);
+    });
+</script>
+
+</body>
+</html>

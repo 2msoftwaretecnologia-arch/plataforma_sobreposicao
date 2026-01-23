@@ -98,6 +98,8 @@ class FileManagement(models.Model):
         blank = True
     )
 
+    
+
     class Meta:
         db_table = 'tb_gerenciamento_arquivos'
         verbose_name = "Gerenciamento de Arquivos"
