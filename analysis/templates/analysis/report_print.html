@@ -34,7 +34,7 @@
   <section class="card">
     <h1 style="margin-bottom: 2rem;">Relatório de Análise de Imóvel Rural</h1>
 
-    <h2>Informações do Imóvel</h2>
+    <h2>Detalhes</h2>
     <div class="info-list" style="margin-bottom: 1rem;">
         {% if resultado.tamanho_area %}
             <div>
@@ -43,6 +43,19 @@
                     {{ resultado.tamanho_area|floatformat:4 }} ha
                 </span>
             </div>
+
+            <div>
+                <strong>Total de áreas com sobreposição</strong>
+
+                <span>
+                    {% if resultado.total_areas_com_sobreposicao == 0 %}
+                        {{ resultado.total_areas_com_sobreposicao|floatformat:4 }} ha
+                    {% else %}
+                        Sem sobreposições
+                    {% endif %}
+                </span>
+            </div>
+
         {% endif %}
 
         {% if municipio and uf %}
@@ -53,6 +66,35 @@
                 </span>
             </div>
         {% endif %}
+
+         {% if demonstrativo %}
+            <div>
+                <strong>Situação</strong>
+                <span>
+                    {{ demonstrativo.registration_status|default:"Não informado" }}                    
+                </span>
+            </div>
+            
+            <div>
+                <strong>Condição</strong>
+                <span>
+                    {{ demonstrativo.external_condicion|default:"Não informado" }}                    
+                </span>
+            </div>
+
+            {% if demonstrativo.issue_rl_quote %}
+                <div>
+                    <strong>Emite cota RL</strong>
+                    <span>
+                        {{ demonstrativo.passivo_ou_excedente_de_reserva_legal }}                    
+                    </span>
+                </div>
+            {% else %}
+                <span>Não</span>
+            {% endif %}
+
+        {% endif %}
+        
     </div>
 
     {% if recibo %}
@@ -62,31 +104,6 @@
     {% if demonstrativo %}
         {% include "analysis/components/tables/statement_table.html" with statement=demonstrativo %}
     {% endif %}
-  </section>
-
-  <!-- ANÁLISE -->
-  <section class="card">
-    <h2>Resultado da Análise Automática</h2>
-    <div class="pill-group">
-      {% if demonstrativo %}
-          <span class="pill green">Situação: {{ demonstrativo.registration_status|default:"Não informado" }}</span>
-          <span class="pill blue">Condição: {{ demonstrativo.external_condicion|default:"Não informado" }}</span>
-      {% endif %}
-      
-        {% if demonstrativo and demonstrativo.issue_rl_quote %}
-            <span class="pill" style="background:#fee2e2; color:#991b1b;">Emite cota RL: {{ demonstrativo.passivo_ou_excedente_de_reserva_legal }}</span>
-        {% else %}
-            <span class="pill green">Emite cota RL: Não</span>
-        {% endif %}
-
-      {% if resultado.total_areas_com_sobreposicao == 0 %}
-        <span class="pill green">Sem sobreposições</span>
-      {% else %}
-        <span class="pill" style="background:#fee2e2; color:#991b1b;">
-            {{ resultado.total_areas_com_sobreposicao }} Sobreposições
-        </span>
-      {% endif %}
-    </div>
   </section>
 
   <!-- CRITÉRIO AMBIENTAL -->
