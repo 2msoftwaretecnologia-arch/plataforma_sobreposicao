@@ -2,19 +2,13 @@
     <thead>
         <tr>
             <th>Área (ha)</th>
-            <th>Vereda (ID)</th>
         </tr>
     </thead>
-    <tbody>
-        {% for item in items %}
+    {% if items %}
+    <tfoot>
         <tr>
-            <td>{{ item.area|floatformat:4 }}</td>
-            <td>{{ item.hash_id|default:"-" }}</td>
+            <td style="font-weight: bold;">Total: {{ total_area|floatformat:4 }}</td>
         </tr>
-        {% empty %}
-        <tr>
-            <td colspan="2">Nenhum registro encontrado.</td>
-        </tr>
-        {% endfor %}
-    </tbody>
+    </tfoot>
+    {% endif %}
 </table>

@@ -1,0 +1,1 @@
+URL_MAPBIOMAS = f"https://plataforma.alerta.mapbiomas.org/mapa?monthRange[0]=2019-01&monthRange[1]=2025-11&sources[0]=All&territoryType=all&authorization=all&embargoed=all&locationType=alert_code&locationText={alert_code}%20&activeBaseMap=1&map=-9.656514%2C-49.901149%2C16"

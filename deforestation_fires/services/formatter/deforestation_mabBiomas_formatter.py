@@ -1,6 +1,8 @@
 from typing import Dict
 from django.db import models
 from kernel.service.abstract.base_formatter import BaseFormatter
+from deforestation_fires.utils import build_mapbiomas_url
+
 
 class DeforestationMapbiomasFormatter(BaseFormatter):
     def format(self, model_obj: models.Model, intersec: Dict) -> Dict:
@@ -20,4 +22,5 @@ class DeforestationMapbiomasFormatter(BaseFormatter):
             "source": model_obj.source,
             "polygon_wkt": intersec["intersection_geom"].wkt,
             "polygon_geojson": intersec["intersection_geom"].geojson,
+            "mapbiomas_url": build_mapbiomas_url(model_obj.alert_code),
         }

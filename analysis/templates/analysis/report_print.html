@@ -34,6 +34,9 @@
   <section class="card">
     <h1 style="margin-bottom: 2rem;">Relatório de Análise de Imóvel Rural</h1>
 
+     <button type="button" onclick="printReport()" style="background: #fff; border: 1px solid #cbd5e1; color: #334155; cursor: pointer;">
+        🖨️ Imprimir PDF
+    </button>
     <h2>Detalhes</h2>
     <div class="info-list" style="margin-bottom: 1rem;">
         {% if resultado.tamanho_area %}
@@ -184,7 +187,7 @@
                     {% elif "Fitoecologias" in base.nome_base %}
                         {% include "analysis/components/tables/phytoecology_table.html" with items=base.areas_encontradas %}
                     {% elif "Veredas" in base.nome_base %}
-                        {% include "analysis/components/tables/paths_table.html" with items=base.areas_encontradas %}
+                        {% include "analysis/components/tables/paths_table.html" with items=base.areas_encontradas total_area=base.total_area %}
                     {% elif "Unidades de Conservação" in base.nome_base %}
                         {% include "analysis/components/tables/conservation_units_table.html" with items=base.areas_encontradas %}
                     {% elif "SNIC" in base.nome_base %}
@@ -256,12 +259,18 @@
 </div>
 
 <script>
+
     window.addEventListener('load', function() {
         // Aguarda renderização dos mapas (tiles)
         setTimeout(function() {
             window.print();
         }, 1500);
     });
+
+    function printReport() {
+        window.print();
+    }
+
 </script>
 
 </body>

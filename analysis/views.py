@@ -141,6 +141,19 @@ class ReportPrintView(View):
 
     def format_data(self, data: dict) -> dict:
         resultado = data.get('resultado') or {}
+        
+        # Calcular área total por base
+        if resultado and 'resultados_por_base' in resultado:
+            for base in resultado['resultados_por_base']:
+                areas = base.get('areas_encontradas', [])
+                total = 0.0
+                for item in areas:
+                    try:
+                        total += float(item.get('area', 0))
+                    except (ValueError, TypeError):
+                        pass
+                base['total_area'] = total
+
         demonstrativo = data.get('demonstrativo')
 
         if not demonstrativo:
