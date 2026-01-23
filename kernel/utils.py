@@ -6,6 +6,8 @@ from typing import Any, Callable, Dict, List, Optional
 from kernel.service.city_state_locator_service import CityStateLocatorService
 from django.contrib.gis.geos import GEOSGeometry
 from decimal import Decimal, InvalidOperation
+from django.db import models
+from kernel.service.database_maintenance_service import DatabaseMaintenanceService
 
 def base_result(
     base_name: str,
@@ -121,3 +123,6 @@ def parse_decimal_br(valor: str) -> Decimal:
         return Decimal(valor.replace(".", "").replace(",", ".").replace(" ", "").replace("ha", ""))
     except InvalidOperation:
         return Decimal("0")
+
+def reset_db(model: models.Model):
+    DatabaseMaintenanceService().truncate_and_reset(model._meta.db_table, 'public', cascade=True)

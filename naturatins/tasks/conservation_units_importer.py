@@ -5,6 +5,8 @@ from django.contrib.auth.models import User
 from control_panel.utils import get_file_management
 from naturatins.models import ConservationUnits
 from kernel.service.geometry_processing_service import GeometryProcessingService
+from kernel.utils import reset_db
+
 
 
 class ConservationUnitsImporter:
@@ -35,6 +37,7 @@ class ConservationUnitsImporter:
         return hashlib.sha256(json_str.encode("utf-8")).hexdigest()
 
     def execute(self):
+        reset_db(ConservationUnits)
         user = self._get_user()
         archive_path = get_file_management()
         if not archive_path or not archive_path.conservation_units_zip_file.path:

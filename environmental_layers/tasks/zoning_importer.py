@@ -5,6 +5,8 @@ import json
 from django.contrib.auth.models import User
 from control_panel.utils import get_file_management
 from environmental_layers.models import ZoningArea
+from kernel.utils import reset_db
+
 
 
 class ZoningAreaImporter:
@@ -35,6 +37,7 @@ class ZoningAreaImporter:
         return hashlib.sha256(json_str.encode("utf-8")).hexdigest()
 
     def execute(self):
+        reset_db(ZoningArea)
         user = self._get_user()
         archive_path = get_file_management()
         if not archive_path or not archive_path.zoning_zip_file.path:

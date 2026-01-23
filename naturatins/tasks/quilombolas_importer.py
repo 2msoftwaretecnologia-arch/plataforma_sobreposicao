@@ -7,6 +7,7 @@ from control_panel.utils import get_file_management
 from naturatins.models import Quilombolas
 from kernel.service.geometry_processing_service import GeometryProcessingService
 
+from kernel.utils import reset_db
 
 class QuilombolasImporter:
     def __init__(self, user=None):
@@ -73,6 +74,7 @@ class QuilombolasImporter:
         return hashlib.sha256(json_str.encode("utf-8")).hexdigest()
 
     def execute(self):
+        reset_db(Quilombolas)
         user = self._get_user()
         archive_path = get_file_management()
         if not archive_path or not archive_path.quilombolas_zip_file.path:

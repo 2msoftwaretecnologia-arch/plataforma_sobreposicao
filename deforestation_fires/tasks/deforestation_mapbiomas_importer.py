@@ -1,10 +1,13 @@
 import geopandas as gpd
+from decimal import Decimal, InvalidOperation
 import hashlib
 import json
 from django.contrib.auth.models import User
 from control_panel.utils import get_file_management
 from deforestation_fires.models import DeforestationMapbiomas
 from kernel.service.geometry_processing_service import GeometryProcessingService
+from kernel.service.database_maintenance_service import DatabaseMaintenanceService
+from kernel.utils import reset_db
 
 
 class DeforestationMapbiomasImporter:
@@ -29,12 +32,14 @@ class DeforestationMapbiomasImporter:
             "source": "Base Deforestation Mapbiomas"    
         }
 
+
     @staticmethod
     def generate_hash(data: dict) -> str:
         json_str = json.dumps(data, sort_keys=True, default=str)
         return hashlib.sha256(json_str.encode("utf-8")).hexdigest()
 
     def execute(self):
+        reset_db(DeforestationMapbiomas)
         user = self._get_user()
         archive_path = get_file_management()
         if not archive_path or not archive_path.snic_total_zip_file.path:

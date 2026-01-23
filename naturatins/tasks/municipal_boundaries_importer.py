@@ -4,6 +4,8 @@ import json
 from django.contrib.auth.models import User
 from control_panel.utils import get_file_management
 from naturatins.models import MunicipalBoundaries
+from kernel.utils import reset_db
+
 
 
 class MunicipalBoundariesImporter:
@@ -33,6 +35,7 @@ class MunicipalBoundariesImporter:
         return hashlib.sha256(json_str.encode("utf-8")).hexdigest()
 
     def execute(self):
+        reset_db(MunicipalBoundaries)
         user = self._get_user()
         archive_path = get_file_management()
         if not archive_path or not archive_path.municipal_boundaries_zip_file.path:

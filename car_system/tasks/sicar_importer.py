@@ -7,7 +7,7 @@ from control_panel.utils import get_file_management
 from car_system.models import SicarRecord
 from kernel.service.database_maintenance_service import DatabaseMaintenanceService
 from kernel.service.geometry_processing_service import GeometryProcessingService
-
+from kernel.utils import reset_db
 
 class SicarImporter:
     def __init__(self, user=None):
@@ -49,12 +49,8 @@ class SicarImporter:
         existing = set(SicarRecord.objects.values_list("car_number", flat=True))
         return df[~df["cod_imovel"].isin(existing)]
 
-    @staticmethod
-    def reset_db():
-        DatabaseMaintenanceService().truncate_and_reset(SicarRecord._meta.db_table, 'public', cascade=True)
-
     def execute(self):
-        self.reset_db()
+        reset_db(SicarRecord)
         user = self._get_user()
         archive_path = get_file_management()
         if not archive_path or not archive_path.sicar_zip_file.path:
