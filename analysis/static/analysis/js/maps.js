@@ -57,16 +57,21 @@
                     overlays[f] = layersByFonte[f];
                 }
 
-                var layer = L.geoJSON(geom, { style: { color: col, weight: 2, fillColor: col, fillOpacity: 0.35 } });
+                var isSicar = (f === 'Base de Dados Sicar');
+                var isPropriedade = (f === 'Área da Propriedade');
+                var baseFillOpacity = (isSicar || isPropriedade) ? 0 : 0.35;
+                var baseWeight = 2;
+
+                var layer = L.geoJSON(geom, { style: { color: col, weight: baseWeight, fillColor: col, fillOpacity: baseFillOpacity } });
                 var tt = [lbl || f, area].filter(function (x) { return x && ('' + x).trim() !== ''; }).join('<br> Área: ');
 
-                (function (tt) {
+                (function (tt, isOutlineOnly, baseFillOpacity, baseWeight) {
                     layer.eachLayer(function (fl) {
                         if (tt) { fl.bindTooltip(tt, { sticky: true }); }
-                        fl.on('mouseover', function (e) { e.target.setStyle({ weight: 3, fillOpacity: 0.5 }); });
-                        fl.on('mouseout', function (e) { e.target.setStyle({ weight: 2, fillOpacity: 0.35 }); });
+                        fl.on('mouseover', function (e) { e.target.setStyle({ weight: 3, fillOpacity: isOutlineOnly ? 0.1 : 0.5 }); });
+                        fl.on('mouseout', function (e) { e.target.setStyle({ weight: baseWeight, fillOpacity: baseFillOpacity }); });
                     });
-                })(tt);
+                })(tt, (isSicar || isPropriedade), baseFillOpacity, baseWeight);
 
                 layer.addTo(layersByFonte[f]);
                 allGroup.addLayer(layer);

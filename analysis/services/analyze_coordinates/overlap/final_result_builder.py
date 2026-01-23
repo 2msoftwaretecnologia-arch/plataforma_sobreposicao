@@ -157,7 +157,7 @@ class FinalResultBuilder:
 
     def _base_color(self, layer):
         mapping = {
-            "SicarRecord": "#2E7D32",
+            "SicarRecord": "#efff00",
             "ZoningArea": "#F57C00",
             "PhytoecologyArea": "#6A1B9A",
             "EnvironmentalProtectionArea": "#C62828",
@@ -169,6 +169,6 @@ class FinalResultBuilder:
             "Sigef": "#D81B60",
             "Ruralsettlement": "#00ACC1",
             "SnicTotal": "#EF6C00",
-            "DeforestationMapbiomas": "#4E342E",
+            "DeforestationMapbiomas": "#FF0000",
         }
         return mapping.get(layer.__name__, "#9E9E9E")
