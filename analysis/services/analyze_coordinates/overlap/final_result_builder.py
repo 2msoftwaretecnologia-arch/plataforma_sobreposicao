@@ -1,3 +1,4 @@
+from django.contrib.gis.geos import GEOSGeometry
 
 class FinalResultBuilder:
 
@@ -92,18 +93,48 @@ class FinalResultBuilder:
                 continue
             acc = grouped.get(key)
             if acc is None:
+                # Inicializa com a geometria atual
+                geom = None
+                if r.get("polygon_wkt"):
+                    try:
+                        geom = GEOSGeometry(r.get("polygon_wkt"))
+                    except:
+                        pass
+
                 grouped[key] = {
                     "nome": key,
                     "area": r.get("area", 0) or 0,
                     "item_info": "Regioões FitoEcologicas: {}".format(key),
                     "preserved_area": r.get("preserved_area", 0),
+                    "_geom_obj": geom # Armazena objeto temporário para união
                 }
             else:
                 acc["area"] = (acc.get("area", 0) or 0) + (r.get("area", 0) or 0)
                 acc["preserved_area"] = (acc.get("preserved_area", 0) or 0) + (r.get("preserved_area", 0) or 0)
+                
+                # Une geometria
+                if r.get("polygon_wkt"):
+                    try:
+                        new_geom = GEOSGeometry(r.get("polygon_wkt"))
+                        if acc["_geom_obj"]:
+                            acc["_geom_obj"] = acc["_geom_obj"].union(new_geom)
+                        else:
+                            acc["_geom_obj"] = new_geom
+                    except:
+                        pass
         
-        print(grouped)
-        return list(grouped.values())
+        # print(grouped)
+        
+        # Finaliza processamento (converte geom para string)
+        results = []
+        for val in grouped.values():
+            geom = val.pop("_geom_obj", None)
+            if geom:
+                val["polygon_wkt"] = geom.wkt
+                val["polygon_geojson"] = geom.geojson
+            results.append(val)
+
+        return results
 
     def _build_base_entry(self, layer, records):
         """
