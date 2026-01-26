@@ -60,6 +60,16 @@
     }
 
     /**
+     * Generates a random HSL color.
+     */
+    function getRandomColor() {
+        var h = Math.floor(Math.random() * 360);
+        var s = Math.floor(Math.random() * 40) + 60; // 60-100%
+        var l = Math.floor(Math.random() * 20) + 40; // 40-60%
+        return 'hsl(' + h + ',' + s + '%,' + l + '%)';
+    }
+
+    /**
      * Processes a single item and adds it to the appropriate layer group.
      */
     function createGeoJsonLayer(item, layersByFonte, overlays, map, allGroup, legend) {
@@ -70,8 +80,21 @@
             var geom = typeof gj === 'string' ? JSON.parse(gj) : gj;
             if (!geom) return;
 
-            var col = item.color || '#d9480f';
             var f = item.fonte || 'Fonte';
+            var isPropriedade = (f === 'Área da Propriedade');
+
+            // Determine color based on source
+            var col;
+            if (isPropriedade) {
+                col = item.color || '#000000';
+            } else if (f.toLowerCase().indexOf('mapbiomas') !== -1) {
+                col = '#ff0000'; // Red for Mapbiomas
+            } else if (f.toLowerCase().indexOf('veredas') !== -1) {
+                col = '#00ff00'; // Green for Veredas
+            } else {
+                col = getRandomColor();
+            }
+            
             var lbl = item.label || '';
             var area = item.area || '';
 
@@ -81,7 +104,7 @@
             }
 
             var isSicar = (f === 'Base de Dados Sicar');
-            var isPropriedade = (f === 'Área da Propriedade');
+            // isPropriedade already defined above
             var baseFillOpacity = (isSicar || isPropriedade) ? 0 : 0.35;
             var baseWeight = 2;
 
