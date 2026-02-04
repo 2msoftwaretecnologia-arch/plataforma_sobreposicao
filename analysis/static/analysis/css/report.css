@@ -245,6 +245,32 @@ body {
   color: #ffffff;
 }
 
+/* EDITABLE FIELDS */
+.editable-field {
+    min-width: 200px;
+    display: inline-block;
+    padding: 4px 8px;
+    border: 1px dashed #cbd5e1;
+    border-radius: 4px;
+    background: #f8fafc;
+    cursor: text;
+    transition: all 0.2s;
+    color: #1f2937;
+}
+
+.editable-field:hover, .editable-field:focus {
+    border-color: #94a3b8;
+    background: #fff;
+    outline: none;
+}
+
+.editable-field:empty::before {
+    content: attr(data-placeholder);
+    color: #94a3b8;
+    font-style: italic;
+    pointer-events: none;
+}
+
 @media print {
     /* Força a impressão de cores de fundo e imagens */
     * {
@@ -265,6 +291,18 @@ body {
     .ghost-button, .local-sort-btn, .print-btn {
         display: none !important;
     }
+    
+    .editable-field {
+        border: none;
+        background: transparent;
+        padding: 0;
+        min-width: auto;
+    }
+    
+    .editable-field:empty::before {
+        content: "";
+    }
+
     .card {
         box-shadow: none;
         /* break-inside: avoid; <--- REMOVIDO para permitir que o conteúdo (várias sobreposições) flua entre páginas */

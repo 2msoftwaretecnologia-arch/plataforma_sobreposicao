@@ -38,6 +38,15 @@
     </div>
     <h2>Detalhes</h2>
     <div class="info-list" style="margin-bottom: 1rem;">
+        <div>
+            <strong>Nome do Proprietário</strong>
+            <span contenteditable="true" class="editable-field" data-placeholder="Clique para editar"></span>
+        </div>
+        <div>
+            <strong>Nome da Fazenda</strong>
+            <span contenteditable="true" class="editable-field" data-placeholder="Clique para editar"></span>
+        </div>
+
         {% if resultado.tamanho_area %}
             <div>
                 <strong>Área total (ha)</strong>
@@ -258,6 +267,23 @@
     function printReport() {
         window.print();
     }
+
+    // Prevent newlines in editable fields
+    document.querySelectorAll('.editable-field').forEach(field => {
+        field.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                field.blur();
+            }
+        });
+        
+        // Paste as plain text
+        field.addEventListener('paste', (e) => {
+            e.preventDefault();
+            const text = (e.clipboardData || window.clipboardData).getData('text');
+            document.execCommand('insertText', false, text);
+        });
+    });
 
 </script>
 
