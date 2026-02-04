@@ -77,7 +77,7 @@
 
             {% if demonstrativo.issue_rl_quote %}
                 <div>
-                    <strong>Emite cota RL</strong>
+                    <strong>Pode Emitir cota RL?</strong>
                     <span>
                         {{ demonstrativo.passivo_ou_excedente_de_reserva_legal }}                    
                     </span>
@@ -92,14 +92,14 @@
         
         {% if has_deficit_rl %}
             <div>
-                <strong>Déficit de RL</strong>
+                <strong>Tem Déficit de RL?</strong>
                 <span>
                     {{ deficit_rl_value }}                    
                 </span>
             </div>
         {% else %}
             <div>
-                <strong>Déficit de RL</strong>
+                <strong>Tem Déficit de RL?</strong>
                 <span>Não</span>
             </div>
         {% endif %}
@@ -116,7 +116,7 @@
         </div>
 
         <div>
-            <strong>APP Antropizada</strong>
+            <strong>Tem APP Antropizada?</strong>
             {% if recibo and recibo.area_antropizada and recibo.app_to_restore %}
                 <span>{{ recibo.area_antropizada }}</span>
             {% elif demonstrativo and demonstrativo.area_antropizada and demonstrativo.app_to_restore %}
