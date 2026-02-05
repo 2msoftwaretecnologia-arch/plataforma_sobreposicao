@@ -148,8 +148,8 @@
                     <span>
                         {% regroup base.areas_encontradas|dictsort:"item_info" by item_info as fito_list %}
                         {% for fito in fito_list %}
-                            {% if "Cerrado" in fito.grouper %}🌾{% elif "Floresta" in fito.grouper %}🌳{% elif "água" in fito.grouper or "agua" in fito.grouper %}💧{% endif %}
-                            {{ fito.grouper }}{% if not forloop.last %} &nbsp;|&nbsp; {% endif %}
+                            {% if "Cerrado" in fito.grouper %}🌾{% elif "Floresta" in fito.grouper %}🌳{% endif %}
+                            {{ fito.grouper }} <strong>({{ fito.list.0.area|floatformat:4 }} ha)</strong>{% if not forloop.last %} &nbsp;|&nbsp; {% endif %}
                         {% endfor %}
                     </span>
                 </div>

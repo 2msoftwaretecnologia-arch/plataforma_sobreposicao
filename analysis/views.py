@@ -145,6 +145,13 @@ class ReportPrintView(View):
         # Calcular área total por base
         if resultado and 'resultados_por_base' in resultado:
             for base in resultado['resultados_por_base']:
+                # Filter out water bodies from Fitoecologias
+                if "Fitoecologias" in base.get('nome_base', ''):
+                    base['areas_encontradas'] = [
+                        item for item in base.get('areas_encontradas', [])
+                        if not ("água" in item.get('item_info', '').lower() or "agua" in item.get('item_info', '').lower())
+                    ]
+
                 areas = base.get('areas_encontradas', [])
                 total = 0.0
                 for item in areas:
