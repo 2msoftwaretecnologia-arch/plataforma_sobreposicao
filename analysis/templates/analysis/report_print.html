@@ -85,6 +85,17 @@
             </div>
         {% endif %}
 
+        <div>
+            <strong>Reserva Legal (ha)</strong>
+            <span>
+                {% if recibo and recibo.area_reserva_legal %}
+                    {{ recibo.area_reserva_legal }}
+                {% else %}
+                    {{ resultado.area_preservada_total|floatformat:4|default:"0.0000" }}
+                {% endif %}
+            </span>
+        </div>
+
         {% if has_deficit_rl %}
             <div>
                 <strong>Tem Déficit de RL?</strong>
@@ -111,17 +122,6 @@
                 <span>Não</span>
             {% endif %}
         {% endif %}
-        
-        <div>
-            <strong>Reserva Legal (ha)</strong>
-            <span>
-                {% if recibo and recibo.area_reserva_legal %}
-                    {{ recibo.area_reserva_legal }}
-                {% else %}
-                    {{ resultado.area_preservada_total|floatformat:4|default:"0.0000" }}
-                {% endif %}
-            </span>
-        </div>
 
         <div>
             <strong>Tem APP Antropizada?</strong>
