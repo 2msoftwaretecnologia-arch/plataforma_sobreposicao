@@ -70,6 +70,18 @@
     }
     applyMode();
 
+    if (carInput) {
+        carInput.addEventListener('input', function (e) {
+            if (e.target.value.includes('.')) {
+                e.target.value = e.target.value.replace(/\./g, '');
+                clientError.style.display = 'block';
+                clientError.textContent = '❌ Não é permitido o uso de pontos.';
+            } else {
+                clientError.style.display = 'none';
+            }
+        });
+    }
+
     zipInput.addEventListener('change', function () {
         if (zipInput.files && zipInput.files.length > 0) {
             zipLabelText.textContent = zipInput.files[0].name;
@@ -196,13 +208,18 @@
         const mode = getSelectedMode();
         const zipSelectedEmpty = mode === 'zip' && (!zipInput.files || zipInput.files.length === 0);
         const carSelectedEmpty = mode === 'car' && (carInput.value.trim() === '');
+        const carHasDots = mode === 'car' && carInput.value.includes('.');
         const demoInvalidPdf = mode === 'demostrativo' && demoInput && demoInput.files && demoInput.files.length > 0 && !isPdf(demoInput.files[0]);
         const reciboInvalidPdf = mode === 'recibo' && reciboInput && reciboInput.files && reciboInput.files.length > 0 && !isPdf(reciboInput.files[0]);
 
-        if (zipSelectedEmpty || carSelectedEmpty || demoInvalidPdf || reciboInvalidPdf) {
+        if (zipSelectedEmpty || carSelectedEmpty || demoInvalidPdf || reciboInvalidPdf || carHasDots) {
             e.preventDefault();
             clientError.style.display = 'block';
-            clientError.textContent = (demoInvalidPdf || reciboInvalidPdf) ? '❌ Por favor, selecione um arquivo PDF.' : '❌ Por favor, envie um ZIP ou informe o número do CAR.';
+            if (carHasDots) {
+                clientError.textContent = '❌ Não é permitido o uso de pontos no número do CAR.';
+            } else {
+                clientError.textContent = (demoInvalidPdf || reciboInvalidPdf) ? '❌ Por favor, selecione um arquivo PDF.' : '❌ Por favor, envie um ZIP ou informe o número do CAR.';
+            }
             return;
         }
 
