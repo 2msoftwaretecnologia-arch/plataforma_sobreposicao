@@ -85,13 +85,20 @@
             </div>
         {% endif %}
 
+        {% if demonstrativo %}
+            <div>
+                <strong>Reserva Legal Declarada</strong>
+                <span>{{ demonstrativo.area_reserva_legal_proposta|default:"-" }} ha</span>
+            </div>
+        {% endif %}
+
         <div>
-            <strong>Reserva Legal (ha)</strong>
+            <strong>Reserva Legal Necessaria</strong>
             <span>
                 {% if recibo and recibo.area_reserva_legal %}
-                    {{ recibo.area_reserva_legal }}
+                    {{ recibo.area_reserva_legal }} ha
                 {% else %}
-                    {{ resultado.area_preservada_total|floatformat:4|default:"0.0000" }}
+                    {{ resultado.area_preservada_total|floatformat:4|default:"0.0000" }} ha
                 {% endif %}
             </span>
         </div>
