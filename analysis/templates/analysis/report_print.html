@@ -83,22 +83,8 @@
                     {{ demonstrativo.external_condicion|default:"Não informado" }}                    
                 </span>
             </div>
-
-            {% if demonstrativo.issue_rl_quote %}
-                <div>
-                    <strong>Pode Emitir cota RL?</strong>
-                    <span>
-                        {{ demonstrativo.passivo_ou_excedente_de_reserva_legal }}                    
-                    </span>
-                </div>
-            {% else %}
-                <span>Não</span>
-            {% endif %}
-            
-            
-
         {% endif %}
-        
+
         {% if has_deficit_rl %}
             <div>
                 <strong>Tem Déficit de RL?</strong>
@@ -111,6 +97,19 @@
                 <strong>Tem Déficit de RL?</strong>
                 <span>Não</span>
             </div>
+        {% endif %}
+
+        {% if demonstrativo %}
+            {% if demonstrativo.issue_rl_quote %}
+                <div>
+                    <strong>Pode Emitir cota RL?</strong>
+                    <span>
+                        {{ demonstrativo.passivo_ou_excedente_de_reserva_legal }}                    
+                    </span>
+                </div>
+            {% else %}
+                <span>Não</span>
+            {% endif %}
         {% endif %}
         
         <div>
