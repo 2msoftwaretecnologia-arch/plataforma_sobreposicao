@@ -107,7 +107,7 @@
             <div>
                 <strong>Tem Déficit de RL?</strong>
                 <span>
-                    {{ deficit_rl_value }}                    
+                    Sim {{ deficit_rl_value|cut:"-"}}                    
                 </span>
             </div>
         {% else %}
@@ -122,11 +122,14 @@
                 <div>
                     <strong>Pode Emitir cota RL?</strong>
                     <span>
-                        {{ demonstrativo.passivo_ou_excedente_de_reserva_legal }}                    
+                        Sim {{ demonstrativo.passivo_ou_excedente_de_reserva_legal|cut:"-" }} ha
                     </span>
                 </div>
             {% else %}
-                <span>Não</span>
+                <div>
+                    <strong>Pode Emitir cota RL?</strong>
+                    <span>Não</span>
+                </div>
             {% endif %}
         {% endif %}
 
