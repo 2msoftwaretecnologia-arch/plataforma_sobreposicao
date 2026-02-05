@@ -140,6 +140,21 @@
                 <span>Não</span>
             {% endif %}
         </div>
+
+        {% for base in resultado.resultados_por_base %}
+            {% if "Fitoecologias" in base.nome_base and base.areas_encontradas %}
+                <div>
+                    <strong>Bioma(s)</strong>
+                    <span>
+                        {% regroup base.areas_encontradas|dictsort:"item_info" by item_info as fito_list %}
+                        {% for fito in fito_list %}
+                            {% if "Cerrado" in fito.grouper %}🌾{% elif "Floresta" in fito.grouper %}🌳{% elif "água" in fito.grouper or "agua" in fito.grouper %}💧{% endif %}
+                            {{ fito.grouper }}{% if not forloop.last %} &nbsp;|&nbsp; {% endif %}
+                        {% endfor %}
+                    </span>
+                </div>
+            {% endif %}
+        {% endfor %}
     </div>
 
     {% if recibo %}
