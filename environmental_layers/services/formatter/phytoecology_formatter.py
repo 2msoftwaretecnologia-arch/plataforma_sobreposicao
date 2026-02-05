@@ -10,7 +10,7 @@ class PhytoecologyFormatter(BaseFormatter):
         return {
             "area": intersec["intersection_area_ha"],
             "nome": model_obj.phyto_name,
-            "item_info": "{}".format(model_obj.phyto_name),
+            "item_info": "Regioões FitoEcologicas: {}".format(model_obj.phyto_name),
             "polygon_wkt": intersec["intersection_geom"].wkt,
             "polygon_geojson": intersec["intersection_geom"].geojson,
             "preserved_area": preserved_area

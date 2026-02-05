@@ -46,7 +46,7 @@
                             {% include "analysis/components/base/_area_item_zoneamento.html" %}
 
                         {# --- Fitoecologias #}
-                        {% elif area.item_info and "fitoecolog" in area.item_info|lower %}
+                        {% elif "fitoecologias" in base.nome_base|lower %}
                             {% include "analysis/components/base/_area_item_fitoecologias.html" %}
 
                         {# --- Fallback genérico #}

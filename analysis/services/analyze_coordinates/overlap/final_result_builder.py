@@ -104,7 +104,7 @@ class FinalResultBuilder:
                 grouped[key] = {
                     "nome": key,
                     "area": r.get("area", 0) or 0,
-                    "item_info": "Regioões FitoEcologicas: {}".format(key),
+                    "item_info": key,
                     "preserved_area": r.get("preserved_area", 0),
                     "_geom_obj": geom # Armazena objeto temporário para união
                 }
