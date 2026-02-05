@@ -98,7 +98,7 @@
                 {% if recibo and recibo.area_reserva_legal %}
                     {{ recibo.area_reserva_legal }} ha
                 {% else %}
-                    {{ resultado.area_preservada_total|floatformat:4|default:"0.0000" }} ha
+                    {{ resultado.area_preservada_total|floatformat:4|default:"0,0000" }} ha
                 {% endif %}
             </span>
         </div>
