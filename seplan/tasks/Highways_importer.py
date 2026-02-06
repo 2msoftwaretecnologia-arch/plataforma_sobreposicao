@@ -24,7 +24,7 @@ class HighwaysImporter:
     @staticmethod
     def format_data(row, user):
         return {
-            "NOME_2011": row.get("nome_area") if row.get("nome_area") else "Sem Nome",
+            "NOME_2011": row.get("NOME_2011") if row.get("NOME_2011") else "Sem Nome",
             "CLAS_2011": row.get("CLAS_2011") if row.get("CLAS_2011") else "Sem Classe",
             "geometry": str(row.get("geometry")),
             "created_by": user,
