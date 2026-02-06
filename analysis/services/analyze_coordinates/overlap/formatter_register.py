@@ -21,6 +21,8 @@ from gov.services.formatter.snic_total import SnicTotalFormatter
 from gov.services.formatter.sigef_formatter import SigefFormatter
 from deforestation_fires.models import DeforestationMapbiomas
 from deforestation_fires.services.formatter.deforestation_mabBiomas_formatter import DeforestationMapbiomasFormatter
+from seplan.models import Ipuca
+from seplan.services.formatter.ipuca import IpucaFormatter
 
 class FormatterRegister:
     
@@ -39,6 +41,7 @@ class FormatterRegister:
             Ruralsettlement: RuralsettlementFormatter(),
             SnicTotal: SnicTotalFormatter(),
             DeforestationMapbiomas: DeforestationMapbiomasFormatter(),
+            Ipuca: IpucaFormatter(),
         }
         
     @property

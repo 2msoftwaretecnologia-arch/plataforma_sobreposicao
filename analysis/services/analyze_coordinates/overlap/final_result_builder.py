@@ -183,6 +183,7 @@ class FinalResultBuilder:
             "Ruralsettlement": "Base de Dados de Assentamentos Rurais",
             "SnicTotal": "Base de Dados SNIC Total",
             "DeforestationMapbiomas": "Base de Deforestação Mapbiomas",
+            "Ipuca": "Base de Dados IPUCA",
         }
         return mapping.get(layer.__name__, layer.__name__)
 
@@ -201,5 +202,6 @@ class FinalResultBuilder:
             "Ruralsettlement": "#00ACC1",
             "SnicTotal": "#EF6C00",
             "DeforestationMapbiomas": "#FF0000",
+            "Ipuca": "#673AB7",
         }
         return mapping.get(layer.__name__, "#9E9E9E")

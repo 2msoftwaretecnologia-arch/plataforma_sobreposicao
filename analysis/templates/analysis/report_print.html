@@ -201,6 +201,8 @@
                         {% include "analysis/components/tables/phytoecology_table.html" with items=base.areas_encontradas %}
                     {% elif "Veredas" in base.nome_base %}
                         {% include "analysis/components/tables/paths_table.html" with items=base.areas_encontradas total_area=base.total_area %}
+                    {% elif "IPUCA" in base.nome_base %}
+                        {% include "analysis/components/tables/ipuca_table.html" with items=base.areas_encontradas total_area=base.total_area %}
                     {% elif "Unidades de Conservação" in base.nome_base %}
                         {% include "analysis/components/tables/conservation_units_table.html" with items=base.areas_encontradas %}
                     {% elif "SNIC" in base.nome_base %}
