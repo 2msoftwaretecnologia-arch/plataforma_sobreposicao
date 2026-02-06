@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     'gov',
     'deforestation_fires',
     'doc_extractor',
+    'seplan',
 ]
 
 MIDDLEWARE = [

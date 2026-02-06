@@ -98,6 +98,13 @@ class FileManagement(models.Model):
         blank = True
     )
 
+    highways_zip_file = models.FileField(
+        upload_to='documents/',
+        verbose_name="Documentos Highways",
+        help_text="Arquivo ZIP contendo dados da Área de Highways.",
+        null = True,
+        blank = True
+    )
     
 
     class Meta:
