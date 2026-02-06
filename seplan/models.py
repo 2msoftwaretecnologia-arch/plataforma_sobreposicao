@@ -34,3 +34,19 @@ class Highways(GeoBaseModel):
 
     def __str__(self):
         return self.NOME_2011 or f"Rodovia {self.id}"
+
+class Ipuca(GeoBaseModel):
+    
+    hash_id = models.CharField(
+        max_length=64, 
+        verbose_name="Hash ID", 
+        db_column='hash_id', 
+        unique=True, 
+        null=True, 
+        blank=True
+    )
+   
+    class Meta:
+        db_table = 'tb_ipuca'
+        verbose_name = "IPUCA"
+        verbose_name_plural = "IPUCAs"
