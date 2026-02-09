@@ -91,10 +91,10 @@ class Command(BaseCommand):
         if not archive_path:
             raise CommandError("Nenhum arquivo de Embargoe foi configurado.")
         
-        if not archive_path.embargoes_zip_file.path:
+        if not archive_path.adm_embargos_ibama_a_zip_file.path:
             raise CommandError("Nenhum arquivo de Embargoe foi configurado.")
         
-        df = gpd.read_file(archive_path.embargoes_zip_file.path)
+        df = gpd.read_file(archive_path.adm_embargos_ibama_a_zip_file.path)
 
         print(f"Total de linhas: {len(df)}")
 
