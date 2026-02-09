@@ -35,7 +35,7 @@ class DeforestationMapbiomas(GeoBaseModel):
 
 class Embargoes(GeoBaseModel):
     property_name = models.CharField(
-        max_length=250, 
+        max_length=300, 
         verbose_name="Nome do imovel", 
         db_column='nome_imove'
     )
@@ -51,7 +51,7 @@ class Embargoes(GeoBaseModel):
         db_column='num_auto_i'
     )
     nome_embargado = models.CharField(
-        max_length=100, 
+        max_length=300, 
         verbose_name="Nome do embargado", 
         db_column='nome_embar'
     )
@@ -61,7 +61,7 @@ class Embargoes(GeoBaseModel):
         db_column='cpf_cnpj_e'
     )
     control_unity = models.CharField(
-        max_length=100, 
+        max_length=300, 
         verbose_name="Unidade controladora", 
         db_column='unid_contr'
     )
@@ -71,12 +71,12 @@ class Embargoes(GeoBaseModel):
         db_column='num_proce'
     )
     act_description = models.CharField(
-        max_length=100, 
+        max_length=300, 
         verbose_name="Descricao do ato de infracao", 
         db_column='des_tad'
     )
     infraction_description = models.CharField(
-        max_length=100, 
+        max_length=300, 
         verbose_name="Descricao do infracao", 
         db_column='des_infrac'
     )
