@@ -63,7 +63,7 @@ class Embargoes(GeoBaseModel):
     control_unity = models.CharField(
         max_length=100, 
         verbose_name="Unidade controladora", 
-        db_column='unidade_c'
+        db_column='unid_contr'
     )
     process_number = models.CharField(
         max_length=70, 

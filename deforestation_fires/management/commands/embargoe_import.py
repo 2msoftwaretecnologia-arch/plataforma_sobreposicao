@@ -129,7 +129,7 @@ class Command(BaseCommand):
             "number_infraction_act": str(row.get("num_auto_i")),
             "nome_embargado": str(row.get("nome_embar")),
             "cpf_cnpj_embargado": str(row.get("cpf_cnpj_e")),
-            "control_unity": str(row.get("unidade_c")),
+            "control_unity": str(row.get("unid_contr")),
             "process_number": str(row.get("num_proce")),
             "act_description": str(row.get("des_tad")),
             "infraction_description": str(row.get("des_infrac")),

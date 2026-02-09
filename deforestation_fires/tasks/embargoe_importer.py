@@ -30,7 +30,7 @@ class EmbargoesImporter:
             "number_infraction_act": str(row.get("num_auto_i")),
             "nome_embargado": str(row.get("nome_embar")),
             "cpf_cnpj_embargado": str(row.get("cpf_cnpj_e")),
-            "control_unity": str(row.get("unidade_c")),
+            "control_unity": str(row.get("unid_contr")),
             "process_number": str(row.get("num_proce")),
             "act_description": str(row.get("des_tad")),
             "infraction_description": str(row.get("des_infrac")),
@@ -51,9 +51,9 @@ class EmbargoesImporter:
         reset_db(Embargoes)
         user = self._get_user()
         archive_path = get_file_management()
-        if not archive_path or not archive_path.embargoes_zip_file.path:
+        if not archive_path or not archive_path.adm_embargos_ibama_a_zip_file:
             raise ValueError("Nenhum arquivo de Embargoes foi configurado.")
-        df = gpd.read_file(archive_path.embargoes_zip_file.path)
+        df = gpd.read_file(archive_path.adm_embargos_ibama_a_zip_file.path)
         for _, row in df.iterrows():
             formatted = self.format_data(row, user)
             formatted["hash_id"] = self.generate_hash(formatted)
