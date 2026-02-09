@@ -68,7 +68,7 @@ class Embargoes(GeoBaseModel):
     process_number = models.CharField(
         max_length=70, 
         verbose_name="Numero do processo", 
-        db_column='num_proce'
+        db_column='num_process'
     )
     act_description = models.CharField(
         max_length=300, 
@@ -83,12 +83,12 @@ class Embargoes(GeoBaseModel):
     embargoe_date = models.CharField(
         max_length=70, 
         verbose_name="Data do embargado", 
-        db_column='data_embarg'
+        db_column='dat_embarg'
     )
     priting_date = models.CharField(
         max_length=70, 
         verbose_name="Data de impressao", 
-        db_column='data_impres'
+        db_column='dat_impres'
     )
     
     
