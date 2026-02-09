@@ -71,14 +71,29 @@
     applyMode();
 
     if (carInput) {
-        carInput.addEventListener('input', function (e) {
-            if (e.target.value.includes('.')) {
-                e.target.value = e.target.value.replace(/\./g, '');
-                clientError.style.display = 'block';
-                clientError.textContent = '❌ Não é permitido o uso de pontos.';
+        function validateAndCleanCarInput(e) {
+            let value = carInput.value;
+            if (value.includes('.')) {
+                // Remove pontos
+                const newValue = value.replace(/\./g, '');
+                carInput.value = newValue;
+                
+                // Opcional: Notificar o usuário que os pontos foram removidos, 
+                // mas não bloquear ou mostrar erro vermelho permanente se agora está válido.
+                // Por enquanto, vamos limpar o erro se o valor resultante for válido (não vazio).
+                if (newValue.trim() !== '') {
+                    clientError.style.display = 'none';
+                }
             } else {
                 clientError.style.display = 'none';
             }
+        }
+
+        carInput.addEventListener('input', validateAndCleanCarInput);
+        carInput.addEventListener('change', validateAndCleanCarInput);
+        carInput.addEventListener('paste', function(e) {
+            // Aguarda um breve momento para o valor ser colado antes de limpar
+            setTimeout(validateAndCleanCarInput, 0);
         });
     }
 
@@ -206,9 +221,15 @@
 
     form.addEventListener('submit', function (e) {
         const mode = getSelectedMode();
+
+        // Garante que o input do CAR esteja limpo de pontos antes de validar
+        if (mode === 'car' && carInput && carInput.value.includes('.')) {
+            carInput.value = carInput.value.replace(/\./g, '');
+        }
+
         const zipSelectedEmpty = mode === 'zip' && (!zipInput.files || zipInput.files.length === 0);
         const carSelectedEmpty = mode === 'car' && (carInput.value.trim() === '');
-        const carHasDots = mode === 'car' && carInput.value.includes('.');
+        const carHasDots = mode === 'car' && carInput.value.includes('.'); // Será false se limpo acima
         const demoInvalidPdf = mode === 'demostrativo' && demoInput && demoInput.files && demoInput.files.length > 0 && !isPdf(demoInput.files[0]);
         const reciboInvalidPdf = mode === 'recibo' && reciboInput && reciboInput.files && reciboInput.files.length > 0 && !isPdf(reciboInput.files[0]);
 
