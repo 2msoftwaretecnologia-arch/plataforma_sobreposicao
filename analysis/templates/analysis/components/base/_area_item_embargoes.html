@@ -1,0 +1,17 @@
+<div class="area-item area-item--embargo" data-area="{{ area.area|stringformat:'f' }}" title="{{ area.item_info|default:'' }}">
+    <div class="area-item__icon" aria-hidden="true" style="color: #FF5722;">🚫</div>
+    <div class="area-item__content">
+        {% if area.area %}
+        <p class="area-item__label">Área sobreposta</p>
+        <p class="area-item__value">{{ area.area|floatformat:4 }} ha</p>
+        {% endif %}
+        
+        {% if area.number_infraction_act %}
+        <p class="area-item__meta"><strong>Auto:</strong> {{ area.number_infraction_act }}</p>
+        {% endif %}
+
+        {% if area.embargoe_date %}
+        <p class="area-item__meta">Data: {{ area.embargoe_date }}</p>
+        {% endif %}
+    </div>
+</div>

@@ -41,6 +41,7 @@ class FormatterRegister:
             Ruralsettlement: RuralsettlementFormatter(),
             SnicTotal: SnicTotalFormatter(),
             DeforestationMapbiomas: DeforestationMapbiomasFormatter(),
+            Embargoes: EmbargoeFormatter(),
             Ipuca: IpucaFormatter(),
         }
         
