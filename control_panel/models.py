@@ -113,6 +113,14 @@ class FileManagement(models.Model):
         blank = True
     )
 
+    adm_embargos_ibama_a_zip_file = models.FileField(
+        upload_to='documents/',
+        verbose_name="Documentos Embargos IBAMA A",
+        help_text="Arquivo ZIP contendo dados da Área de Embargos IBAMA A.",
+        null = True,
+        blank = True
+    )
+
     class Meta:
         db_table = 'tb_gerenciamento_arquivos'
         verbose_name = "Gerenciamento de Arquivos"
