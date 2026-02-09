@@ -35,7 +35,7 @@ class DeforestationMapbiomas(GeoBaseModel):
 
 class Embargoes(GeoBaseModel):
     property_name = models.CharField(
-        max_length=100, 
+        max_length=250, 
         verbose_name="Nome do imovel", 
         db_column='nome_imove'
     )
