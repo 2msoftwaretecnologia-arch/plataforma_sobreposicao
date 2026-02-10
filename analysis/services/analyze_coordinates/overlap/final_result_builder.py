@@ -185,6 +185,7 @@ class FinalResultBuilder:
             "DeforestationMapbiomas": "Base de Deforestação Mapbiomas",
             "Embargoes": "Base de Embargos do IBAMA",
             "Ipuca": "Base de Dados IPUCA",
+            "Prodes": "Base de Dados Prodes",
         }
         return mapping.get(layer.__name__, layer.__name__)
 
@@ -205,5 +206,6 @@ class FinalResultBuilder:
             "DeforestationMapbiomas": "#FF0000",
             "Embargoes": "#FF5722",
             "Ipuca": "#673AB7",
+            "Prodes": "#D84315",
         }
         return mapping.get(layer.__name__, "#9E9E9E")

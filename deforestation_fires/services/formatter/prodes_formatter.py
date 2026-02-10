@@ -1,66 +1,31 @@
-import geopandas as gpd
-import hashlib
-import json
-from django.contrib.auth.models import User
-from control_panel.utils import get_file_management
-from deforestation_fires.models import Prodes
-from kernel.service.geometry_processing_service import GeometryProcessingService
-from kernel.utils import reset_db
+from kernel.service.abstract.base_formatter import BaseFormatter
+from datetime import datetime
 
-
-class ProdesFormatter:
-    def __init__(self, user=None):
-        self.user = user
-
-    def _get_user(self):
-        if self.user:
-            return self.user
-        user = User.objects.first()
-        if not user:
-            raise ValueError("Nenhum usuário encontrado.")
-        return user
-    
-    @staticmethod
-    def format_data(row, user):
-        return {
-            "identification": row.get("main_class"),
-            "image_date": row.get("image_date"),
-            "year": row.get("year"),
-            "satelite": row.get("satelite"),
-            "geometry": str(row.get("geometry")),
-            "created_by": user,
-            "source": "Prodes",
-        }
-
-    @staticmethod
-    def generate_hash(data: dict) -> str:
-        json_str = json.dumps(data, sort_keys=True, default=str)
-        return hashlib.sha256(json_str.encode("utf-8")).hexdigest()
-
-    def execute(self):
-        reset_db(Prodes)
-        user = self._get_user()
-        archive_path = get_file_management()
-        if not archive_path or not archive_path.prodes_zip_file.path:
-            raise ValueError("Nenhum arquivo de Prodes foi configurado.")
-        df = gpd.read_file(archive_path.prodes_zip_file.path, encoding="utf-8")
-        for _, row in df.iterrows():
-            formatted = self.format_data(row, user)
-            formatted["hash_id"] = self.generate_hash(formatted)
-            obj, created = Prodes.objects.get_or_create(
-                hash_id=formatted["hash_id"],
-                defaults={
-                    "image_date": formatted["image_date"],
-                    "year": formatted["year"],
-                    "satelite": formatted["satelite"],
-                    "identification": formatted["identification"],
-                    "geometry": formatted["geometry"],
-                    "created_by": formatted["created_by"],
-                    "source": formatted["source"],
-                },
-            )
-            if created:
-                GeometryProcessingService(Prodes).process_instance(obj)
-                print(f"[OK] {obj.identification}")
+class ProdesFormatter(BaseFormatter):
+    def _format_date(self, date_str):
+        if not date_str:
+            return None
+        try:
+            # Tenta remover a parte de hora se existir e formata
+            # Aceita formatos comuns de banco como YYYY-MM-DD HH:MM:SS ou YYYY-MM-DD
+            dt = None
+            if ' ' in date_str:
+                dt = datetime.strptime(date_str.split('.')[0], '%Y-%m-%d %H:%M:%S')
             else:
-                print(f"[SKIP] {obj.identification} já existe")
+                dt = datetime.strptime(date_str, '%Y-%m-%d')
+            return dt.strftime('%d/%m/%Y')
+        except (ValueError, TypeError, IndexError):
+            # Se falhar o parse, retorna a string original
+            return date_str
+
+    def format(self, model_obj, intersec):
+        return {
+            "area": intersec["intersection_area_ha"],
+            "identification": model_obj.identification,
+            "year": model_obj.year,
+            "satelite": model_obj.satelite,
+            "image_date": self._format_date(model_obj.image_date),
+            "item_info": f"Prodes: {model_obj.identification} - {model_obj.year}",
+            "polygon_wkt": intersec["intersection_geom"].wkt,
+            "polygon_geojson": intersec["intersection_geom"].geojson,
+        }

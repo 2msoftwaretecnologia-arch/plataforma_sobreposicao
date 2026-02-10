@@ -229,6 +229,8 @@
                         {% include "analysis/components/tables/deforestation_mapbiomas_table.html" with items=base.areas_encontradas %}
                     {% elif "Embargos" in base.nome_base or "Embargoes" in base.nome_base %}
                         {% include "analysis/components/tables/embargoes_table.html" with items=base.areas_encontradas %}
+                    {% elif "Prodes" in base.nome_base %}
+                        {% include "analysis/components/tables/prodes_table.html" with items=base.areas_encontradas %}
                     {% else %}
                         <table class="report-table">
                             <thead>

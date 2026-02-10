@@ -19,9 +19,10 @@ from gov.models import Sigef, Ruralsettlement, SnicTotal
 from gov.services.formatter.ruralsettlement import RuralsettlementFormatter
 from gov.services.formatter.snic_total import SnicTotalFormatter
 from gov.services.formatter.sigef_formatter import SigefFormatter
-from deforestation_fires.models import DeforestationMapbiomas, Embargoes
+from deforestation_fires.models import DeforestationMapbiomas, Embargoes, Prodes
 from deforestation_fires.services.formatter.deforestation_mabBiomas_formatter import DeforestationMapbiomasFormatter
 from deforestation_fires.services.formatter.embargoe_formatter import EmbargoeFormatter
+from deforestation_fires.services.formatter.prodes_formatter import ProdesFormatter
 from seplan.models import Ipuca, Highways
 from seplan.services.formatter.ipuca import IpucaFormatter
 from seplan.services.formatter.Highways import HighwaysFormatter
@@ -44,6 +45,7 @@ class FormatterRegister:
             SnicTotal: SnicTotalFormatter(),
             DeforestationMapbiomas: DeforestationMapbiomasFormatter(),
             Embargoes: EmbargoeFormatter(),
+            Prodes: ProdesFormatter(),
             Ipuca: IpucaFormatter(),
             Highways: HighwaysFormatter(),
         }
