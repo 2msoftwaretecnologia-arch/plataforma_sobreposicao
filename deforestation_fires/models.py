@@ -141,9 +141,9 @@ class Prodes(GeoBaseModel):
     )
    
     class Meta:
-        db_table = 'tb_area_deforestation_mapbiomas'
-        verbose_name = "Deforestation Mapbiomas"
-        verbose_name_plural = "Deforestation Mapbiomas"
+        db_table = 'tb_prodes'
+        verbose_name = "Prodes"
+        verbose_name_plural = "Prodes"
 
     def __str__(self):
-        return self.alert_code
+        return self.identification
