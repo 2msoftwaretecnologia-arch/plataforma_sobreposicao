@@ -120,6 +120,14 @@ class FileManagement(models.Model):
         null = True,
         blank = True
     )
+    
+    prodes_zip_file = models.FileField(
+        upload_to='documents/',
+        verbose_name="Documentos Prodes",
+        help_text="Arquivo ZIP contendo dados da Área de Prodes.",
+        null = True,
+        blank = True
+    )
 
     class Meta:
         db_table = 'tb_gerenciamento_arquivos'
