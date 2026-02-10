@@ -6,12 +6,68 @@
         <p class="area-item__value">{{ area.area|floatformat:4 }} ha</p>
         {% endif %}
         
-        {% if area.number_infraction_act %}
-        <p class="area-item__meta"><strong>Auto:</strong> {{ area.number_infraction_act }}</p>
-        {% endif %}
+        <div style="margin-top: 8px; border-top: 1px solid #eee; padding-top: 6px;">
+            <!-- Imóvel e Tipo -->
+            {% if area.property_name or area.type_area %}
+            <p class="area-item__meta">
+                {% if area.property_name %}
+                    <strong>Imóvel:</strong> {{ area.property_name }}
+                {% endif %}
+                
+                {% if area.type_area %}
+                    {% if area.property_name %}<br>{% endif %}
+                    <strong>Tipo de Área:</strong> {{ area.type_area }}
+                {% endif %}
+            </p>
+            {% endif %}
 
-        {% if area.embargoe_date %}
-        <p class="area-item__meta">Data: {{ area.embargoe_date }}</p>
-        {% endif %}
+            <!-- Embargado e CPF/CNPJ -->
+            {% if area.nome_embargado %}
+            <p class="area-item__meta">
+                <strong>Embargado:</strong> {{ area.nome_embargado }}
+                {% if area.cpf_cnpj_embargado %}<br><strong>CPF/CNPJ: </strong>{{ area.cpf_cnpj_embargado }}{% endif %}
+            </p>
+            {% endif %}
+
+            <!-- Unidade de Controle -->
+            {% if area.control_unity %}
+            <p class="area-item__meta"><strong>Unidade Controladora:</strong> {{ area.control_unity }}</p>
+            {% endif %}
+
+            <!-- Auto e Processo -->
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px;">
+                {% if area.number_infraction_act %}
+                <p class="area-item__meta" style="margin: 0;"><strong>Número do Auto:</strong> {{ area.number_infraction_act }}</p>
+                {% endif %}
+                {% if area.process_number %}
+                <p class="area-item__meta" style="margin: 0;"><strong>Número do Processo:</strong> {{ area.process_number }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Datas -->
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 2px;">
+                {% if area.embargoe_date %}
+                <p class="area-item__meta" style="margin: 0;"><strong>Data do Embargo:</strong> {{ area.embargoe_date }}</p>
+                {% endif %}
+                {% if area.priting_date %}
+                <p class="area-item__meta" style="margin: 0;"><strong>Data da Impressão:</strong> {{ area.priting_date }}</p>
+                {% endif %}
+            </div>
+            
+            <!-- Descrições -->
+            <div style="margin-top: 6px; font-size: 0.85em; background: #f9f9f9; padding: 4px; border-radius: 4px;">
+                {% if area.infraction_description %}
+                <p class="area-item__meta" style="margin-bottom: 2px;" title="{{ area.infraction_description }}">
+                    <strong>Infração:</strong> {{ area.infraction_description|truncatechars:60 }}
+                </p>
+                {% endif %}
+                
+                {% if area.act_description %}
+                <p class="area-item__meta" style="margin: 0;" title="{{ area.act_description }}">
+                    <strong>Descrição do Ato:</strong> {{ area.act_description|truncatechars:60 }}
+                </p>
+                {% endif %}
+            </div>
+        </div>
     </div>
 </div>

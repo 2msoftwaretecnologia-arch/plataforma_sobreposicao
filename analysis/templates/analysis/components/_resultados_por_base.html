@@ -50,7 +50,7 @@
                             {% include "analysis/components/base/_area_item_fitoecologias.html" %}
 
                         {# --- Embargos #}
-                        {% elif "embargos" in base.nome_base|lower %}
+                        {% elif "embargos" in base.nome_base|lower or "embargoes" in base.nome_base|lower %}
                             {% include "analysis/components/base/_area_item_embargoes.html" %}
 
                         {# --- Fallback genérico #}

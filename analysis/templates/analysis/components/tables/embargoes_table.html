@@ -2,22 +2,56 @@
     <thead>
         <tr>
             <th>Área (ha)</th>
-            <th>Nº Auto</th>
+            <th>Infração / Processo</th>
+            <th>Imóvel / Unidade Controladora</th>
             <th>Embargado</th>
-            <th>Data</th>
+            <th>Descrições</th>
+            <th>Datas</th>
         </tr>
     </thead>
     <tbody>
         {% for item in items %}
         <tr>
             <td>{{ item.area|floatformat:4 }}</td>
-            <td>{{ item.number_infraction_act|default:"-" }}</td>
-            <td>{{ item.nome_embargado|default:"-" }}</td>
-            <td>{{ item.embargoe_date|default:"-" }}</td>
+            <td>
+                <strong>Número do Auto:</strong> {{ item.number_infraction_act|default:"-" }}<br>
+                <strong>Número do Processo:</strong> {{ item.process_number|default:"-" }}
+            </td>
+            <td>
+                <strong>Nome do Imóvel:</strong> {{ item.property_name|default:"-" }}<br>
+                {% if item.type_area %}
+                <small class="text-muted"><strong>Tipo de Área:</strong> {{ item.type_area }}</small><br>
+                {% endif %}
+                {% if item.control_unity %}
+                <small class="text-muted"><strong>Unidade Controladora:</strong> {{ item.control_unity }}</small>
+                {% endif %}
+            </td>
+            <td>
+                <strong>Nome do Embargado:</strong> {{ item.nome_embargado|default:"-" }}<br>
+                <small class="text-muted"><strong>CPF/CNPJ:</strong> {{ item.cpf_cnpj_embargado|default:"-" }}</small>
+            </td>
+            <td>
+                <div style="max-width: 250px; font-size: 0.85em;">
+                    {% if item.infraction_description %}
+                        <div><strong>Infração:</strong> {{ item.infraction_description }}</div>
+                    {% endif %}
+                    {% if item.act_description %}
+                        <div style="margin-top: 4px;"><strong>Ato:</strong> {{ item.act_description }}</div>
+                    {% endif %}
+                </div>
+            </td>
+            <td>
+                <div style="font-size: 0.85em;">
+                    <div><strong>Data do Embargo:</strong> {{ item.embargoe_date|default:"-" }}</div>
+                    {% if item.priting_date %}
+                    <div><strong>Data da Impressão:</strong> {{ item.priting_date }}</div>
+                    {% endif %}
+                </div>
+            </td>
         </tr>
         {% empty %}
         <tr>
-            <td colspan="4">Nenhum registro encontrado.</td>
+            <td colspan="6">Nenhum registro encontrado.</td>
         </tr>
         {% endfor %}
     </tbody>

@@ -145,6 +145,24 @@
         </div>
 
         {% for base in resultado.resultados_por_base %}
+            {% if "Embargos" in base.nome_base or "Embargoes" in base.nome_base %}
+                <div>
+                    <strong>Há Embargos?</strong>
+                    <span style="text-align: right;">
+                        {% if base.areas_encontradas %}
+                            Sim
+                            {% for item in base.areas_encontradas %}
+                                <br>{{ item.area|floatformat:4 }} ha
+                            {% endfor %}
+                        {% else %}
+                            Não
+                        {% endif %}
+                    </span>
+                </div>
+            {% endif %}
+        {% endfor %}
+
+        {% for base in resultado.resultados_por_base %}
             {% if "Fitoecologias" in base.nome_base and base.areas_encontradas %}
                 <div>
                     <strong>Bioma(s)</strong>
@@ -209,7 +227,7 @@
                         {% include "analysis/components/tables/snic_total_table.html" with items=base.areas_encontradas %}
                     {% elif "Deforestação" in base.nome_base or "Mapbiomas" in base.nome_base %}
                         {% include "analysis/components/tables/deforestation_mapbiomas_table.html" with items=base.areas_encontradas %}
-                    {% elif "Embargos" in base.nome_base %}
+                    {% elif "Embargos" in base.nome_base or "Embargoes" in base.nome_base %}
                         {% include "analysis/components/tables/embargoes_table.html" with items=base.areas_encontradas %}
                     {% else %}
                         <table class="report-table">
