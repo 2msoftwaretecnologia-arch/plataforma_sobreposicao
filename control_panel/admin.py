@@ -17,6 +17,7 @@ class FileManagementAdmin(admin.ModelAdmin):
         'snic_total_zip_file',
         'deforestation_mapbiomas_zip_file',
         'adm_embargos_ibama_a_zip_file',
+        'prodes_zip_file',
     )
     
     list_display_links = (
@@ -33,6 +34,7 @@ class FileManagementAdmin(admin.ModelAdmin):
         'snic_total_zip_file',
         'deforestation_mapbiomas_zip_file',
         'adm_embargos_ibama_a_zip_file',
+        'prodes_zip_file',
     )
     
     search_fields = (
@@ -49,6 +51,7 @@ class FileManagementAdmin(admin.ModelAdmin):
         'snic_total_zip_file',
         'deforestation_mapbiomas_zip_file',
         'adm_embargos_ibama_a_zip_file',
+        'prodes_zip_file',
     )
     
     def has_add_permission(self, request):

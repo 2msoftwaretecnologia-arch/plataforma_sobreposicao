@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import DeforestationMapbiomas, Embargoes
+from .models import DeforestationMapbiomas, Embargoes , Prodes
 # Register your models here.
 from leaflet.admin import LeafletGeoAdmin
 
@@ -57,3 +57,23 @@ class EmbargoesAdmin(LeafletGeoAdmin):
         )
     
 admin.site.register(Embargoes, EmbargoesAdmin)
+
+class ProdesAdmin(LeafletGeoAdmin):   
+    list_display = ('identification', 'image_date', 'year', 'satelite')
+    search_fields = ('identification', 'image_date', 'year', 'satelite')
+    
+    fieldsets = (
+        (None, {
+            'fields': ('identification', 'image_date', 'year', 'satelite', 'geometry')
+        }),
+        (None, {
+            'fields': ('usable_geometry', 'area_m2', 'area_ha')
+        }),
+    )
+    
+    readonly_fields = (
+            'area_m2',
+            'area_ha',
+        )
+    
+admin.site.register(Prodes, ProdesAdmin)

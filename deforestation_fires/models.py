@@ -108,3 +108,42 @@ class Embargoes(GeoBaseModel):
 
     def __str__(self):
         return self.property_name
+
+class Prodes(GeoBaseModel):
+    identification = models.CharField(
+        max_length=100, 
+        verbose_name="Identificação", 
+        db_column='main_class'
+    )
+    
+    image_date = models.CharField(
+        max_length=70, 
+        verbose_name="Data da imagem", 
+        db_column='image_date'
+    )
+    year = models.CharField(
+        max_length=70, 
+        verbose_name="Ano", 
+        db_column='year'
+    )
+    satelite = models.CharField(
+        max_length=100, 
+        verbose_name="Satélite", 
+        db_column='satelite'
+    )
+    hash_id = models.CharField(
+        max_length=64, 
+        verbose_name="Hash ID", 
+        db_column='hash_id', 
+        unique=True, 
+        null=True, 
+        blank=True
+    )
+   
+    class Meta:
+        db_table = 'tb_area_deforestation_mapbiomas'
+        verbose_name = "Deforestation Mapbiomas"
+        verbose_name_plural = "Deforestation Mapbiomas"
+
+    def __str__(self):
+        return self.alert_code
