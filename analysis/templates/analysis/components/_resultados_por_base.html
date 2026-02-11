@@ -53,6 +53,10 @@
                         {% elif "embargos" in base.nome_base|lower or "embargoes" in base.nome_base|lower %}
                             {% include "analysis/components/base/_area_item_embargoes.html" %}
 
+                        {# --- Prodes #}
+                        {% elif "prodes" in base.nome_base|lower %}
+                            {% include "analysis/components/base/_area_item_prodes.html" %}
+
                         {# --- Fallback genérico #}
                         {% else %}
                             {% include "analysis/components/_area_item.html" %}

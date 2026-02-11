@@ -12,10 +12,10 @@
         {% for item in items %}
         <tr>
             <td>{{ item.area|floatformat:4 }}</td>
-            <td>{{ item.identification|default:"-" }}</td>
-            <td>{{ item.year|default:"-" }}</td>
+            <td>{{ item.identificacao|default:"-" }}</td>
+            <td>{{ item.ano|default:"-" }}</td>
             <td>{{ item.satelite|default:"-" }}</td>
-            <td>{{ item.image_date|default:"-" }}</td>
+            <td>{{ item.data_da_imagem|default:"-" }}</td>
         </tr>
         {% empty %}
         <tr>

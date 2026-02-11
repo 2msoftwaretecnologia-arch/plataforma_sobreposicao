@@ -1,0 +1,33 @@
+<div class="area-item area-item--prodes" data-area="{{ area.area|stringformat:'f' }}" title="{{ area.item_info|default:'' }}">
+    <div class="area-item__icon" aria-hidden="true" style="color: #D84315;">🛰️</div>
+    <div class="area-item__content">
+        {% if area.area %}
+        <p class="area-item__label">Área sobreposta</p>
+        <p class="area-item__value">{{ area.area|floatformat:4 }} ha</p>
+        {% endif %}
+        
+        <div style="margin-top: 8px; border-top: 1px solid #eee; padding-top: 6px;">
+            {% if area.identificacao %}
+            <p class="area-item__meta">
+                <strong>Identificação:</strong> {{ area.identificacao }}
+            </p>
+            {% endif %}
+
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px;">
+                {% if area.ano %}
+                <p class="area-item__meta" style="margin: 0;"><strong>Ano:</strong> {{ area.ano }}</p>
+                {% endif %}
+                
+                {% if area.satelite %}
+                <p class="area-item__meta" style="margin: 0;"><strong>Satélite:</strong> {{ area.satelite }}</p>
+                {% endif %}
+            </div>
+
+            {% if area.data_da_imagem %}
+            <p class="area-item__meta" style="margin-top: 4px;">
+                <strong>Data da Imagem:</strong> {{ area.data_da_imagem }}
+            </p>
+            {% endif %}
+        </div>
+    </div>
+</div>

@@ -19,13 +19,14 @@ class ProdesFormatter(BaseFormatter):
             return date_str
 
     def format(self, model_obj, intersec):
+        image_date = self._format_date(model_obj.image_date)
         return {
             "area": intersec["intersection_area_ha"],
-            "identification": model_obj.identification,
-            "year": model_obj.year,
+            "identificacao": model_obj.identification,
+            "ano": model_obj.year,
             "satelite": model_obj.satelite,
-            "image_date": self._format_date(model_obj.image_date),
-            "item_info": f"Prodes: {model_obj.identification} - {model_obj.year}",
+            "data_da_imagem": image_date,
+            "item_info": f"Prodes: {model_obj.identification} - Ano: {model_obj.year} - Satélite: {model_obj.satelite} - Data: {image_date}",
             "polygon_wkt": intersec["intersection_geom"].wkt,
             "polygon_geojson": intersec["intersection_geom"].geojson,
         }
