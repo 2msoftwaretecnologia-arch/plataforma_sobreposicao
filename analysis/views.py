@@ -1,11 +1,18 @@
 # Standard library
+import io
+import os
+import tempfile
 import zipfile
 from dataclasses import asdict
 
 # Django
 from django.conf import settings
+from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.views import View
+
+import geopandas as gpd
+from shapely import wkt as shapely_wkt
 
 # Local apps – analysis
 from analysis.services.analyze_coordinates.search_all import SearchAll
@@ -175,6 +182,107 @@ class ReportPrintView(View):
         data['deficit_rl_value'] = f"{(deficit_rl):.4f} ha"
 
         return data
+
+
+class DownloadPropertyShapefileView(View):
+    def get(self, request):
+        data = request.session.get('last_analysis') or {}
+        resultado = data.get('resultado') or {}
+        alvo_wkt = resultado.get('alvo_wkt')
+
+        if not alvo_wkt:
+            return HttpResponse('Nenhuma geometria da propriedade foi encontrada para exportação.', status=400)
+
+        try:
+            geom = shapely_wkt.loads(alvo_wkt)
+        except Exception:
+            return HttpResponse('Geometria da propriedade inválida.', status=400)
+
+        car_value = data.get('car_input') or ''
+        status_car = ''
+
+        demonstrativo = data.get('demonstrativo') or {}
+        status_car = demonstrativo.get('registration_status') or ''
+
+        if not status_car and car_value:
+            qs = get_sicar_record(car_number__iexact=car_value)
+            if qs.exists():
+                status_car = getattr(qs.first(), 'status', '') or ''
+
+        gdf = gpd.GeoDataFrame(
+            [{'car': car_value, 'status_car': status_car}],
+            geometry=[geom],
+            crs='EPSG:4674',
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            shp_path = os.path.join(tmpdir, 'propriedade.shp')
+            gdf.to_file(shp_path, driver='ESRI Shapefile', index=False)
+
+            buffer = io.BytesIO()
+            with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+                for root, dirs, files in os.walk(tmpdir):
+                    for filename in files:
+                        filepath = os.path.join(root, filename)
+                        arcname = os.path.basename(filepath)
+                        zf.write(filepath, arcname)
+
+        buffer.seek(0)
+
+        filename = 'propriedade.shp.zip'
+        if car_value:
+            filename = f'propriedade_{car_value}.zip'
+
+        response = HttpResponse(buffer.getvalue(), content_type='application/zip')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
+
+class DownloadPropertyKmlView(View):
+    def get(self, request):
+        data = request.session.get('last_analysis') or {}
+        resultado = data.get('resultado') or {}
+        alvo_wkt = resultado.get('alvo_wkt')
+
+        if not alvo_wkt:
+            return HttpResponse('Nenhuma geometria da propriedade foi encontrada para exportação.', status=400)
+
+        try:
+            geom = shapely_wkt.loads(alvo_wkt)
+        except Exception:
+            return HttpResponse('Geometria da propriedade inválida.', status=400)
+
+        car_value = data.get('car_input') or ''
+        status_car = ''
+
+        demonstrativo = data.get('demonstrativo') or {}
+        status_car = demonstrativo.get('registration_status') or ''
+
+        if not status_car and car_value:
+            qs = get_sicar_record(car_number__iexact=car_value)
+            if qs.exists():
+                status_car = getattr(qs.first(), 'status', '') or ''
+
+        gdf = gpd.GeoDataFrame(
+            [{'car': car_value, 'status_car': status_car}],
+            geometry=[geom],
+            crs='EPSG:4674',
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            kml_path = os.path.join(tmpdir, 'propriedade.kml')
+            gdf.to_file(kml_path, driver='KML')
+
+            with open(kml_path, 'rb') as f:
+                content = f.read()
+
+        filename = 'propriedade.kml'
+        if car_value:
+            filename = f'propriedade_{car_value}.kml'
+
+        response = HttpResponse(content, content_type='application/vnd.google-earth.kml+xml')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
 
 class UploadZipCarView(View):
     template_upload = 'analysis/upload.html'

@@ -55,12 +55,30 @@
         </section>
         {% endif %}
 
-        {% if demonstrativo or recibo %}
-        <div style="display: flex; justify-content: flex-end; margin-bottom: 16px;">
-            <button type="button" onclick="printReport()" class="ghost-button" style="background: #fff; border: 1px solid #cbd5e1; color: #334155; cursor: pointer;">
-                📃 Gerar Relatório
-            </button>
-        </div>
+        {% if resultado or demonstrativo or recibo %}
+        <section class="panel">
+            <div class="panel-header">
+                <div>
+                    <p class="eyebrow">Exportar</p>
+                    <h2 class="panel-title">Relatório e arquivos da propriedade</h2>
+                </div>
+                <div class="actions-group">
+                    {% if demonstrativo or recibo %}
+                    <button type="button" onclick="printReport()" class="ghost-button ghost-button--small">
+                        📃 Gerar Relatório
+                    </button>
+                    {% endif %}
+                    {% if resultado %}
+                    <a href="{% url 'download_property_shp' %}" class="ghost-button ghost-button--small">
+                        ⬇️ Baixar SHP da propriedade
+                    </a>
+                    <a href="{% url 'download_property_kml' %}" class="ghost-button ghost-button--small">
+                        ⬇️ Baixar KML da propriedade
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </section>
 
         <script>
             function printReport() {

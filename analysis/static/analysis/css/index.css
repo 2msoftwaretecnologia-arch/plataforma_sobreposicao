@@ -99,6 +99,12 @@ body {
     color: #fff;
 }
 
+.ghost-button--small {
+    padding: 6px 14px;
+    font-size: 13px;
+    border-radius: 999px;
+}
+
 /* -----------------------------------------------------
    SEÇÃO PRINCIPAL (HERO)
 ------------------------------------------------------ */
@@ -139,6 +145,12 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
+}
+
+.actions-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .panel-title {
