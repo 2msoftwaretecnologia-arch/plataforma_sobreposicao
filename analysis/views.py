@@ -469,3 +469,9 @@ class UploadZipCarView(View):
 
 def termos(request):
     return render(request, 'analysis/termos_de_uso.html')
+
+
+class Lading_PageView(View):
+    def get(self, request):
+        return render(request, 'analysis/lading_page.html')
+        
