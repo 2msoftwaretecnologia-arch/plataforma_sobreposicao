@@ -178,7 +178,10 @@
                 </div>
             {% endif %}
         {% endfor %}
-
+            <div>
+            <strong>Possui alertas do MapBiomas?</strong>
+            <span>{% if has_mapbiomas_alerts %}Sim{% else %}Não{% endif %}</span>
+        </div>
         {% for base in resultado.resultados_por_base %}
             {% if "Fitoecologias" in base.nome_base and base.areas_encontradas %}
                 <div>

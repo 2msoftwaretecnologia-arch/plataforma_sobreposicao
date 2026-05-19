@@ -148,6 +148,7 @@ class ReportPrintView(View):
 
     def format_data(self, data: dict) -> dict:
         resultado = data.get('resultado') or {}
+        data['has_mapbiomas_alerts'] = False
         
         # Calcular área total por base
         if resultado and 'resultados_por_base' in resultado:
@@ -167,6 +168,13 @@ class ReportPrintView(View):
                     except (ValueError, TypeError):
                         pass
                 base['total_area'] = total
+
+                nome_base = base.get('nome_base', '')
+                if (
+                    ("Mapbiomas" in nome_base or "MapBiomas" in nome_base)
+                    and base.get('areas_encontradas')
+                ):
+                    data['has_mapbiomas_alerts'] = True
 
         demonstrativo = data.get('demonstrativo')
 
