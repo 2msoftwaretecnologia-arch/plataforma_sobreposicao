@@ -120,14 +120,14 @@
         {% if demonstrativo %}
             {% if demonstrativo.issue_rl_quote %}
                 <div>
-                    <strong>Pode Emitir cota RL?</strong>
+                    <strong>Pode Emitir de cota Reserva Legal?</strong>
                     <span>
                         Sim {{ demonstrativo.passivo_ou_excedente_de_reserva_legal|cut:"-" }} ha
                     </span>
                 </div>
             {% else %}
                 <div>
-                    <strong>Pode Emitir cota RL?</strong>
+                    <strong>Pode Emitir de cota Reserva Legal?</strong>
                     <span>Não</span>
                 </div>
             {% endif %}
