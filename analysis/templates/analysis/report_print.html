@@ -93,7 +93,24 @@
         {% endif %}
 
         <div>
-            <strong>Reserva Legal Necessaria</strong>
+            <strong class="info-label-with-help">
+                Reserva Legal Necessaria
+                <span class="help-tooltip">
+                    <button
+                        type="button"
+                        class="help-tooltip__button"
+                        aria-label="Informações sobre Reserva Legal necessária"
+                        aria-describedby="reserva-legal-help"
+                    >!</button>
+                    <span id="reserva-legal-help" class="help-tooltip__content" role="tooltip">
+                        <span class="help-tooltip__title">Lei 12.651/2012 - Código Florestal Brasileiro</span>
+                        <span>Estabelece normas para proteção da vegetação nativa em imóveis rurais e urbanos. Exige a manutenção de:</span>
+                        <span><strong>Áreas de Preservação Permanente (APP):</strong> margens de rios, topos de morros, manguezais, etc., sem restrição de tamanho da propriedade.</span>
+                        <span><strong>Reserva Legal (RL):</strong> percentual mínimo de vegetação nativa por bioma: 80% na Amazônia, 35% no Cerrado (dentro da Amazônia Legal) e 20% nos demais biomas (Mata Atlântica, Pampa, etc.).</span>
+                        <span>Institui o Cadastro Ambiental Rural (CAR) como registro eletrônico obrigatório para todos os imóveis rurais, visando monitoramento e recuperação ambiental.</span>
+                    </span>
+                </span>
+            </strong>
             <span>
                 {% if recibo and recibo.area_reserva_legal %}
                     {{ recibo.area_reserva_legal }} ha
