@@ -17,6 +17,20 @@ from decouple import config
 import os
 
 
+def config_bool(name, default=False):
+    value = config(name, default=default)
+    if isinstance(value, bool):
+        return value
+
+    normalized = str(value).strip().lower()
+    if normalized in {"1", "true", "t", "yes", "y", "on", "debug", "development", "dev"}:
+        return True
+    if normalized in {"0", "false", "f", "no", "n", "off", "release", "production", "prod"}:
+        return False
+
+    return bool(default)
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
@@ -24,7 +38,7 @@ import os
 SECRET_KEY = config('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config('DEBUG', default=False, cast=bool)
+DEBUG = config_bool('DEBUG', default=False)
 
 ALLOWED_HOSTS = [
     "69.62.126.40",
@@ -83,6 +97,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'kernel.context_processors.static_version',
             ],
         },
     },
@@ -163,9 +178,12 @@ STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 STATICFILES_DIRS = [
-    BASE_DIR / "static",
-    BASE_DIR / "analysis/static",
+    path for path in [
+        BASE_DIR / "static",
+    ] if path.exists()
 ]
+
+STATIC_VERSION = config("STATIC_VERSION", default="20260519")
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / "media"

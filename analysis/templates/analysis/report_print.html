@@ -9,7 +9,7 @@
   <!-- Leaflet & Maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link href='https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/leaflet.fullscreen.css' rel='stylesheet' />
-  <link rel="stylesheet" href="{% static 'analysis/css/report.css' %}" />
+  <link rel="stylesheet" href="{% static 'analysis/css/report.css' %}?v={{ static_version|default:'20260519' }}" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src='https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/Leaflet.fullscreen.min.js'></script>
   <script src="{% static 'analysis/js/maps.js' %}"></script>
