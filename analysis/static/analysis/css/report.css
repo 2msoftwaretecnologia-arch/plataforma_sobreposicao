@@ -331,6 +331,109 @@ body {
     background-color: #fcfcfc;
 }
 
+.zoning-acronym {
+    align-items: center;
+    color: #0f172a;
+    display: inline-flex;
+    font-weight: 700;
+    gap: 6px;
+    position: relative;
+}
+
+.zoning-acronym__hint {
+    align-items: center;
+    background: #eef6ff;
+    border: 1px solid #93c5fd;
+    border-radius: 50%;
+    color: #1d4ed8;
+    cursor: help;
+    display: inline-flex;
+    font-size: 11px;
+    height: 17px;
+    justify-content: center;
+    line-height: 1;
+    width: 17px;
+}
+
+.zoning-acronym__tooltip {
+    background: #0f172a;
+    border-radius: 6px;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.22);
+    color: #ffffff;
+    display: block;
+    font-size: 12px;
+    font-weight: 400;
+    left: 0;
+    line-height: 1.45;
+    max-width: min(380px, 72vw);
+    opacity: 0;
+    padding: 10px 12px;
+    pointer-events: none;
+    position: absolute;
+    top: calc(100% + 8px);
+    transition: opacity 0.16s ease, visibility 0.16s ease;
+    visibility: hidden;
+    width: 360px;
+    z-index: 1000;
+}
+
+.zoning-acronym__tooltip::before {
+    border-bottom: 7px solid #0f172a;
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    content: "";
+    left: 14px;
+    position: absolute;
+    top: -7px;
+}
+
+.zoning-acronym:hover .zoning-acronym__tooltip,
+.zoning-acronym:focus .zoning-acronym__tooltip,
+.zoning-acronym:focus-within .zoning-acronym__tooltip {
+    opacity: 1;
+    visibility: visible;
+}
+
+.zoning-legend {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    margin-top: 10px;
+    padding: 10px 12px;
+}
+
+.zoning-legend summary {
+    color: #334155;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.zoning-legend__list {
+    display: grid;
+    gap: 8px 14px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 10px;
+}
+
+.zoning-legend__list div {
+    display: grid;
+    gap: 6px;
+    grid-template-columns: 52px 1fr;
+}
+
+.zoning-legend dt {
+    color: #0f172a;
+    font-weight: 800;
+}
+
+.zoning-legend dd {
+    color: #475569;
+    font-size: 12px;
+    line-height: 1.4;
+    margin: 0;
+}
+
 /* FOOTER */
 .footer {
   text-align: center;
@@ -406,5 +509,19 @@ body {
         page-break-inside: avoid;
         break-inside: avoid;
         display: block; /* Garante que o container do mapa seja tratado como bloco */
+    }
+
+    .zoning-acronym__hint,
+    .zoning-acronym__tooltip {
+        display: none !important;
+    }
+
+    .zoning-legend {
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    .zoning-legend__list {
+        display: grid !important;
     }
 }

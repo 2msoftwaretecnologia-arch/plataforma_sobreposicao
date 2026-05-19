@@ -1,7 +1,7 @@
 <table class="report-table">
     <thead>
         <tr>
-            <th>Área (ha)</th>
+            <th>&Aacute;rea (ha)</th>
             <th>Zona</th>
             <th>Sigla</th>
         </tr>
@@ -11,7 +11,47 @@
         <tr>
             <td>{{ item.area|floatformat:4 }}</td>
             <td>{{ item.zona|default:"-" }}</td>
-            <td>{{ item.sigla|default:"-" }}</td>
+            <td>
+                {% if item.sigla %}
+                    <span class="zoning-acronym" tabindex="0">
+                        {{ item.sigla }}
+                        <span class="zoning-acronym__hint" aria-hidden="true">?</span>
+                        <span class="zoning-acronym__tooltip" role="tooltip">
+                            {% if "ZDI" in item.sigla %}
+                                <strong>{{ item.sigla }}</strong> - Zona de Desenvolvimento Intensivo. &Aacute;rea destinada a atividades produtivas intensivas, como agricultura irrigada, grandes projetos agropecu&aacute;rios ou industriais, com restri&ccedil;&otilde;es ambientais moderadas.
+                            {% elif item.sigla == "ZDE" %}
+                                <strong>ZDE</strong> - Zona de Desenvolvimento Extensivo. Voltada para pecu&aacute;ria, silvicultura ou agricultura de baixo impacto, com maior espa&ccedil;amento entre interven&ccedil;&otilde;es.
+                            {% elif item.sigla == "ZCE" %}
+                                <strong>ZCE</strong> - Zona de Conserva&ccedil;&atilde;o Ecol&oacute;gica. Prioriza a preserva&ccedil;&atilde;o da biodiversidade, com atividades humanas muito restritas.
+                            {% elif item.sigla == "ZAU" %}
+                                <strong>ZAU</strong> - Zona de Agropecu&aacute;ria e Uso Sustent&aacute;vel, ou Zona de Agricultura e Urbaniza&ccedil;&atilde;o.
+                            {% elif item.sigla == "ZPA" %}
+                                <strong>ZPA</strong> - Zona de Prote&ccedil;&atilde;o Ambiental, equivalente a APAs estaduais ou municipais.
+                            {% elif item.sigla == "ZR" %}
+                                <strong>ZR</strong> - Zona Rural, com uso agropecu&aacute;rio diversificado.
+                            {% elif item.sigla == "ZU" %}
+                                <strong>ZU</strong> - Zona Urbana, consolidada ou de expans&atilde;o.
+                            {% elif item.sigla == "ZP" %}
+                                <strong>ZP</strong> - Zona de Preserva&ccedil;&atilde;o Permanente, como APPs do C&oacute;digo Florestal.
+                            {% elif item.sigla == "ZER" %}
+                                <strong>ZER</strong> - Zona de Expans&atilde;o Restrita, com limita&ccedil;&otilde;es legais como encostas ou terras ind&iacute;genas.
+                            {% elif item.sigla == "ZRE" %}
+                                <strong>ZRE</strong> - Zona de Recupera&ccedil;&atilde;o Ecol&oacute;gica, para &aacute;reas degradadas em restaura&ccedil;&atilde;o.
+                            {% elif item.sigla == "ZMC" %}
+                                <strong>ZMC</strong> - Zona de Minera&ccedil;&atilde;o e Controle, com extra&ccedil;&atilde;o mineral sujeita a licenciamento espec&iacute;fico.
+                            {% elif item.sigla == "ZIT" %}
+                                <strong>ZIT</strong> - Zona de Interesse Tur&iacute;stico, voltada a recrea&ccedil;&atilde;o e ecoturismo.
+                            {% elif item.sigla == "ZEUS" %}
+                                <strong>ZEUS</strong> - Zona de Expans&atilde;o Urbana Sustent&aacute;vel.
+                            {% else %}
+                                Sigla de zoneamento informada pela base consultada.
+                            {% endif %}
+                        </span>
+                    </span>
+                {% else %}
+                    -
+                {% endif %}
+            </td>
         </tr>
         {% empty %}
         <tr>
@@ -20,3 +60,22 @@
         {% endfor %}
     </tbody>
 </table>
+
+<details class="zoning-legend" open>
+    <summary>Significado das siglas de zoneamento</summary>
+    <dl class="zoning-legend__list">
+        <div><dt>ZDI-1</dt><dd>Zona de Desenvolvimento Intensivo (subzona 1). &Aacute;rea para atividades produtivas intensivas, com restri&ccedil;&otilde;es ambientais moderadas.</dd></div>
+        <div><dt>ZDE</dt><dd>Zona de Desenvolvimento Extensivo. Pecu&aacute;ria, silvicultura ou agricultura de baixo impacto.</dd></div>
+        <div><dt>ZCE</dt><dd>Zona de Conserva&ccedil;&atilde;o Ecol&oacute;gica. Preserva&ccedil;&atilde;o da biodiversidade e uso humano muito restrito.</dd></div>
+        <div><dt>ZAU</dt><dd>Zona de Agropecu&aacute;ria e Uso Sustent&aacute;vel, ou Zona de Agricultura e Urbaniza&ccedil;&atilde;o.</dd></div>
+        <div><dt>ZPA</dt><dd>Zona de Prote&ccedil;&atilde;o Ambiental, equivalente a APAs estaduais ou municipais.</dd></div>
+        <div><dt>ZR</dt><dd>Zona Rural, com uso agropecu&aacute;rio diversificado.</dd></div>
+        <div><dt>ZU</dt><dd>Zona Urbana, consolidada ou de expans&atilde;o.</dd></div>
+        <div><dt>ZP</dt><dd>Zona de Preserva&ccedil;&atilde;o Permanente, como APPs do C&oacute;digo Florestal.</dd></div>
+        <div><dt>ZER</dt><dd>Zona de Expans&atilde;o Restrita, com limita&ccedil;&otilde;es legais.</dd></div>
+        <div><dt>ZRE</dt><dd>Zona de Recupera&ccedil;&atilde;o Ecol&oacute;gica, para &aacute;reas degradadas em restaura&ccedil;&atilde;o.</dd></div>
+        <div><dt>ZMC</dt><dd>Zona de Minera&ccedil;&atilde;o e Controle, com licenciamento espec&iacute;fico.</dd></div>
+        <div><dt>ZIT</dt><dd>Zona de Interesse Tur&iacute;stico, para recrea&ccedil;&atilde;o e ecoturismo.</dd></div>
+        <div><dt>ZEUS</dt><dd>Zona de Expans&atilde;o Urbana Sustent&aacute;vel.</dd></div>
+    </dl>
+</details>
