@@ -29,6 +29,20 @@ def get_database_size_bytes():
         return cursor.fetchone()[0]
 
 
+def get_top_tables(limit=8):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT relname, pg_total_relation_size(relid) AS size_bytes
+            FROM pg_catalog.pg_statio_user_tables
+            ORDER BY pg_total_relation_size(relid) DESC
+            LIMIT %s
+            """,
+            [limit],
+        )
+        return cursor.fetchall()
+
+
 def get_disk_usage():
     path = getattr(settings, 'STORAGE_DISK_PATH', settings.BASE_DIR)
     usage = shutil.disk_usage(path)

@@ -55,4 +55,23 @@
     <p class="chart-empty">Ainda não há histórico suficiente. Volte em alguns dias para ver a evolução.</p>
     {% endif %}
 </div>
+
+<div class="card tables-card">
+    <span class="card-label">O que está pesando (maiores tabelas do banco)</span>
+    {% if top_tables %}
+    <div class="table-bars">
+        {% for table in top_tables %}
+        <div class="table-bar-row">
+            <span class="table-bar-name">{{ table.name }}</span>
+            <div class="table-bar-track">
+                <div class="table-bar-fill" style="width: {{ table.bar_percent }}%;"></div>
+            </div>
+            <span class="table-bar-size">{{ table.size }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="chart-empty">Nenhuma tabela encontrada.</p>
+    {% endif %}
+</div>
 {% endblock %}

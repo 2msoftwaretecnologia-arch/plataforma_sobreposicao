@@ -273,3 +273,52 @@ body {
 .empty-state {
     color: #6b7280;
 }
+
+/* Top tables bars */
+
+.tables-card {
+    margin-bottom: 20px;
+}
+
+.table-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 14px;
+}
+
+.table-bar-row {
+    display: grid;
+    grid-template-columns: minmax(140px, 220px) 1fr 90px;
+    align-items: center;
+    gap: 12px;
+}
+
+.table-bar-name {
+    font-size: 0.85rem;
+    color: #374151;
+    font-family: "Consolas", "SFMono-Regular", monospace;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.table-bar-track {
+    height: 10px;
+    background: #e5e7eb;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.table-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: #2563eb;
+}
+
+.table-bar-size {
+    font-size: 0.85rem;
+    color: #374151;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
