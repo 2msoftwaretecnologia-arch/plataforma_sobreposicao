@@ -1,6 +1,23 @@
 from pickle import TRUE
 from django.db import models
 
+
+class StorageSnapshot(models.Model):
+    captured_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    database_size_bytes = models.BigIntegerField(verbose_name="Tamanho do Banco (bytes)")
+    disk_used_bytes = models.BigIntegerField(verbose_name="Disco Utilizado (bytes)")
+    disk_total_bytes = models.BigIntegerField(verbose_name="Disco Total (bytes)")
+
+    class Meta:
+        db_table = 'tb_armazenamento_snapshot'
+        verbose_name = "Snapshot de Armazenamento"
+        verbose_name_plural = "Snapshots de Armazenamento"
+        ordering = ['-captured_at']
+
+    def __str__(self):
+        return f"Snapshot {self.captured_at:%d/%m/%Y %H:%M}"
+
+
 class FileManagement(models.Model):
     phytoecology_zip_file = models.FileField(
         upload_to='documents/',

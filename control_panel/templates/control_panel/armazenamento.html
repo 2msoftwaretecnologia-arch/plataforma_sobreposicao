@@ -1,0 +1,58 @@
+{% extends 'control_panel/base_dashboard.html' %}
+
+{% block title %}Armazenamento — Painel Administrativo{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Armazenamento</h1>
+    <form method="post" action="{% url 'control_panel:armazenamento_refresh' %}">
+        {% csrf_token %}
+        <button type="submit" class="btn-refresh">Atualizar agora</button>
+    </form>
+</div>
+
+<div class="cards-row">
+    <div class="card">
+        <span class="card-label">Tamanho do Banco de Dados</span>
+        <span class="card-value">{{ database_size }}</span>
+    </div>
+    <div class="card">
+        <span class="card-label">Disco Utilizado no Servidor</span>
+        <span class="card-value">{{ disk_used }} <small>/ {{ disk_total }}</small></span>
+    </div>
+    <div class="card">
+        <span class="card-label">Status</span>
+        <span class="status-badge status-{{ status_code }}">{{ status_label }}</span>
+    </div>
+</div>
+
+<div class="card progress-card">
+    <div class="progress-header">
+        <span>Uso de disco do servidor</span>
+        <span>{{ percent }}%</span>
+    </div>
+    <div class="progress-bar-track">
+        <div class="progress-bar-fill status-{{ status_code }}" style="width: {{ percent }}%;"></div>
+    </div>
+    <div class="progress-footer">
+        <span>Última atualização: {{ last_updated|date:"d/m/Y H:i" }}</span>
+    </div>
+</div>
+
+<div class="card chart-card">
+    <span class="card-label">Evolução do uso de disco (últimos 7 dias)</span>
+    {% if chart %}
+    <svg viewBox="0 0 {{ chart.width }} {{ chart.height }}" class="storage-chart" preserveAspectRatio="none">
+        <line x1="0" y1="{{ chart.warning_y }}" x2="{{ chart.width }}" y2="{{ chart.warning_y }}" class="chart-threshold chart-threshold-warning" />
+        <line x1="0" y1="{{ chart.critical_y }}" x2="{{ chart.width }}" y2="{{ chart.critical_y }}" class="chart-threshold chart-threshold-critical" />
+        <polyline points="{{ chart.polyline }}" class="chart-line" />
+        {% for point in chart.points %}
+        <circle cx="{{ point.x }}" cy="{{ point.y }}" r="4" class="chart-dot" />
+        <text x="{{ point.x }}" y="{{ point.label_y }}" class="chart-label">{{ point.label }}</text>
+        {% endfor %}
+    </svg>
+    {% else %}
+    <p class="chart-empty">Ainda não há histórico suficiente. Volte em alguns dias para ver a evolução.</p>
+    {% endif %}
+</div>
+{% endblock %}
