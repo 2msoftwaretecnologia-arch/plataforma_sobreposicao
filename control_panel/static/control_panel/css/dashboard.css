@@ -221,6 +221,8 @@ body {
     margin-top: 10px;
     font-size: 0.8rem;
     color: #6b7280;
+    display: flex;
+    justify-content: space-between;
 }
 
 /* Chart */

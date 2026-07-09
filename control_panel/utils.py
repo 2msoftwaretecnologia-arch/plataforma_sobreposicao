@@ -1,4 +1,5 @@
 import shutil
+import socket
 from datetime import timedelta
 
 from django.conf import settings
@@ -63,6 +64,7 @@ def capture_storage_snapshot():
         database_size_bytes=get_database_size_bytes(),
         disk_used_bytes=disk_used,
         disk_total_bytes=disk_total,
+        hostname=socket.gethostname(),
     )
     return snapshot
 

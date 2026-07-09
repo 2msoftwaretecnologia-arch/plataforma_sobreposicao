@@ -75,6 +75,7 @@ def _storage_context(snapshot):
         'database_size': utils.format_bytes(snapshot.database_size_bytes),
         'disk_used': utils.format_bytes(snapshot.disk_used_bytes),
         'disk_total': utils.format_bytes(snapshot.disk_total_bytes),
+        'hostname': snapshot.hostname,
         'percent': _fnum(percent),
         'status_code': status_code,
         'status_label': status_label,

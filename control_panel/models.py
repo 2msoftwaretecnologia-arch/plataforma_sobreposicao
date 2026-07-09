@@ -7,6 +7,7 @@ class StorageSnapshot(models.Model):
     database_size_bytes = models.BigIntegerField(verbose_name="Tamanho do Banco (bytes)")
     disk_used_bytes = models.BigIntegerField(verbose_name="Disco Utilizado (bytes)")
     disk_total_bytes = models.BigIntegerField(verbose_name="Disco Total (bytes)")
+    hostname = models.CharField(max_length=255, default='', blank=True, verbose_name="Servidor")
 
     class Meta:
         db_table = 'tb_armazenamento_snapshot'
