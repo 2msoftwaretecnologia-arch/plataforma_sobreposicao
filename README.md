@@ -187,16 +187,6 @@ App da experiência principal de análise.
 - `static/analysis/images/icon_page.svg`: ícone usado na interface.
 - `admin.py`, `apps.py`, `__init__.py`: arquivos padrão do app Django.
 
-### `authentication/`
-
-Login e logout.
-
-- `urls.py`: rotas `/accounts/` e `/accounts/logout/`.
-- `views.py`: autentica usuário, cria sessão e encerra sessão.
-- `templates/login/login.html`: tela de login.
-- `static/authentication/css/login.css`: estilo da tela de login.
-- `models.py`, `admin.py`, `apps.py`, `tests.py`, `migrations/`: estrutura padrão do app.
-
 ### `control_panel/`
 
 Painel administrativo para cadastrar os arquivos ZIP usados nas importações.

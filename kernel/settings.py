@@ -67,7 +67,6 @@ INSTALLED_APPS = [
     'environmental_layers',
     'car_system',
     'control_panel',
-    'authentication',
     'naturatins',
     'gov',
     'deforestation_fires',
@@ -187,12 +186,6 @@ STATIC_VERSION = config("STATIC_VERSION", default="20260519")
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / "media"
-
-
-# Authentication redirects
-LOGIN_URL = '/accounts/login/'
-LOGIN_REDIRECT_URL = '/'
-LOGOUT_REDIRECT_URL = '/'
 
 
 # Default primary key field type
