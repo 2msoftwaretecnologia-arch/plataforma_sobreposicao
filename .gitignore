@@ -16,6 +16,9 @@ ENV/
 # Variantes de .env (dev, test, etc.)
 .env.*
 
+#AI, Agents, LLMs
+.claude
+
 # Cache e bytecode Python
 __pycache__/
 # Bytecode Python (*.pyc, *.pyo, *.pyd)
