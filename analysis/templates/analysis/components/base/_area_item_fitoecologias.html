@@ -1,11 +1,13 @@
-<div class="area-item area-item--fitoecologias" data-area="{{ area.area|stringformat:'f' }}" title="{{ area.item_info }}">
-    <div class="area-item__icon" aria-hidden="true">🌿</div>
+<div class="area-item area-item--fitoecologias area-item--{{ severity }}" data-area="{{ area.area|stringformat:'f' }}" title="{{ area.item_info }}">
+    <div class="area-item__icon" role="img" aria-label="{% if severity == 'critical' %}Alerta crítico{% elif severity == 'warning' %}Área de atenção{% else %}Informativo{% endif %}">🌿</div>
     <div class="area-item__content">
         <p class="area-item__label">Área sobreposta</p>
         <p class="area-item__value">{{ area.area|floatformat:4 }} ha</p>
+        {% include "analysis/components/base/_area_item_pct.html" %}
         <p class="area-item__meta">Área preservada: {{ area.preserved_area|floatformat:4 }} ha</p>
         {% if area.item_info %}
         <p class="area-item__meta">{{ area.item_info }}</p>
         {% endif %}
+        {% include "analysis/components/base/_area_item_map_link.html" %}
     </div>
 </div>

@@ -1,13 +1,15 @@
-<div class="area-item area-item--imoveis" data-area="{{ area.area|stringformat:'f' }}" title="{% if area.item_info %}{{ area.item_info }}{% endif %}{% if area.status %}{% if area.item_info %} · {% endif %}Status: {{ area.status }}{% endif %}">
-    <div class="area-item__icon" aria-hidden="true">🏠</div>
+<div class="area-item area-item--imoveis area-item--{{ severity }}" data-area="{{ area.area|stringformat:'f' }}" title="{% if area.item_info %}{{ area.item_info }}{% endif %}{% if area.status %}{% if area.item_info %} · {% endif %}Status: {{ area.status }}{% endif %}">
+    <div class="area-item__icon" role="img" aria-label="{% if severity == 'critical' %}Alerta crítico{% elif severity == 'warning' %}Área de atenção{% else %}Informativo{% endif %}">🏠</div>
     <div class="area-item__content">
         <p class="area-item__label">Área sobreposta</p>
         <p class="area-item__value">{{ area.area|floatformat:4 }} ha</p>
+        {% include "analysis/components/base/_area_item_pct.html" %}
         {% if area.item_info %}
         <p class="area-item__meta">{{ area.item_info }}</p>
         {% endif %}
         {% if area.status %}
         <span class="badge badge-soft">Status: {{ area.status }}</span>
         {% endif %}
+        {% include "analysis/components/base/_area_item_map_link.html" %}
     </div>
 </div>

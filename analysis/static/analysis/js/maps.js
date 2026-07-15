@@ -1,6 +1,10 @@
 (function (global) {
     'use strict';
 
+    // Estado do último mapa inicializado nesta página, usado por focusMapLayer
+    // para permitir que os cards de resultado apontem/centralizem o mapa.
+    var mapState = null;
+
     /**
      * Creates and returns the base layers for the map.
      * @param {string|null} planetTilesUrl 
@@ -291,6 +295,86 @@
             var legendEl = document.getElementById('legend-imoveis');
             if (legendEl) legendEl.innerHTML = '';
         }
+
+        mapState = {
+            map: map,
+            layersByFonte: data.layersByFonte,
+            legendEl: (!isStatic) ? document.getElementById('legend-imoveis') : null
+        };
+    };
+
+    /**
+     * Adiciona uma classe de destaque temporária a um layer (path SVG do Leaflet).
+     */
+    function flashPath(fl) {
+        var el = fl.getElement ? fl.getElement() : (fl._path || null);
+        if (!el) return;
+        el.classList.add('leaflet-flash-highlight');
+        setTimeout(function () {
+            el.classList.remove('leaflet-flash-highlight');
+        }, 2800);
+    }
+
+    /**
+     * Centraliza o mapa na geometria de uma fonte/base e, se conseguir
+     * identificar o item exato (por rótulo + área), destaca-o e ajusta
+     * o zoom nele. Caso não encontre correspondência exata, centraliza
+     * em todas as geometrias daquela fonte (degradação segura).
+     *
+     * @param {string} fonte Nome da base (deve bater com `item.fonte` usado ao montar o mapa).
+     * @param {string} label Rótulo do item (item_info/unidade) usado para tentar achar a geometria exata.
+     * @param {string|number} areaVal Área formatada com 4 casas decimais, usada como desempate na busca.
+     * @returns {boolean} true se a base foi encontrada no mapa (mesmo sem match exato do item).
+     */
+    global.focusMapLayer = function (fonte, label, areaVal) {
+        if (!mapState || !fonte) return false;
+        var grp = mapState.layersByFonte[fonte];
+        if (!grp) return false;
+
+        if (!mapState.map.hasLayer(grp)) {
+            mapState.map.addLayer(grp);
+            if (mapState.legendEl) {
+                var legendItems = mapState.legendEl.querySelectorAll('.legend-item');
+                for (var i = 0; i < legendItems.length; i++) {
+                    if (legendItems[i].dataset.fonte === fonte) {
+                        legendItems[i].classList.remove('off');
+                    }
+                }
+            }
+        }
+
+        var normLabel = (label || '').trim().toLowerCase();
+        var normArea = (areaVal || '').toString().trim();
+        var target = null;
+
+        grp.eachLayer(function (outerLayer) {
+            if (target || !outerLayer.eachLayer) return;
+            var matched = false;
+            outerLayer.eachLayer(function (fl) {
+                if (matched) return;
+                var tt = fl.getTooltip ? fl.getTooltip() : null;
+                var content = tt ? ('' + tt.getContent()).toLowerCase() : '';
+                if (normLabel && content.indexOf(normLabel) !== -1 && (!normArea || content.indexOf(normArea) !== -1)) {
+                    matched = true;
+                }
+            });
+            if (matched) target = outerLayer;
+        });
+
+        var focusLayer = target || grp;
+        if (focusLayer.getBounds) {
+            try {
+                mapState.map.fitBounds(focusLayer.getBounds(), { padding: [24, 24], maxZoom: 17 });
+            } catch (e) {
+                // geometria sem bounds válidos: mantém o mapa como está
+            }
+        }
+
+        if (target && target.eachLayer) {
+            target.eachLayer(flashPath);
+        }
+
+        return true;
     };
 
 })(window);

@@ -1,7 +1,7 @@
-<div class="area-item area-item--apas" data-area="{{ area.area|stringformat:'f' }}" title="{{ area.unidade }}{% if area.dominios %} · {{ area.dominios }}{% endif %}{% if area.classe %} · {{ area.classe }}{% endif %}{% if area.fundo_legal %} · {{ area.fundo_legal }}{% endif %}">
-    
+<div class="area-item area-item--apas area-item--{{ severity }}" data-area="{{ area.area|stringformat:'f' }}" title="{{ area.unidade }}{% if area.dominios %} · {{ area.dominios }}{% endif %}{% if area.classe %} · {{ area.classe }}{% endif %}{% if area.fundo_legal %} · {{ area.fundo_legal }}{% endif %}">
+
     <!-- Ícone / Identificação visual -->
-    <div class="area-item__icon" aria-hidden="true">🏞️</div>
+    <div class="area-item__icon" role="img" aria-label="{% if severity == 'critical' %}Alerta crítico{% elif severity == 'warning' %}Área de atenção{% else %}Informativo{% endif %}">🏞️</div>
 
     <!-- Conteúdo da área -->
     <div class="area-item__content">
@@ -11,6 +11,7 @@
         <p class="area-item__value">
             {{ area.area|floatformat:4 }} ha
         </p>
+        {% include "analysis/components/base/_area_item_pct.html" %}
 
         <!-- Metadados da APA -->
         <div class="area-details">
@@ -37,6 +38,8 @@
             </p>
             {% endif %}
         </div>
+
+        {% include "analysis/components/base/_area_item_map_link.html" %}
 
     </div>
 </div>
