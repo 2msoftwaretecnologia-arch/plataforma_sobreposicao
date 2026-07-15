@@ -19,55 +19,6 @@ body {
   padding: 5mm;
 }
 
-/* RESUMO */
-.summary {
-  background: #000;
-  color: #fff;
-  padding: 25px;
-  border-radius: 14px;
-  margin-bottom: 25px;
-}
-
-.summary-status {
-  font-size: 22px;
-  font-weight: 700;
-}
-
-.summary-sub {
-  margin-top: 6px;
-  font-size: 14px;
-  opacity: 0.95;
-}
-
-/* REPORT HEADER */
-.report-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 2rem;
-}
-
-.report-header h1 {
-  margin-bottom: 0;
-}
-
-.print-btn {
-  background: #fff;
-  border: 1px solid #cbd5e1;
-  color: #334155;
-  cursor: pointer;
-  padding: 8px 16px;
-  border-radius: 4px;
-  font-size: 14px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.print-btn:hover {
-  background: #f1f5f9;
-}
-
 /* CONTAINER */
 .container {
   max-width: 210mm;
@@ -75,11 +26,100 @@ body {
   padding: 0;
 }
 
+/* Pré-visualização em tela: simula uma "folha" sobre um fundo neutro,
+   sem afetar a saída de impressão (ver @media print). */
+@media screen {
+  body {
+    background: #eef1f5;
+    padding: 32px 16px 64px;
+  }
+
+  .container {
+    background: #ffffff;
+    padding: 36px 44px;
+    border-radius: 18px;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+  }
+}
+
+/* REPORT HEADER */
+.report-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 2rem;
+}
+
+.report-header__brand {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.report-header__logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #0f172a;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.report-header__eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 2px;
+}
+
+.report-header h1 {
+  font-size: 22px;
+  margin: 0;
+}
+
+.report-header__meta {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.print-btn {
+  background: #0f172a;
+  border: 1px solid #0f172a;
+  color: #fff;
+  cursor: pointer;
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.print-btn:hover {
+  background: #1e293b;
+}
+
+.print-btn:active {
+  transform: scale(0.97);
+}
+
 /* CARDS */
 .card {
-  /* background: #fff; */
-  /* border-radius: 14px; */
-  /* padding: 22px; */
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 22px 24px;
   margin-bottom: 20px;
   page-break-inside: avoid;
 }
@@ -89,20 +129,94 @@ body {
   margin-bottom: 16px;
 }
 
-/* INFO LIST */
-.info-list div {
-  display: flex;
-  justify-content: space-between;
-  padding: 12px 0;
-  border-bottom: 1px solid #e5e7eb;
+/* DASHBOARD DE INDICADORES */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
 }
 
-.info-list div:last-child {
-  border-bottom: none;
+.stat-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #94a3b8;
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.stat-card__label {
+  display: block;
+  font-size: 12px;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+
+.stat-card__value {
+  font-size: 22px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.stat-card--ok {
+  border-left-color: #16a34a;
+}
+
+.stat-card--ok .stat-card__value {
+  color: #166534;
+}
+
+.stat-card--danger {
+  border-left-color: #dc2626;
+}
+
+.stat-card--danger .stat-card__value {
+  color: #991b1b;
+}
+
+.stat-card--warning {
+  border-left-color: #d97706;
+}
+
+.stat-card--warning .stat-card__value {
+  color: #92400e;
+}
+
+/* INFO LIST */
+.info-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px 20px;
+}
+
+.info-list > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+}
+
+.info-list__wide {
+  grid-column: 1 / -1;
 }
 
 .info-list strong {
-  color: #475569;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.info-list span {
+  font-weight: 600;
+  color: #0f172a;
+  font-size: 14.5px;
 }
 
 .info-label-with-help {
@@ -199,77 +313,58 @@ body {
   visibility: visible;
 }
 
-.info-list span {
-  font-weight: 600;
-}
-
-/* PILLS */
-.pill-group {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.pill {
-  padding: 8px 14px;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.green {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.blue {
-  background: #dbeafe;
-  color: #1e40af;
-}
-
-/* AMBIENTAL */
-.env-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 14px;
-}
-
-.env-box {
-  background: #f8fafc;
-  padding: 16px;
-  border-radius: 10px;
-  text-align: center;
-}
-
-.env-title {
-  display: block;
-  font-size: 13px;
-  color: #64748b;
-}
-
-.env-value {
-  font-size: 22px;
-  font-weight: 700;
-  margin-top: 6px;
-}
-
 /* BADGES */
 .badge {
-  display: inline-block;
-  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 6px 14px;
-  border-radius: 20px;
+  border-radius: 999px;
+  font-size: 13px;
   font-weight: 700;
+  line-height: 1.3;
 }
 
-.badge.yes {
+.badge--positive {
   background: #dcfce7;
   color: #166534;
 }
 
-.badge.no {
+.badge--negative {
   background: #fee2e2;
   color: #991b1b;
+}
+
+.badge--warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.badge--neutral {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+/* `.info-list span` abaixo é mais específico que uma única classe de badge;
+   estas regras garantem que as cores semânticas do badge prevaleçam ali. */
+.info-list .badge {
+  font-weight: 700;
+}
+
+.info-list .badge--positive {
+  color: #166534;
+}
+
+.info-list .badge--negative {
+  color: #991b1b;
+}
+
+.info-list .badge--warning {
+  color: #92400e;
+}
+
+.info-list .badge--neutral {
+  color: #334155;
 }
 
 /* ALERT */
@@ -280,15 +375,30 @@ body {
   margin-bottom: 14px;
 }
 
-.alert.warning {
-  background: #fff7ed;
-  color: #9a3412;
+/* SOBREPOSIÇÕES - NAVEGAÇÃO RÁPIDA */
+.section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.section-heading h2 {
+  margin-bottom: 0;
+}
+
+.section-heading__count {
+  font-size: 13px;
+  color: #64748b;
 }
 
 /* SOBREPOSIÇÕES - TABELAS */
 .base-section {
     margin-top: 20px;
     margin-bottom: 30px;
+    scroll-margin-top: 16px;
     /* page-break-inside: avoid; <--- Opcional: remover se quiser permitir que tabela e mapa fiquem em páginas diferentes */
     /* break-inside: avoid; */
 }
@@ -299,13 +409,33 @@ body {
     margin-bottom: 5px;
     border-left: 4px solid #16a34a;
     padding-left: 10px;
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.base-section__icon {
+    font-size: 16px;
+    line-height: 1;
 }
 
 .base-count {
     font-size: 12px;
     color: #64748b;
     margin-left: 10px;
+}
+
+.table-container {
+    margin-top: 20px;
+}
+
+.table-container h4 {
+    font-size: 14px;
+    font-weight: 700;
+    color: #334155;
+    margin-bottom: 8px;
+    padding-left: 10px;
+    border-left: 3px solid #16a34a;
 }
 
 .report-table {
@@ -439,7 +569,7 @@ body {
   text-align: center;
   margin-top: 30px;
   font-size: 13px;
-  color: #ffffff;
+  color: #94a3b8;
 }
 
 /* EDITABLE FIELDS */
@@ -478,24 +608,18 @@ body {
     body {
         background: white;
     }
- 
-    .summary {
-        /* background: #16a34a !important;  <-- Removido para usar a cor definida acima */
-        /* color: white !important; */
-        box-shadow: none;
-        border: 1px solid #000; /* Adicionado borda para garantir visibilidade em P&B se necessário */
-    }
-    .ghost-button, .local-sort-btn, .print-btn {
+
+    .print-btn {
         display: none !important;
     }
-    
+
     .editable-field {
         border: none;
         background: transparent;
         padding: 0;
         min-width: auto;
     }
-    
+
     .editable-field:empty::before {
         content: "";
     }

@@ -1,15 +1,16 @@
 {% load static %}
 {% load l10n %}
+{% load report_extras %}
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
   <title>Análise de Imóvel Rural</title>
-  
+
   <!-- Leaflet & Maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link href='https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/leaflet.fullscreen.css' rel='stylesheet' />
-  <link rel="stylesheet" href="{% static 'analysis/css/report.css' %}?v={{ static_version|default:'20260519' }}" />
+  <link rel="stylesheet" href="{% static 'analysis/css/report.css' %}?v={{ static_version|default:'20260715' }}" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src='https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/Leaflet.fullscreen.min.js'></script>
   <script src="{% static 'analysis/js/maps.js' %}"></script>
@@ -31,11 +32,46 @@
   <!-- INFORMAÇÕES GERAIS -->
   <section class="card">
     <div class="report-header">
-        <h1>Relatório de Análise de Imóvel Rural</h1>
+        <div class="report-header__brand">
+            <span class="report-header__logo">🧭</span>
+            <div>
+                <p class="report-header__eyebrow">Geo Monitor</p>
+                <h1>Relatório de Análise de Imóvel Rural</h1>
+                <p class="report-header__meta">
+                    Gerado em {% now "d/m/Y H:i" %}
+                    {% if municipio or uf %}
+                        &nbsp;·&nbsp;
+                        {% if municipio %}{{ municipio }}{% endif %}{% if municipio and uf %} - {% endif %}{% if uf %}{{ uf }}{% endif %}
+                    {% endif %}
+                </p>
+            </div>
+        </div>
         <button type="button" class="print-btn" onclick="printReport()">
             🖨️ Imprimir PDF
         </button>
     </div>
+
+    {% if resultado %}
+    <div class="stat-grid">
+        <div class="stat-card">
+            <span class="stat-card__label">Área total</span>
+            <span class="stat-card__value">{{ resultado.tamanho_area|floatformat:4|default:"-" }} ha</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-card__label">Sobreposições encontradas</span>
+            <span class="stat-card__value">{{ resultado.total_areas_com_sobreposicao|default:"0" }}</span>
+        </div>
+        <div class="stat-card {% if has_deficit_rl %}stat-card--danger{% else %}stat-card--ok{% endif %}">
+            <span class="stat-card__label">Déficit de Reserva Legal</span>
+            <span class="stat-card__value">{% if has_deficit_rl %}Sim{% else %}Não{% endif %}</span>
+        </div>
+        <div class="stat-card {% if has_mapbiomas_alerts %}stat-card--danger{% else %}stat-card--ok{% endif %}">
+            <span class="stat-card__label">Alertas de desmatamento</span>
+            <span class="stat-card__value">{% if has_mapbiomas_alerts %}Sim{% else %}Não{% endif %}</span>
+        </div>
+    </div>
+    {% endif %}
+
     <h2>Detalhes</h2>
     <div class="info-list" style="margin-bottom: 1rem;">
         <div>
@@ -54,17 +90,13 @@
                     {{ resultado.tamanho_area|floatformat:4 }}
                 </span>
             </div>
-
-            
-            
-
         {% endif %}
 
         {% if municipio and uf %}
             <div>
                 <strong>Município / UF</strong>
                 <span>
-                    {{ municipio }} - {{ uf }}                    
+                    {{ municipio }} - {{ uf }}
                 </span>
             </div>
         {% endif %}
@@ -73,14 +105,14 @@
             <div>
                 <strong>Situação</strong>
                 <span>
-                    {{ demonstrativo.registration_status|default:"Não informado" }}                    
+                    {{ demonstrativo.registration_status|default:"Não informado" }}
                 </span>
             </div>
-            
+
             <div>
                 <strong>Condição</strong>
                 <span>
-                    {{ demonstrativo.external_condicion|default:"Não informado" }}                    
+                    {{ demonstrativo.external_condicion|default:"Não informado" }}
                 </span>
             </div>
         {% endif %}
@@ -123,14 +155,12 @@
         {% if has_deficit_rl %}
             <div>
                 <strong>Tem Déficit de Reserva legal?</strong>
-                <span>
-                    Sim {{ deficit_rl_value|cut:"-"}}                    
-                </span>
+                <span class="badge badge--negative">⚠️ Sim · {{ deficit_rl_value|cut:"-" }}</span>
             </div>
         {% else %}
             <div>
                 <strong>Tem Déficit de Reserva legal?</strong>
-                <span>Não</span>
+                <span class="badge badge--positive">✔ Não</span>
             </div>
         {% endif %}
 
@@ -138,14 +168,12 @@
             {% if demonstrativo.issue_rl_quote %}
                 <div>
                     <strong>Pode Emitir de cota Reserva Legal?</strong>
-                    <span>
-                        Sim {{ demonstrativo.passivo_ou_excedente_de_reserva_legal|cut:"-" }} ha
-                    </span>
+                    <span class="badge badge--positive">✔ Sim · {{ demonstrativo.passivo_ou_excedente_de_reserva_legal|cut:"-" }} ha</span>
                 </div>
             {% else %}
                 <div>
                     <strong>Pode Emitir de cota Reserva Legal?</strong>
-                    <span>Não</span>
+                    <span class="badge badge--neutral">Não</span>
                 </div>
             {% endif %}
         {% endif %}
@@ -153,26 +181,26 @@
         <div>
             <strong>Tem APP Antropizada aposta 22/07/2008?</strong>
             {% if recibo and recibo.area_antropizada and recibo.app_to_restore %}
-                <span>{{ recibo.area_antropizada }}</span>
+                <span class="badge badge--warning">{{ recibo.area_antropizada }}</span>
             {% elif demonstrativo and demonstrativo.area_antropizada and demonstrativo.app_to_restore %}
-                <span>{{ demonstrativo.area_antropizada }}</span>
+                <span class="badge badge--warning">{{ demonstrativo.area_antropizada }}</span>
             {% else %}
-                <span>Não</span>
+                <span class="badge badge--positive">✔ Não</span>
             {% endif %}
         </div>
 
         {% for base in resultado.resultados_por_base %}
             {% if "Embargos" in base.nome_base or "Embargoes" in base.nome_base %}
-                <div>
+                <div class="info-list__wide">
                     <strong>Há Embargos do IBAMA?</strong>
-                    <span style="text-align: right;">
+                    <span>
                         {% if base.areas_encontradas %}
-                            Sim
+                            <span class="badge badge--negative">⚠️ Sim</span>
                             {% for item in base.areas_encontradas %}
                                 <br>{{ item.area|floatformat:4 }} ha
                             {% endfor %}
                         {% else %}
-                            Não
+                            <span class="badge badge--positive">✔ Não</span>
                         {% endif %}
                     </span>
                 </div>
@@ -180,11 +208,17 @@
         {% endfor %}
         <div>
             <strong>Possui alertas de Desmatamento ?</strong>
-            <span>{% if has_mapbiomas_alerts %}Sim{% else %}Não{% endif %}</span>
+            <span>
+                {% if has_mapbiomas_alerts %}
+                    <span class="badge badge--negative">⚠️ Sim</span>
+                {% else %}
+                    <span class="badge badge--positive">✔ Não</span>
+                {% endif %}
+            </span>
         </div>
         {% for base in resultado.resultados_por_base %}
             {% if "Fitoecologias" in base.nome_base and base.areas_encontradas %}
-                <div>
+                <div class="info-list__wide">
                     <strong>Bioma(s)</strong>
                     <span>
                         {% regroup base.areas_encontradas|dictsort:"item_info" by item_info as fito_list %}
@@ -209,14 +243,19 @@
 
   <!-- SOBREPOSIÇÕES -->
   <section class="card">
-    <h2>Camadas Ativas</h2>
+    <div class="section-heading">
+        <h2>Camadas Ativas</h2>
+        {% if resultado.total_areas_com_sobreposicao %}
+            <span class="section-heading__count">{{ resultado.total_areas_com_sobreposicao }} ocorrência(s) no total</span>
+        {% endif %}
+    </div>
 
     {% if resultado.total_areas_com_sobreposicao > 0 %}
 
         {% for base in resultado.resultados_por_base %}
             {% if base.areas_encontradas %}
-                <div class="base-section">
-                    <h3>{{ base.nome_base }}</h3>
+                <div class="base-section" id="base-{{ forloop.counter }}">
+                    <h3><span class="base-section__icon">{{ base.nome_base|base_icon }}</span> {{ base.nome_base }}</h3>
                     <span class="base-count">{{ base.areas_encontradas|length }} ocorrência(s)</span>
 
                     {% if "Sigef" in base.nome_base %}
@@ -272,7 +311,7 @@
                     <script>
                         (function(){
                             var items = [];
-                        
+
                             // Sobreposições
                             {% for item in base.areas_encontradas %}
                                 {% if item.polygon_geojson %}
@@ -285,7 +324,7 @@
                                     });
                                 {% endif %}
                             {% endfor %}
-                
+
                             // Inicializa mapa apenas se houver itens
                             if(items.length > 0){
                                 initImoveisMap(items, {
@@ -314,20 +353,9 @@
   </section>
 
   <footer class="footer">
-    {{ "now"|date:"d/m/Y H:i" }}
+    Documento gerado automaticamente pelo Geo Monitor em {% now "d/m/Y H:i" %}
   </footer>
 
-            </td>
-        </tr>
-    </tbody>
-    <tfoot>
-        <tr>
-            <td>
-                <div class="footer-space">&nbsp;</div>
-            </td>
-        </tr>
-    </tfoot>
-  </table>
 </div>
 
 <script>
@@ -344,7 +372,7 @@
                 field.blur();
             }
         });
-        
+
         // Paste as plain text
         field.addEventListener('paste', (e) => {
             e.preventDefault();
