@@ -143,6 +143,8 @@ body {
   border-left: 4px solid #94a3b8;
   border-radius: 10px;
   padding: 14px 16px;
+  break-inside: avoid;
+  page-break-inside: avoid;
 }
 
 .stat-card__label {
@@ -199,6 +201,8 @@ body {
   background: #f8fafc;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
+  break-inside: avoid;
+  page-break-inside: avoid;
 }
 
 .info-list__wide {
@@ -399,8 +403,8 @@ body {
     margin-top: 20px;
     margin-bottom: 30px;
     scroll-margin-top: 16px;
-    /* page-break-inside: avoid; <--- Opcional: remover se quiser permitir que tabela e mapa fiquem em páginas diferentes */
-    /* break-inside: avoid; */
+    break-inside: avoid;
+    page-break-inside: avoid;
 }
 
 .base-section h3 {
@@ -443,6 +447,15 @@ body {
     border-collapse: collapse;
     margin-top: 10px;
     font-size: 13px;
+}
+
+.report-table thead {
+    display: table-header-group;
+}
+
+.report-table tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
 }
 
 .report-table th, .report-table td {
@@ -647,5 +660,11 @@ body {
 
     .zoning-legend__list {
         display: grid !important;
+    }
+
+    .report-table td,
+    .table-container td {
+        orphans: 3;
+        widows: 3;
     }
 }
