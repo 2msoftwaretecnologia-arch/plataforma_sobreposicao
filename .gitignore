@@ -8,7 +8,7 @@ venv/
 env/
 # Variante em maiúsculas
 ENV/
-
+ 
 
 
 # Arquivos de variáveis de ambiente (segredos)
