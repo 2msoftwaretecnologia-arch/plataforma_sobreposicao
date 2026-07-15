@@ -310,12 +310,12 @@
                     <div id="map-base-{{ forloop.counter }}" class="report-map"></div>
                     <script>
                         (function(){
-                            var items = [];
+                            var overlapItems = [];
 
                             // Sobreposições
                             {% for item in base.areas_encontradas %}
                                 {% if item.polygon_geojson %}
-                                    items.push({
+                                    overlapItems.push({
                                         gj: {{ item.polygon_geojson|safe }},
                                         label: "{{ item.item_info|escapejs }}",
                                         area: "{{ item.area|default:'' }}",
@@ -325,8 +325,23 @@
                                 {% endif %}
                             {% endfor %}
 
-                            // Inicializa mapa apenas se houver itens
-                            if(items.length > 0){
+                            // Inicializa mapa apenas se houver sobreposição para mostrar
+                            if(overlapItems.length > 0){
+                                var items = [];
+
+                                // Contorno da propriedade, para dar referência de onde ela está
+                                {% if resultado.alvo_geojson %}
+                                    items.push({
+                                        gj: {{ resultado.alvo_geojson|safe }},
+                                        label: "Área da Propriedade",
+                                        area: "{{ resultado.tamanho_area|floatformat:4|default:'' }} ha",
+                                        color: "#000000",
+                                        fonte: "Área da Propriedade"
+                                    });
+                                {% endif %}
+
+                                items = items.concat(overlapItems);
+
                                 initImoveisMap(items, {
                                     elementId: 'map-base-{{ forloop.counter }}',
                                     planet_tiles_url: '{{ planet_tiles_url|default:"" }}',
