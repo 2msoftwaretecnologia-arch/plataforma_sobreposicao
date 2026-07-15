@@ -5,6 +5,10 @@
     // para permitir que os cards de resultado apontem/centralizem o mapa.
     var mapState = null;
 
+    // Fonte que representa o contorno da propriedade — única camada que
+    // começa marcada por padrão no mapa interativo.
+    var PROPERTY_FONTE = 'Área da Propriedade';
+
     /**
      * Creates and returns the base layers for the map.
      * @param {string|null} planetTilesUrl 
@@ -85,7 +89,7 @@
             if (!geom) return;
 
             var f = item.fonte || 'Fonte';
-            var isPropriedade = (f === 'Área da Propriedade');
+            var isPropriedade = (f === PROPERTY_FONTE);
 
             // Determine color based on source
             var col;
@@ -189,8 +193,11 @@
                 
                 item.appendChild(sw);
                 item.appendChild(lbl);
-                
+
                 item.dataset.fonte = k;
+                if (!map.hasLayer(layersByFonte[k])) {
+                    item.classList.add('off');
+                }
                 item.addEventListener('click', function () {
                     var fonte = this.dataset.fonte;
                     var grp = layersByFonte[fonte];
@@ -210,7 +217,8 @@
     }
 
     /**
-     * Configures the "Toggle All" button.
+     * Configures the "Toggle All" button. O contorno da propriedade fica de
+     * fora dessa ação — ele é a referência fixa do mapa, não uma "base".
      */
     function setupToggleAll(toggleBtn, layersByFonte, map, legendEl) {
         if (!toggleBtn) return;
@@ -220,30 +228,36 @@
         toggleBtn.parentNode.replaceChild(newBtn, toggleBtn);
         toggleBtn = newBtn;
 
-        var allOn = true;
+        function baseFontes() {
+            return Object.keys(layersByFonte).filter(function (f) { return f !== PROPERTY_FONTE; });
+        }
+
+        var allOn = baseFontes().some(function (f) { return map.hasLayer(layersByFonte[f]); });
+        toggleBtn.textContent = allOn ? 'Desmarcar todas as bases' : 'Marcar todas as bases';
 
         toggleBtn.addEventListener('click', function () {
-            var fontes = Object.keys(layersByFonte);
+            var fontes = baseFontes();
             for (var i = 0; i < fontes.length; i++) {
                 var f = fontes[i];
                 var grp = layersByFonte[f];
                 if (!grp) continue;
-                
+
                 if (allOn) {
                     if (map.hasLayer(grp)) { map.removeLayer(grp); }
                 } else {
                     if (!map.hasLayer(grp)) { map.addLayer(grp); }
                 }
             }
-            
+
             if (legendEl) {
                 var legendItems = legendEl.querySelectorAll('.legend-item');
                 for (var k = 0; k < legendItems.length; k++) {
+                    if (legendItems[k].dataset.fonte === PROPERTY_FONTE) continue;
                     if (allOn) { legendItems[k].classList.add('off'); }
                     else { legendItems[k].classList.remove('off'); }
                 }
             }
-            
+
             allOn = !allOn;
             this.textContent = allOn ? 'Desmarcar todas as bases' : 'Marcar todas as bases';
         });
@@ -282,6 +296,16 @@
 
         // 5. Controls & Legend
         if (!isStatic) {
+            // Por padrão, só o contorno da propriedade fica marcado; as demais
+            // bases começam desmarcadas para reduzir poluição visual no mapa.
+            // (Mapas estáticos do relatório impresso continuam mostrando tudo,
+            // já que lá não há como reativar uma camada escondida.)
+            Object.keys(data.layersByFonte).forEach(function (f) {
+                if (f === PROPERTY_FONTE) return;
+                var grp = data.layersByFonte[f];
+                if (map.hasLayer(grp)) { map.removeLayer(grp); }
+            });
+
             // Only add layer controls and legend if NOT static
             L.control.layers(baseLayersInfo.layers, data.overlays, { collapsed: false }).addTo(map);
             
