@@ -5,7 +5,11 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <title>Análise de Imóvel Rural</title>
+  <title>Relatório de Análise | TerraView Tocantins</title>
+  <icon type="image/x-icon" href="{% static 'analysis/images/icon_page.svg' %}">
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 
   <!-- Leaflet & Maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -30,12 +34,16 @@
 <div class="container">
 
   <!-- INFORMAÇÕES GERAIS -->
-  <section class="card">
+  <section class="card reveal">
     <div class="report-header">
         <div class="report-header__brand">
-            <span class="report-header__logo">🧭</span>
+            <span class="report-header__logo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 21V9"/><path d="M12 9c-2.8 0-4.5-1.8-4.5-4.5C10.2 4.5 12 6.2 12 9zM12 9c2.8 0 4.5-1.8 4.5-4.5C13.8 4.5 12 6.2 12 9zM12 14c-2.8 0-4.5-1.8-4.5-4.5 2.7 0 4.5 1.7 4.5 4.5zM12 14c2.8 0 4.5-1.8 4.5-4.5-2.7 0-4.5 1.7-4.5 4.5zM12 19c-2.8 0-4.5-1.8-4.5-4.5 2.7 0 4.5 1.7 4.5 4.5zM12 19c2.8 0 4.5-1.8 4.5-4.5-2.7 0-4.5 1.7-4.5 4.5z"/>
+                </svg>
+            </span>
             <div>
-                <p class="report-header__eyebrow">Geo Monitor</p>
+                <p class="report-header__eyebrow">TerraView Tocantins</p>
                 <h1>Relatório de Análise de Imóvel Rural</h1>
                 <p class="report-header__meta">
                     Gerado em {% now "d/m/Y H:i" %}
@@ -242,7 +250,7 @@
   </section>
 
   <!-- SOBREPOSIÇÕES -->
-  <section class="card">
+  <section class="card reveal reveal-delay-1">
     <div class="section-heading">
         <h2>Camadas Ativas</h2>
         {% if resultado.total_areas_com_sobreposicao %}
@@ -254,7 +262,7 @@
 
         {% for base in resultado.resultados_por_base %}
             {% if base.areas_encontradas %}
-                <div class="base-section" id="base-{{ forloop.counter }}">
+                <div class="base-section reveal" id="base-{{ forloop.counter }}">
                     <h3><span class="base-section__icon">{{ base.nome_base|base_icon }}</span> {{ base.nome_base }}</h3>
                     <span class="base-count">{{ base.areas_encontradas|length }} ocorrência(s)</span>
 
@@ -368,7 +376,7 @@
   </section>
 
   <footer class="footer">
-    Documento gerado automaticamente pelo Geo Monitor em {% now "d/m/Y H:i" %}
+    Documento gerado automaticamente pela TerraView Tocantins em {% now "d/m/Y H:i" %}
   </footer>
 
 </div>
@@ -397,6 +405,7 @@
     });
 
 </script>
+<script src="{% static 'analysis/js/landing_page.js' %}"></script>
 
 </body>
 </html>
