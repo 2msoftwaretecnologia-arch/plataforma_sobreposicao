@@ -5,93 +5,124 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resultados da Análise</title>
-
-    <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/index.css' %}">
-    <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/background_ocean.css' %}">
+    <title>Resultados da Análise | TerraView Tocantins</title>
+    <icon type="image/x-icon" href="{% static 'analysis/images/icon_page.svg' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/landing_page.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/results.css' %}">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link href='https://unpkg.com/leaflet-fullscreen@1.0.2/dist/leaflet.fullscreen.css' rel='stylesheet' />
 </head>
 <body>
-    <div class="ocean-backdrop"><div class="island-backdrop"></div></div>
-    <svg height="0" width="0">
-        <filter id="handDrawnNoise">
-            <feTurbulence result="noise" numOctaves="5" baseFrequency="0.0065" type="fractalNoise" />
-            <feDisplacementMap yChannelSelector="G" xChannelSelector="R" scale="900" in2="noise" in="SourceGraphic" />
-        </filter>
+
+    <!-- ===== Definições de ícones SVG ===== -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <defs>
+            <symbol id="i-wheat" viewBox="0 0 24 24"><path d="M12 21V9"/><path d="M12 9c-2.8 0-4.5-1.8-4.5-4.5C10.2 4.5 12 6.2 12 9zM12 9c2.8 0 4.5-1.8 4.5-4.5C13.8 4.5 12 6.2 12 9zM12 14c-2.8 0-4.5-1.8-4.5-4.5 2.7 0 4.5 1.7 4.5 4.5zM12 14c2.8 0 4.5-1.8 4.5-4.5-2.7 0-4.5 1.7-4.5 4.5zM12 19c-2.8 0-4.5-1.8-4.5-4.5 2.7 0 4.5 1.7 4.5 4.5zM12 19c2.8 0 4.5-1.8 4.5-4.5-2.7 0-4.5 1.7-4.5 4.5z"/></symbol>
+            <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+            <symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 3H7a1.5 1.5 0 0 0-1.5 1.5v15A1.5 1.5 0 0 0 7 21h10a1.5 1.5 0 0 0 1.5-1.5V7.5z"/><path d="M14 3v4.5h4.5M9 12.5h6M9 16h6"/></symbol>
+            <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.2 12.4 2.5 2.5 5-5.4"/></symbol>
+            <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4 2.8 19.6h18.4z"/><path d="M12 10v4.4M12 17.1v.1"/></symbol>
+            <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3.5 8.5 4.5L12 12.5 3.5 8z"/><path d="m3.5 12.5 8.5 4.5 8.5-4.5M3.5 16.5 12 21l8.5-4.5"/></symbol>
+            <symbol id="i-map" viewBox="0 0 24 24"><path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6z"/><path d="M9 4v14M15 6v14"/></symbol>
+            <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v10.5M8 11l4 4.5 4-4.5"/><path d="M4.5 15.5v3A1.5 1.5 0 0 0 6 20h12a1.5 1.5 0 0 0 1.5-1.5v-3"/></symbol>
+        </defs>
     </svg>
+
+    <!-- ===== Navegação ===== -->
+    <div class="topbar">
+        <div class="container">
+            <nav class="nav">
+                <a href="{% url 'landing_page' %}" class="brand">
+                    <div class="brand-mark">
+                        <svg class="ico"><use href="#i-wheat"/></svg>
+                    </div>
+                    <div>
+                        <div class="brand-title">TerraView Tocantins</div>
+                        <div class="brand-subtitle">Geoanálise rural inteligente</div>
+                    </div>
+                </a>
+                <div class="nav-links">
+                    <a href="{% url 'landing_page' %}#funcionalidades">Funcionalidades</a>
+                    <a href="{% url 'landing_page' %}#bases">Bases de dados</a>
+                    <a href="{% url 'landing_page' %}#como-funciona">Como funciona</a>
+                </div>
+                <a href="{% url 'upload_zip_car' %}" class="btn btn-outline-green">Nova análise</a>
+            </nav>
+        </div>
+    </div>
+
+    <!-- ===== Hero de resultados ===== -->
+    <header class="hero hero-results">
+        <div class="container">
+            <div class="hero-grid">
+                <div class="reveal visible">
+                    <div class="hero-badge">
+                        <svg class="ico"><use href="#i-check"/></svg>
+                        Consulta concluída
+                    </div>
+                    <h1>Resultados da <em>análise geoambiental</em>.</h1>
+                    <p class="hero-text">
+                        Sobreposições, bases consultadas e mapa interativo da propriedade analisada, organizados para apoio técnico, ambiental e fundiário.
+                    </p>
+
+                    {% if municipio or uf %}
+                    <div class="hero-status-row">
+                        {% if municipio %}
+                            <span class="badge badge-strong">
+                                <svg class="ico" style="width:14px;height:14px;margin-right:6px"><use href="#i-pin"/></svg>
+                                {{ municipio }}
+                            </span>
+                        {% endif %}
+                        {% if uf %}
+                            <span class="badge">{{ uf }}</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    {% if resultado or demonstrativo or recibo %}
+                    <div class="hero-actions">
+                        {% if demonstrativo or recibo %}
+                        <button type="button" onclick="printReport()" class="btn btn-gold">
+                            <svg class="ico" style="width:18px;height:18px"><use href="#i-doc"/></svg>
+                            Gerar Relatório
+                        </button>
+                        {% endif %}
+                        {% if resultado %}
+                        <a href="{% url 'download_property_shp' %}" class="btn btn-outline-light">
+                            <svg class="ico" style="width:18px;height:18px"><use href="#i-download"/></svg>
+                            Baixar SHP
+                        </a>
+                        <a href="{% url 'download_property_kml' %}" class="btn btn-outline-light">
+                            <svg class="ico" style="width:18px;height:18px"><use href="#i-download"/></svg>
+                            Baixar KML
+                        </a>
+                        {% endif %}
+                    </div>
+
+                    <script>
+                        function printReport() {
+                            const url = "{% url 'report_print' %}";
+                            const win = window.open(url, '_blank');
+                            if (win) {
+                                win.focus();
+                            } else {
+                                alert('Por favor, permita popups para este site para visualizar o relatório.');
+                            }
+                        }
+                    </script>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <svg class="fence-divider" viewBox="0 0 1440 44" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M0 44 L0 30 Q 360 8 720 22 T 1440 18 L1440 44 Z" fill="#fbf8f0"/>
+        </svg>
+    </header>
+
     <div class="page">
-
-        <header class="header">
-            <div class="brand">
-                <div class="brand-icon">🧭</div>
-                <div>
-                    <p class="brand-label">Geo Monitor</p>
-                    <h1 class="brand-title">Análise de Sobreposição</h1>
-                </div>
-            </div>
-
-            <a class="ghost-button" href="{% url 'upload_zip_car' %}">
-                📦 Upload de ZIP ou CAR
-            </a>
-        </header>
-
-        {% if municipio or uf %}
-        <section class="panel">
-            <div class="panel-header">
-                <span class="pill">Localização</span>
-                <div class="location-summary">
-                    {% if municipio %}
-                        <span class="badge badge-strong">{{ municipio }}</span>
-                    {% endif %}
-                    {% if uf %}
-                        <span class="badge">{{ uf }}</span>
-                    {% endif %}
-                </div>
-            </div>
-            <p class="panel-description">
-                Identificamos automaticamente o município e estado pertencentes ao polígono informado.
-            </p>
-        </section>
-        {% endif %}
-
-        {% if resultado or demonstrativo or recibo %}
-        <section class="panel">
-            <div class="panel-header">
-                <div>
-                    <p class="eyebrow">Exportar</p>
-                    <h2 class="panel-title">Relatório e arquivos da propriedade</h2>
-                </div>
-                <div class="actions-group">
-                    {% if demonstrativo or recibo %}
-                    <button type="button" onclick="printReport()" class="ghost-button ghost-button--small">
-                        📃 Gerar Relatório
-                    </button>
-                    {% endif %}
-                    {% if resultado %}
-                    <a href="{% url 'download_property_shp' %}" class="ghost-button ghost-button--small">
-                        ⬇️ Baixar SHP da propriedade
-                    </a>
-                    <a href="{% url 'download_property_kml' %}" class="ghost-button ghost-button--small">
-                        ⬇️ Baixar KML da propriedade
-                    </a>
-                    {% endif %}
-                </div>
-            </div>
-        </section>
-
-        <script>
-            function printReport() {
-                const url = "{% url 'report_print' %}";
-                const win = window.open(url, '_blank');
-                if (win) {
-                    win.focus();
-                } else {
-                    alert('Por favor, permita popups para este site para visualizar o relatório.');
-                }
-            }
-        </script>
-        {% endif %}
 
         {% if demonstrativo %}
             {% include "analysis/components/_demonstrativo_cards.html" %}
@@ -103,7 +134,9 @@
 
         {% if erro %}
         <section class="alert">
-            <div class="alert-icon">⚠️</div>
+            <div class="alert-icon">
+                <svg class="ico" style="width:24px;height:24px"><use href="#i-alert"/></svg>
+            </div>
             <div>
                 <p class="alert-title">Algo não deu certo</p>
                 <p class="alert-text">{{ erro }}</p>
@@ -118,7 +151,7 @@
                     <p class="eyebrow">Resumo da execução</p>
                     <h2 class="panel-title">Resultados da Análise</h2>
                 </div>
-                <span class="badge">Consulta concluída</span>
+                <span class="badge badge-strong">Consulta concluída</span>
             </div>
 
             <div class="summary-grid">
@@ -163,23 +196,24 @@
         <section class="panel">
             <div class="panel-header">
                 <div>
-                    <h class="panel-title">Mapa</h>
+                    <p class="eyebrow">Mapa</p>
+                    <h2 class="panel-title">Mapa interativo</h2>
                 </div>
             </div>
 
-            <div id="map-imoveis"></div>
+            <div class="map-frame">
+                <div class="map-frame-header">
+                    <div class="map-title">
+                        <svg class="ico" style="width:16px;height:16px;margin-right:8px;vertical-align:-3px"><use href="#i-layers"/></svg>
+                        Camadas ativáveis
+                    </div>
+                    <span class="online">online</span>
+                </div>
+                <div id="map-imoveis"></div>
+            </div>
             <div id="legend-controls"><button id="toggle-all-layers" type="button">Desmarcar todas as bases</button></div>
             <div id="legend-imoveis"></div>
         </section>
-        <style>
-            #map-imoveis{height:480px;border:1px solid var(--line);border-radius:var(--radius);}
-            #legend-controls{margin-top:8px}
-            #legend-controls button{padding:6px 10px;border:1px solid var(--line);border-radius:12px;background:transparent;cursor:pointer}
-            #legend-imoveis{margin-top:8px;display:flex;flex-wrap:wrap;gap:8px}
-            .legend-item{display:flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--line);border-radius:12px;font-size:12px}
-            .legend-swatch{width:14px;height:14px;border-radius:3px;border:1px solid rgba(0,0,0,0.15)}
-            .legend-item.off{opacity:.5}
-        </style>
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
         <script src='https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/Leaflet.fullscreen.min.js'></script>
         <script src="{% static 'analysis/js/maps.js' %}"></script>
@@ -189,7 +223,6 @@
                 document.getElementById("map-items").textContent
             );
 
-            console.log(items);
             const options = {
                 planet_tiles_url: "{{ planet_tiles_url|default:'' }}"
             };
@@ -198,7 +231,15 @@
         </script>
         {% endif %}
 
-        
     </div>
+
+    <!-- ===== Rodapé ===== -->
+    <footer class="site-footer">
+        <div class="container">
+            TerraView Tocantins &copy; 2026 &mdash; Análise geoambiental e fundiária para imóveis rurais no Tocantins.
+        </div>
+    </footer>
+
+    <script src="{% static 'analysis/js/landing_page.js' %}"></script>
 </body>
 </html>
