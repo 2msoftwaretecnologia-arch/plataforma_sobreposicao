@@ -4,13 +4,45 @@
   inset: 0;
   background: rgba(255, 255, 255, 0.92);
   display: none;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 1.5rem;
   z-index: 9999;
 }
 
 .loader-overlay.visible {
   display: flex;
+}
+
+/* Mensagens rotativas abaixo do hamster, avisando o que está sendo processado */
+.loader-status {
+  max-width: min(90vw, 26rem);
+  padding: 0.65rem 1.4rem;
+  background: #111;
+  border-radius: 1.25rem;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.loader-status__text {
+  display: block;
+  color: #956afa;
+  font-family: "Poppins", "Segoe UI", sans-serif;
+  font-weight: 500;
+  font-size: 0.95rem;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+
+.loader-status__text.is-changing {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 
 /* From Uiverse.io by Nawsome */ 
