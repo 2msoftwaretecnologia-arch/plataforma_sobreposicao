@@ -1,0 +1,74 @@
+{% extends 'authentication/base_auth.html' %}
+
+{% block title %}Sobre você | TerraView Tocantins{% endblock %}
+
+{% block content %}
+<div class="auth-card auth-card-wide">
+    <p class="auth-eyebrow">Só mais um passo</p>
+    <h1 class="auth-title">Conte um pouco sobre você</h1>
+    <p class="auth-subtitle">Isso nos ajuda a entender quem usa a plataforma e a priorizar o que é mais útil para você.</p>
+
+    <form method="post" class="auth-form" novalidate id="onboarding_form">
+        {% csrf_token %}
+        {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+
+        <div class="form-group">
+            <label>Qual é o seu objetivo na plataforma?</label>
+            <div class="option-grid">
+                {% for radio in form.objetivo %}
+                <div class="option-card">
+                    {{ radio.tag }}
+                    <label for="{{ radio.id_for_label }}">{{ radio.choice_label }}</label>
+                </div>
+                {% endfor %}
+            </div>
+            {% for error in form.objetivo.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+        </div>
+
+        <div class="form-group" id="group_objetivo_outro" style="display:none;">
+            <label for="{{ form.objetivo_outro.id_for_label }}">Qual, exatamente?</label>
+            {{ form.objetivo_outro }}
+            {% for error in form.objetivo_outro.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+        </div>
+
+        <div class="form-group">
+            <label for="{{ form.profissao.id_for_label }}">Qual é a sua profissão?</label>
+            {{ form.profissao }}
+            {% for error in form.profissao.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+        </div>
+
+        <div class="form-group" id="group_profissao_outro" style="display:none;">
+            <label for="{{ form.profissao_outro.id_for_label }}">Qual, exatamente?</label>
+            {{ form.profissao_outro }}
+            {% for error in form.profissao_outro.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+        </div>
+
+        <button type="submit" class="btn btn-gold">Concluir cadastro</button>
+    </form>
+</div>
+
+<script>
+(function () {
+    function toggleGroup(groupId, value) {
+        document.getElementById(groupId).style.display = value === 'outro' ? 'block' : 'none';
+    }
+
+    var objetivoInputs = document.querySelectorAll('input[name="objetivo"]');
+    objetivoInputs.forEach(function (input) {
+        input.addEventListener('change', function () {
+            toggleGroup('group_objetivo_outro', input.value);
+        });
+    });
+    var checkedObjetivo = document.querySelector('input[name="objetivo"]:checked');
+    toggleGroup('group_objetivo_outro', checkedObjetivo ? checkedObjetivo.value : '');
+
+    var profissaoSelect = document.querySelector('select[name="profissao"]');
+    if (profissaoSelect) {
+        profissaoSelect.addEventListener('change', function () {
+            toggleGroup('group_profissao_outro', profissaoSelect.value);
+        });
+        toggleGroup('group_profissao_outro', profissaoSelect.value);
+    }
+})();
+</script>
+{% endblock %}

@@ -53,7 +53,13 @@
                     <a href="{% url 'landing_page' %}#como-funciona">Como funciona</a>
                     <a href="{% url 'landing_page' %}#relatorio">Relatório</a>
                 </div>
-                <a href="{% url 'landing_page' %}" class="btn btn-outline-green">Voltar ao início</a>
+                <div class="nav-actions">
+                    <a href="{% url 'landing_page' %}" class="btn btn-outline-green">Voltar ao início</a>
+                    <form method="post" action="{% url 'authentication:logout' %}" class="nav-logout-form">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-green">Sair</button>
+                    </form>
+                </div>
             </nav>
         </div>
     </div>

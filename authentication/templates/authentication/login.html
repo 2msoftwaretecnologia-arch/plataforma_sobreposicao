@@ -1,0 +1,41 @@
+{% extends 'authentication/base_auth.html' %}
+
+{% block title %}Entrar | TerraView Tocantins{% endblock %}
+
+{% block content %}
+<div class="auth-card">
+    <p class="auth-eyebrow">Bem-vindo de volta</p>
+    <h1 class="auth-title">Entrar na plataforma</h1>
+    <p class="auth-subtitle">Acesse sua conta para analisar propriedades rurais no Tocantins.</p>
+
+    {% if form.non_field_errors %}
+    <div class="auth-alert">
+        {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="post" class="auth-form" novalidate>
+        {% csrf_token %}
+        {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+
+        <div class="form-group">
+            <label for="{{ form.username.id_for_label }}">Usuário</label>
+            {{ form.username }}
+            {% for error in form.username.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+        </div>
+
+        <div class="form-group">
+            <label for="{{ form.password.id_for_label }}">Senha</label>
+            {{ form.password }}
+            {% for error in form.password.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+        </div>
+
+        <button type="submit" class="btn btn-gold">Entrar</button>
+    </form>
+
+    <p class="auth-footer">
+        Ainda não tem conta?
+        <a href="{% url 'authentication:register' %}{% if next %}?next={{ next }}{% endif %}">Cadastre-se</a>
+    </p>
+</div>
+{% endblock %}

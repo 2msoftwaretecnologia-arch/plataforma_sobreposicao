@@ -1,0 +1,45 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}TerraView Tocantins{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/landing_page.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'authentication/css/auth.css' %}">
+</head>
+
+<body class="contour-bg">
+
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <defs>
+            <symbol id="i-wheat" viewBox="0 0 24 24"><path d="M12 21V9"/><path d="M12 9c-2.8 0-4.5-1.8-4.5-4.5C10.2 4.5 12 6.2 12 9zM12 9c2.8 0 4.5-1.8 4.5-4.5C13.8 4.5 12 6.2 12 9zM12 14c-2.8 0-4.5-1.8-4.5-4.5 2.7 0 4.5 1.7 4.5 4.5zM12 14c2.8 0 4.5-1.8 4.5-4.5-2.7 0-4.5 1.7-4.5 4.5zM12 19c-2.8 0-4.5-1.8-4.5-4.5 2.7 0 4.5 1.7 4.5 4.5zM12 19c2.8 0 4.5-1.8 4.5-4.5-2.7 0-4.5 1.7-4.5 4.5z"/></symbol>
+        </defs>
+    </svg>
+
+    <div class="topbar">
+        <div class="container">
+            <nav class="nav">
+                <a href="{% url 'landing_page' %}" class="brand">
+                    <div class="brand-mark">
+                        <svg class="ico"><use href="#i-wheat"/></svg>
+                    </div>
+                    <div>
+                        <div class="brand-title">TerraView Tocantins</div>
+                        <div class="brand-subtitle">Geoanálise rural inteligente</div>
+                    </div>
+                </a>
+            </nav>
+        </div>
+    </div>
+
+    <main class="auth-shell">
+        {% block content %}{% endblock %}
+    </main>
+
+</body>
+</html>

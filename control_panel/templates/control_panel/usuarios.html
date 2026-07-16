@@ -7,7 +7,51 @@
     <h1>Usuários</h1>
 </div>
 
-<div class="card empty-state">
-    <p>Esta seção ainda será implementada.</p>
+<div class="cards-row">
+    <div class="card">
+        <span class="card-label">Total de usuários cadastrados</span>
+        <span class="card-value">{{ total_usuarios }}</span>
+    </div>
+</div>
+
+<div class="card table-card">
+    {% if usuarios %}
+    <div class="table-scroll">
+        <table class="users-table">
+            <thead>
+                <tr>
+                    <th>Usuário</th>
+                    <th>E-mail</th>
+                    <th>Objetivo</th>
+                    <th>Profissão</th>
+                    <th>Cadastrado em</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for usuario in usuarios %}
+                <tr>
+                    <td class="users-table-name">{{ usuario.username }}</td>
+                    <td>{{ usuario.email|default:"—" }}</td>
+                    <td>{{ usuario.profile.objetivo_exibicao|default:"—" }}</td>
+                    <td>{{ usuario.profile.profissao_exibicao|default:"—" }}</td>
+                    <td>{{ usuario.date_joined|date:"d/m/Y H:i" }}</td>
+                    <td>
+                        {% if usuario.is_staff %}
+                        <span class="status-badge status-staff">Staff</span>
+                        {% elif usuario.profile.onboarding_completo %}
+                        <span class="status-badge status-seguro">Completo</span>
+                        {% else %}
+                        <span class="status-badge status-quase_cheio">Onboarding pendente</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="empty-state">Nenhum usuário cadastrado ainda.</p>
+    {% endif %}
 </div>
 {% endblock %}

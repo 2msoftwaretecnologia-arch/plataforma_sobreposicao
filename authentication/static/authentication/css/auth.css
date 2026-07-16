@@ -1,0 +1,198 @@
+/* Telas de autenticação — estende o design system da landing page (landing_page.css) */
+
+.auth-shell {
+  min-height: calc(100vh - 78px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 20px 64px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 440px;
+  background: #fff;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--cream-200);
+  box-shadow: 0 24px 48px rgba(23, 48, 31, 0.1);
+  padding: 36px 34px;
+}
+
+.auth-card.auth-card-wide {
+  max-width: 620px;
+}
+
+.auth-eyebrow {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--green-600);
+  margin-bottom: 8px;
+}
+
+.auth-title {
+  font-family: var(--serif);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--ink-900);
+  margin-bottom: 8px;
+}
+
+.auth-subtitle {
+  color: var(--ink-500);
+  font-size: 14.5px;
+  line-height: 1.5;
+  margin-bottom: 28px;
+}
+
+.auth-form .form-group {
+  margin-bottom: 18px;
+}
+
+.auth-form label {
+  display: block;
+  font-weight: 700;
+  font-size: 12.5px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--green-800);
+  margin-bottom: 8px;
+}
+
+.auth-form input[type="text"],
+.auth-form input[type="password"],
+.auth-form input[type="email"],
+.auth-form select {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 15px;
+  font-family: var(--sans);
+  color: var(--ink-900);
+  border: 1.5px solid var(--cream-200);
+  border-radius: var(--radius-md);
+  background: var(--cream-50);
+  outline: none;
+  transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+}
+
+.auth-form input:focus,
+.auth-form select:focus {
+  border-color: var(--green-600);
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(58, 122, 75, 0.12);
+}
+
+.auth-form .field-hint {
+  font-size: 12.5px;
+  color: var(--ink-500);
+  margin-top: 6px;
+}
+
+.auth-form .field-error {
+  font-size: 12.5px;
+  color: #b3261e;
+  margin-top: 6px;
+  font-weight: 600;
+}
+
+.auth-form .btn {
+  width: 100%;
+  margin-top: 6px;
+}
+
+.auth-footer {
+  margin-top: 24px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--ink-500);
+}
+
+.auth-footer a {
+  color: var(--green-600);
+  font-weight: 700;
+}
+
+.auth-footer a:hover {
+  color: var(--gold-500);
+}
+
+.auth-alert {
+  background: #fdecea;
+  border: 1px solid rgba(179, 38, 30, 0.25);
+  color: #b3261e;
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  font-size: 13.5px;
+  margin-bottom: 20px;
+}
+
+/* ===== Onboarding ===== */
+.option-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.option-card {
+  position: relative;
+}
+
+.option-card input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.option-card label {
+  display: block;
+  padding: 13px 14px;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--cream-200);
+  background: var(--cream-50);
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--ink-600);
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: pointer;
+  transition: border-color .2s ease, background .2s ease, color .2s ease, box-shadow .2s ease;
+}
+
+.option-card input:checked + label {
+  background: var(--green-900);
+  border-color: var(--green-900);
+  color: var(--gold-400);
+  box-shadow: 0 8px 18px rgba(23, 48, 31, 0.2);
+}
+
+.option-card input:focus-visible + label {
+  outline: 2px solid var(--gold-500);
+  outline-offset: 2px;
+}
+
+.auth-progress {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 22px;
+}
+
+.auth-progress span {
+  height: 4px;
+  flex: 1;
+  border-radius: 999px;
+  background: var(--cream-200);
+}
+
+.auth-progress span.done {
+  background: var(--green-600);
+}
+
+@media (max-width: 520px) {
+  .auth-card {
+    padding: 28px 22px;
+  }
+  .option-grid {
+    grid-template-columns: 1fr;
+  }
+}

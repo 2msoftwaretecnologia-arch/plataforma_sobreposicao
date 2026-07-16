@@ -63,7 +63,17 @@
           <a href="#como-funciona">Como funciona</a>
           <a href="#relatorio">Relatório</a>
         </div>
-        <a href="{% url 'upload_zip_car' %}" class="btn btn-gold">Analisar seu CAR</a>
+        <div class="nav-actions">
+          {% if user.is_authenticated %}
+          <form method="post" action="{% url 'authentication:logout' %}" class="nav-logout-form">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-green">Sair</button>
+          </form>
+          {% else %}
+          <a href="{% url 'authentication:login' %}" class="btn btn-outline-green">Entrar</a>
+          {% endif %}
+          <a href="{% url 'upload_zip_car' %}" class="btn btn-gold">Analisar seu CAR</a>
+        </div>
       </nav>
     </div>
   </div>

@@ -49,7 +49,13 @@
                     <a href="{% url 'landing_page' %}#bases">Bases de dados</a>
                     <a href="{% url 'landing_page' %}#como-funciona">Como funciona</a>
                 </div>
-                <a href="{% url 'upload_zip_car' %}" class="btn btn-outline-green">Nova análise</a>
+                <div class="nav-actions">
+                    <a href="{% url 'upload_zip_car' %}" class="btn btn-outline-green">Nova análise</a>
+                    <form method="post" action="{% url 'authentication:logout' %}" class="nav-logout-form">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-green">Sair</button>
+                    </form>
+                </div>
             </nav>
         </div>
     </div>

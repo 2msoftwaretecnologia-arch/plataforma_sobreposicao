@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.contrib.auth.models import User
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
@@ -104,4 +105,10 @@ def armazenamento_refresh_view(request):
 
 
 def usuarios_view(request):
-    return render(request, 'control_panel/usuarios.html', {'active_nav': 'usuarios'})
+    usuarios = User.objects.select_related('profile').order_by('-date_joined')
+    context = {
+        'active_nav': 'usuarios',
+        'usuarios': usuarios,
+        'total_usuarios': usuarios.count(),
+    }
+    return render(request, 'control_panel/usuarios.html', context)

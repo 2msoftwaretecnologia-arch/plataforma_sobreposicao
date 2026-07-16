@@ -27,6 +27,13 @@
                     Usuários
                 </a>
             </nav>
+            <div class="sidebar-footer">
+                <span class="sidebar-user">{{ user.username }}</span>
+                <form method="post" action="{% url 'authentication:logout' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="sidebar-logout">Sair</button>
+                </form>
+            </div>
         </aside>
 
         <main class="dashboard-content">

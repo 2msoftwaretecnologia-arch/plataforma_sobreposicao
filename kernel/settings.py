@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     'django_celery_results',
     'django_celery_beat',
     'kernel',
+    'authentication',
     'analysis',
     'environmental_layers',
     'car_system',
@@ -82,7 +83,12 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'authentication.middleware.OnboardingRequiredMiddleware',
 ]
+
+LOGIN_URL = 'authentication:login'
+LOGIN_REDIRECT_URL = 'landing_page'
+LOGOUT_REDIRECT_URL = 'landing_page'
 
 ROOT_URLCONF = 'kernel.urls'
 
