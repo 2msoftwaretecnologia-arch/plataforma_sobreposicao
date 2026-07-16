@@ -250,6 +250,13 @@ body { background: var(--cream-50); color: var(--ink-900); }
   border-radius: var(--radius-md);
   background: var(--cream-100);
   border: 1px solid var(--cream-200);
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+
+.summary-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(58, 122, 75, 0.35);
+  box-shadow: 0 12px 26px rgba(36, 31, 20, 0.08);
 }
 
 .summary-label {
@@ -397,10 +404,13 @@ body { background: var(--cream-50); color: var(--ink-900); }
 .overview-chip--toggle {
   cursor: pointer;
   background: #fff;
-  transition: .15s;
+  transition: background .15s ease, transform .15s ease;
 }
 
-.overview-chip--toggle:hover { background: var(--cream-100); }
+.overview-chip--toggle:hover {
+  background: var(--cream-100);
+  transform: translateY(-2px);
+}
 
 .overview-chip--toggle[aria-pressed="true"] {
   background: var(--green-900);
@@ -478,6 +488,12 @@ body { background: var(--cream-50); color: var(--ink-900); }
   flex-direction: column;
   gap: 16px;
   overflow-wrap: break-word;
+  transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+}
+
+.base-card--has-overlap:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 30px rgba(36, 31, 20, 0.08);
 }
 
 .base-card--empty {
@@ -553,6 +569,17 @@ body { background: var(--cream-50); color: var(--ink-900); }
   border: 1px solid var(--cream-200);
   border-radius: var(--radius-md);
   overflow-wrap: break-word;
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+
+.area-item:hover {
+  transform: translateY(-2px);
+  border-color: rgba(58, 122, 75, 0.3);
+  box-shadow: 0 10px 22px rgba(36, 31, 20, 0.07);
+}
+
+.area-item:hover .area-item__icon {
+  transform: scale(1.08);
 }
 
 .area-item__icon {
@@ -564,6 +591,7 @@ body { background: var(--cream-50); color: var(--ink-900); }
   background: var(--green-100);
   border: 1px solid var(--cream-200);
   font-size: 19px;
+  transition: transform .2s ease;
 }
 
 .area-item--critical { border-left: 3px solid var(--critical); }
@@ -628,12 +656,14 @@ body { background: var(--cream-50); color: var(--ink-900); }
   border-radius: 999px;
   cursor: pointer;
   font-family: var(--sans);
+  transition: background .2s ease, border-color .2s ease, color .2s ease, transform .2s ease;
 }
 
 .show-more-btn:hover {
   background: var(--green-900);
   border-color: var(--green-900);
   color: var(--gold-400);
+  transform: translateY(-2px);
 }
 
 /* ===== "Ver no mapa" ===== */
@@ -651,12 +681,14 @@ body { background: var(--cream-50); color: var(--ink-900); }
   border-radius: 999px;
   cursor: pointer;
   font-family: var(--sans);
+  transition: background .2s ease, border-color .2s ease, color .2s ease, transform .2s ease;
 }
 
 .area-item__locate:hover {
   background: var(--green-900);
   border-color: var(--green-900);
   color: var(--gold-400);
+  transform: translateY(-2px);
 }
 
 /* ===== Estado vazio ===== */
@@ -719,13 +751,14 @@ body { background: var(--cream-50); color: var(--ink-900); }
   font-size: 13px;
   color: var(--green-800);
   cursor: pointer;
-  transition: .2s;
+  transition: background .2s ease, border-color .2s ease, color .2s ease, transform .2s ease;
 }
 
 #legend-controls button:hover {
   background: var(--green-900);
   border-color: var(--green-900);
   color: var(--gold-400);
+  transform: translateY(-2px);
 }
 
 #legend-imoveis {
@@ -747,7 +780,12 @@ body { background: var(--cream-50); color: var(--ink-900); }
   font-weight: 600;
   color: var(--ink-900);
   cursor: pointer;
-  transition: opacity .15s;
+  transition: opacity .15s, transform .15s ease, box-shadow .15s ease;
+}
+
+.legend-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(36, 31, 20, 0.1);
 }
 
 .legend-swatch {
@@ -771,6 +809,20 @@ body { background: var(--cream-50); color: var(--ink-900); }
 /* ===== Rodapé ===== */
 .results-footer {
   padding: 40px 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .summary-card,
+  .base-card,
+  .area-item,
+  .area-item__icon,
+  .legend-item,
+  .show-more-btn,
+  .area-item__locate,
+  .overview-chip--toggle,
+  #legend-controls button {
+    transition: none;
+  }
 }
 
 /* ===== Responsivo ===== */

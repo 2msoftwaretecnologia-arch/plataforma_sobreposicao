@@ -321,6 +321,13 @@ h1 em {
   border-radius: 50%;
   background: var(--green-600);
   box-shadow: 0 0 0 3px rgba(58, 122, 75, 0.25);
+  animation: onlinePulse 2.2s ease-out infinite;
+}
+
+@keyframes onlinePulse {
+  0% { box-shadow: 0 0 0 3px rgba(58, 122, 75, 0.25); }
+  70% { box-shadow: 0 0 0 8px rgba(58, 122, 75, 0); }
+  100% { box-shadow: 0 0 0 3px rgba(58, 122, 75, 0); }
 }
 
 .mini-map {
@@ -972,6 +979,7 @@ section { padding: 92px 0; }
 @media (prefers-reduced-motion: reduce) {
   .reveal { opacity: 1; transform: none; transition: none; }
   .plot { animation: none; }
+  .online::before { animation: none; }
 }
 
 /* ===== Responsivo ===== */

@@ -58,7 +58,7 @@
     <header class="hero hero-results">
         <div class="container">
             <div class="hero-grid">
-                <div class="reveal visible">
+                <div class="reveal">
                     <div class="hero-badge">
                         <svg class="ico"><use href="#i-check"/></svg>
                         Consulta concluída
@@ -67,54 +67,54 @@
                     <p class="hero-text">
                         Sobreposições, bases consultadas e mapa interativo da propriedade analisada, organizados para apoio técnico, ambiental e fundiário.
                     </p>
+                </div>
 
-                    {% if municipio or uf %}
-                    <div class="hero-status-row">
-                        {% if municipio %}
-                            <span class="badge badge-strong">
-                                <svg class="ico" style="width:14px;height:14px;margin-right:6px"><use href="#i-pin"/></svg>
-                                {{ municipio }}
-                            </span>
-                        {% endif %}
-                        {% if uf %}
-                            <span class="badge">{{ uf }}</span>
-                        {% endif %}
-                    </div>
+                {% if municipio or uf %}
+                <div class="hero-status-row reveal reveal-delay-1">
+                    {% if municipio %}
+                        <span class="badge badge-strong">
+                            <svg class="ico" style="width:14px;height:14px;margin-right:6px"><use href="#i-pin"/></svg>
+                            {{ municipio }}
+                        </span>
                     {% endif %}
-
-                    {% if resultado or demonstrativo or recibo %}
-                    <div class="hero-actions">
-                        {% if demonstrativo or recibo %}
-                        <button type="button" onclick="printReport()" class="btn btn-gold">
-                            <svg class="ico" style="width:18px;height:18px"><use href="#i-doc"/></svg>
-                            Gerar Relatório
-                        </button>
-                        {% endif %}
-                        {% if resultado %}
-                        <a href="{% url 'download_property_shp' %}" class="btn btn-outline-light">
-                            <svg class="ico" style="width:18px;height:18px"><use href="#i-download"/></svg>
-                            Baixar SHP
-                        </a>
-                        <a href="{% url 'download_property_kml' %}" class="btn btn-outline-light">
-                            <svg class="ico" style="width:18px;height:18px"><use href="#i-download"/></svg>
-                            Baixar KML
-                        </a>
-                        {% endif %}
-                    </div>
-
-                    <script>
-                        function printReport() {
-                            const url = "{% url 'report_print' %}";
-                            const win = window.open(url, '_blank');
-                            if (win) {
-                                win.focus();
-                            } else {
-                                alert('Por favor, permita popups para este site para visualizar o relatório.');
-                            }
-                        }
-                    </script>
+                    {% if uf %}
+                        <span class="badge">{{ uf }}</span>
                     {% endif %}
                 </div>
+                {% endif %}
+
+                {% if resultado or demonstrativo or recibo %}
+                <div class="hero-actions reveal reveal-delay-2">
+                    {% if demonstrativo or recibo %}
+                    <button type="button" onclick="printReport()" class="btn btn-gold">
+                        <svg class="ico" style="width:18px;height:18px"><use href="#i-doc"/></svg>
+                        Gerar Relatório
+                    </button>
+                    {% endif %}
+                    {% if resultado %}
+                    <a href="{% url 'download_property_shp' %}" class="btn btn-outline-light">
+                        <svg class="ico" style="width:18px;height:18px"><use href="#i-download"/></svg>
+                        Baixar SHP
+                    </a>
+                    <a href="{% url 'download_property_kml' %}" class="btn btn-outline-light">
+                        <svg class="ico" style="width:18px;height:18px"><use href="#i-download"/></svg>
+                        Baixar KML
+                    </a>
+                    {% endif %}
+                </div>
+
+                <script>
+                    function printReport() {
+                        const url = "{% url 'report_print' %}";
+                        const win = window.open(url, '_blank');
+                        if (win) {
+                            win.focus();
+                        } else {
+                            alert('Por favor, permita popups para este site para visualizar o relatório.');
+                        }
+                    }
+                </script>
+                {% endif %}
             </div>
         </div>
         <svg class="fence-divider" viewBox="0 0 1440 44" preserveAspectRatio="none" aria-hidden="true">
@@ -133,7 +133,7 @@
         {% endif %}
 
         {% if erro %}
-        <section class="alert">
+        <section class="alert reveal">
             <div class="alert-icon">
                 <svg class="ico" style="width:24px;height:24px"><use href="#i-alert"/></svg>
             </div>
@@ -145,7 +145,7 @@
         {% endif %}
 
         {% if resultado %}
-        <section class="panel">
+        <section class="panel reveal">
             <div class="panel-header">
                 <div>
                     <p class="eyebrow">Resumo da execução</p>
@@ -155,13 +155,13 @@
             </div>
 
             <div class="summary-grid">
-                <div class="summary-card">
+                <div class="summary-card reveal">
                     <p class="summary-label">Áreas com Sobreposição</p>
                     <p class="summary-value">{{ resultado.total_areas_com_sobreposicao }}</p>
                     <p class="summary-detail">Total de intersecções encontradas</p>
                 </div>
 
-                <div class="summary-card">
+                <div class="summary-card reveal reveal-delay-1">
                     <p class="summary-label">Tamanho da Área (ha)</p>
                     <p class="summary-value">
                         {% if resultado.tamanho_area != None %}
@@ -175,7 +175,7 @@
                     <p class="summary-detail">Extensão do polígono analisado</p>
                 </div>
 
-                <div class="summary-card">
+                <div class="summary-card reveal reveal-delay-2">
                     <p class="summary-label">Tempo de Análise</p>
                     <p class="summary-value">
                         {% if resultado.tempo_execucao_formatado %}
@@ -193,7 +193,7 @@
         {% endif %}
 
         {% if resultado and resultado.poligonos_imoveis %}
-        <section class="panel">
+        <section class="panel reveal">
             <div class="panel-header">
                 <div>
                     <p class="eyebrow">Mapa</p>

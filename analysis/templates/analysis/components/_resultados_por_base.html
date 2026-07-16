@@ -54,7 +54,7 @@
 
         {% for base in resultado.resultados_por_base %}
         {% with severity=base.nome_base|base_severity %}
-        <article class="base-card {% if base.areas_encontradas %}base-card--has-overlap base-card--{{ severity }}{% else %}base-card--empty{% endif %}"
+        <article class="base-card reveal {% cycle 'reveal-delay-1' 'reveal-delay-2' 'reveal-delay-3' %} {% if base.areas_encontradas %}base-card--has-overlap base-card--{{ severity }}{% else %}base-card--empty{% endif %}"
                  data-total-area="{{ base.total_area|stringformat:'f' }}"
                  data-nome-base="{{ base.nome_base|lower }}"
                  data-severity="{{ severity }}">
