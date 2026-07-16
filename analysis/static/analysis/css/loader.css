@@ -17,24 +17,30 @@
 
 /* Mensagens rotativas abaixo do hamster, avisando o que está sendo processado */
 .loader-status {
-  max-width: min(90vw, 26rem);
-  padding: 0.65rem 1.4rem;
-  background: #111;
-  border-radius: 1.25rem;
+  width: min(90vw, 26rem);
+  min-height: 2.9em;
+  padding: 0.5rem 1.4rem;
+  background: var(--green-900, #17301f);
+  border: 1px solid var(--green-700, #2b5a38);
+  border-radius: var(--radius-lg, 22px);
+  box-shadow: 0 8px 18px rgba(23, 48, 31, 0.25);
   box-sizing: border-box;
   overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .loader-status__text {
   display: block;
-  color: #956afa;
-  font-family: "Poppins", "Segoe UI", sans-serif;
-  font-weight: 500;
+  color: var(--gold-400, #dba63f);
+  font-family: var(--sans, "Inter", "Segoe UI", sans-serif);
+  font-weight: 600;
   font-size: 0.95rem;
+  line-height: 1.3;
   text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: break-word;
   opacity: 1;
   transform: translateY(0);
   transition: opacity 0.35s ease, transform 0.35s ease;
@@ -43,6 +49,28 @@
 .loader-status__text.is-changing {
   opacity: 0;
   transform: translateY(-8px);
+}
+
+/* Respeita quem prefere menos movimento na tela */
+@media (prefers-reduced-motion: reduce) {
+  .wheel,
+  .hamster,
+  .hamster__head,
+  .hamster__ear,
+  .hamster__eye,
+  .hamster__body,
+  .hamster__limb--fr,
+  .hamster__limb--fl,
+  .hamster__limb--br,
+  .hamster__limb--bl,
+  .hamster__tail,
+  .spoke {
+    animation: none !important;
+  }
+
+  .loader-status__text {
+    transition: none;
+  }
 }
 
 /* From Uiverse.io by Nawsome */ 

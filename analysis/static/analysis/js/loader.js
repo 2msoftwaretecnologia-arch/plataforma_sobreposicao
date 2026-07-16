@@ -33,9 +33,19 @@
         return arr;
     }
 
+    // Reembaralha evitando que a última frase de uma volta se repita
+    // logo na primeira da próxima (senão a caixa "trava" visualmente).
+    function reshuffleAvoidingRepeat(lastMsg) {
+        const next = shuffle(messages);
+        if (next[0] === lastMsg && next.length > 1) {
+            [next[0], next[1]] = [next[1], next[0]];
+        }
+        return next;
+    }
+
     function showNextMessage() {
         if (pointer >= order.length) {
-            order = shuffle(messages);
+            order = reshuffleAvoidingRepeat(order[order.length - 1]);
             pointer = 0;
         }
         const msg = order[pointer++];
@@ -48,15 +58,17 @@
 
     function start() {
         if (intervalId) return;
+        loaderEl.setAttribute('aria-hidden', 'false');
         order = shuffle(messages);
         pointer = 0;
         textEl.textContent = order[pointer++];
-        intervalId = setInterval(showNextMessage, 2200);
+        intervalId = setInterval(showNextMessage, 2600);
     }
 
     function stop() {
         clearInterval(intervalId);
         intervalId = null;
+        loaderEl.setAttribute('aria-hidden', 'true');
     }
 
     const observer = new MutationObserver(function () {
