@@ -26,6 +26,11 @@
                     <span class="sidebar-icon">👤</span>
                     Usuários
                 </a>
+                <a class="sidebar-link {% if active_nav == 'buscas' %}active{% endif %}"
+                   href="{% url 'control_panel:buscas' %}">
+                    <span class="sidebar-icon">🔎</span>
+                    Buscas
+                </a>
                 <a class="sidebar-link {% if active_nav == 'bases_dados' %}active{% endif %}"
                    href="{% url 'control_panel:bases_dados' %}">
                     <span class="sidebar-icon">🗺️</span>

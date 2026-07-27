@@ -89,6 +89,7 @@
                 </div>
                 {% endif %}
 
+                {% if not is_historico %}
                 {% if resultado or demonstrativo or recibo %}
                 <div class="hero-actions reveal reveal-delay-2">
                     {% if demonstrativo or recibo %}
@@ -121,6 +122,7 @@
                     }
                 </script>
                 {% endif %}
+                {% endif %}
             </div>
         </div>
         <svg class="fence-divider" viewBox="0 0 1440 44" preserveAspectRatio="none" aria-hidden="true">
@@ -129,6 +131,25 @@
     </header>
 
     <div class="page">
+
+        {% if is_historico %}
+        <section class="panel reveal">
+            <div class="panel-header">
+                <div>
+                    <p class="eyebrow">Histórico de busca — painel administrativo</p>
+                    <h2 class="panel-title">Busca de {{ historico.user.username|default:"usuário removido" }}</h2>
+                </div>
+                <span class="badge badge-strong">{{ historico.created_at|date:"d/m/Y H:i" }}</span>
+            </div>
+            <p style="margin:0;color:#6b7280;">
+                Tipo: {{ historico.get_search_type_display }}
+                {% if historico.car_input %} • CAR: {{ historico.car_input }}{% endif %}
+            </p>
+            <p style="margin-top:12px;">
+                <a href="{% url 'control_panel:buscas' %}" class="btn btn-outline-green" style="display:inline-block;">&laquo; Voltar para Buscas</a>
+            </p>
+        </section>
+        {% endif %}
 
         {% if demonstrativo %}
             {% include "analysis/components/_demonstrativo_cards.html" %}

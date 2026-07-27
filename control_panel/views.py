@@ -1,10 +1,17 @@
 from django.contrib import messages
 from django.contrib.auth.models import User
+from django.core.paginator import Paginator
+from django.db.models import Q
 from django.http import Http404
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
+from analysis.models import SearchHistory
+from analysis.services.view_services.result_map_formatter import (
+    format_data_map,
+    planet_tiles_url,
+)
 from kernel.utils import reset_db
 
 from . import utils
@@ -119,6 +126,54 @@ def usuarios_view(request):
         'total_usuarios': usuarios.count(),
     }
     return render(request, 'control_panel/usuarios.html', context)
+
+
+def buscas_view(request):
+    buscas_qs = SearchHistory.objects.select_related('user')
+
+    filtro_tipo = request.GET.get('tipo', '').strip()
+    if filtro_tipo:
+        buscas_qs = buscas_qs.filter(search_type=filtro_tipo)
+
+    filtro_erros = request.GET.get('erros') == '1'
+    if filtro_erros:
+        buscas_qs = buscas_qs.filter(sucesso=False)
+
+    busca_texto = request.GET.get('q', '').strip()
+    if busca_texto:
+        buscas_qs = buscas_qs.filter(
+            Q(car_input__icontains=busca_texto)
+            | Q(municipio__icontains=busca_texto)
+            | Q(user__username__icontains=busca_texto)
+        )
+
+    paginator = Paginator(buscas_qs, 25)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    context = {
+        'active_nav': 'buscas',
+        'page_obj': page_obj,
+        'total_buscas': SearchHistory.objects.count(),
+        'total_sucesso': SearchHistory.objects.filter(sucesso=True).count(),
+        'total_erros': SearchHistory.objects.filter(sucesso=False).count(),
+        'search_types': SearchHistory.SearchType.choices,
+        'filtro_tipo': filtro_tipo,
+        'filtro_erros': filtro_erros,
+        'busca_texto': busca_texto,
+    }
+    return render(request, 'control_panel/buscas.html', context)
+
+
+def busca_detalhe_view(request, pk):
+    historico = get_object_or_404(SearchHistory.objects.select_related('user'), pk=pk)
+
+    data = dict(historico.result_data or {})
+    data['planet_tiles_url'] = planet_tiles_url()
+    data = format_data_map(data)
+    data['is_historico'] = True
+    data['historico'] = historico
+
+    return render(request, 'analysis/results.html', data)
 
 
 def _get_base_cfg(modelo):

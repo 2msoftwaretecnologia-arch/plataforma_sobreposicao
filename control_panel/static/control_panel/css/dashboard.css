@@ -401,6 +401,65 @@ body {
     color: #1e40af;
 }
 
+/* Buscas */
+
+.buscas-filtros {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.buscas-filtros input[type="text"],
+.buscas-filtros select {
+    padding: 9px 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    color: #374151;
+}
+
+.buscas-filtros input[type="text"] {
+    min-width: 220px;
+}
+
+.buscas-filtro-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.88rem;
+    color: #374151;
+}
+
+.buscas-limpar-filtro {
+    font-size: 0.85rem;
+    color: #6b7280;
+    text-decoration: underline;
+}
+
+.buscas-ver-link {
+    color: #2563eb;
+    font-weight: 600;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+.buscas-paginacao {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 16px 0 4px;
+    font-size: 0.88rem;
+    color: #374151;
+}
+
+.buscas-paginacao a {
+    color: #2563eb;
+    font-weight: 600;
+}
+
 /* Bases de Dados (SHP) */
 
 .bd-intro {

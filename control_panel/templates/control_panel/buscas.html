@@ -1,0 +1,104 @@
+{% extends 'control_panel/base_dashboard.html' %}
+
+{% block title %}Buscas — Painel Administrativo{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Buscas</h1>
+</div>
+
+<div class="cards-row">
+    <div class="card">
+        <span class="card-label">Total de buscas</span>
+        <span class="card-value">{{ total_buscas }}</span>
+    </div>
+    <div class="card">
+        <span class="card-label">Concluídas com sucesso</span>
+        <span class="card-value">{{ total_sucesso }}</span>
+    </div>
+    <div class="card">
+        <span class="card-label">Com erro</span>
+        <span class="card-value">{{ total_erros }}</span>
+    </div>
+</div>
+
+<form method="get" class="buscas-filtros">
+    <input type="text" name="q" value="{{ busca_texto }}" placeholder="Usuário, CAR ou município...">
+    <select name="tipo">
+        <option value="">Todos os tipos</option>
+        {% for valor, rotulo in search_types %}
+        <option value="{{ valor }}" {% if filtro_tipo == valor %}selected{% endif %}>{{ rotulo }}</option>
+        {% endfor %}
+    </select>
+    <label class="buscas-filtro-checkbox">
+        <input type="checkbox" name="erros" value="1" {% if filtro_erros %}checked{% endif %}>
+        Somente com erro
+    </label>
+    <button type="submit" class="btn-refresh">Filtrar</button>
+    {% if filtro_tipo or filtro_erros or busca_texto %}
+    <a href="{% url 'control_panel:buscas' %}" class="buscas-limpar-filtro">Limpar filtros</a>
+    {% endif %}
+</form>
+
+<div class="card table-card">
+    {% if page_obj %}
+    <div class="table-scroll">
+        <table class="users-table">
+            <thead>
+                <tr>
+                    <th>Usuário</th>
+                    <th>Tipo</th>
+                    <th>CAR / Alvo</th>
+                    <th>Município</th>
+                    <th>Área (ha)</th>
+                    <th>Conflitos</th>
+                    <th>Status</th>
+                    <th>Data</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for busca in page_obj %}
+                <tr>
+                    <td class="users-table-name">{{ busca.user.username|default:"usuário removido" }}</td>
+                    <td>{{ busca.get_search_type_display }}</td>
+                    <td>{{ busca.car_input|default:"—" }}</td>
+                    <td>{{ busca.municipio|default:"—" }}{% if busca.uf %} / {{ busca.uf }}{% endif %}</td>
+                    <td>{% if busca.area_ha != None %}{{ busca.area_ha|floatformat:2 }}{% else %}—{% endif %}</td>
+                    <td>{{ busca.conflitos_count }}</td>
+                    <td>
+                        {% if busca.sucesso %}
+                        <span class="status-badge status-seguro">Sucesso</span>
+                        {% else %}
+                        <span class="status-badge status-lotado">Erro</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ busca.created_at|date:"d/m/Y H:i" }}</td>
+                    <td>
+                        {% if busca.sucesso %}
+                        <a href="{% url 'control_panel:busca_detalhe' busca.pk %}" class="buscas-ver-link">Ver resultado</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if page_obj.has_other_pages %}
+    <div class="buscas-paginacao">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}&tipo={{ filtro_tipo }}&q={{ busca_texto }}{% if filtro_erros %}&erros=1{% endif %}">&laquo; Anterior</a>
+        {% endif %}
+        <span>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}&tipo={{ filtro_tipo }}&q={{ busca_texto }}{% if filtro_erros %}&erros=1{% endif %}">Próxima &raquo;</a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <p class="empty-state">Nenhuma busca encontrada.</p>
+    {% endif %}
+</div>
+{% endblock %}

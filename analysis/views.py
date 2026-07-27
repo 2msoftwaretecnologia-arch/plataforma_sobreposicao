@@ -6,7 +6,6 @@ import zipfile
 from dataclasses import asdict
 
 # Django
-from django.conf import settings
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.views import View
@@ -15,8 +14,13 @@ import geopandas as gpd
 from shapely import wkt as shapely_wkt
 
 # Local apps – analysis
+from analysis.models import SearchHistory
 from analysis.services.analyze_coordinates.search_all import SearchAll
 from analysis.services.analyze_coordinates.search_for_car import SearchForCar
+from analysis.services.view_services.result_map_formatter import (
+    format_data_map,
+    planet_tiles_url,
+)
 from analysis.services.view_services.zip_upload_service import ZipUploadService
 
 # Local apps – car_system / kernel
@@ -31,6 +35,28 @@ from doc_extractor.services.parsers.implement.extract_text.extract_pdf_plumber i
     ExtractDocumentPdfPlumber,
 )
 
+def _save_search_history(request, data, search_type):
+    """Persiste um registro em `SearchHistory` para cada busca executada,
+    para que o painel administrativo possa listar o que os usuários
+    pesquisaram. Não deve nunca quebrar o fluxo de busca do usuário."""
+    try:
+        resultado = data.get('resultado') or {}
+        SearchHistory.objects.create(
+            user=request.user if request.user.is_authenticated else None,
+            search_type=search_type,
+            car_input=data.get('car_input') or '',
+            municipio=data.get('municipio') or '',
+            uf=data.get('uf') or '',
+            area_ha=resultado.get('tamanho_area'),
+            conflitos_count=resultado.get('total_areas_com_sobreposicao') or 0,
+            sucesso=bool(data.get('sucesso')),
+            erro=data.get('erro') or '',
+            result_data=data,
+        )
+    except Exception:
+        pass
+
+
 class HomePageView(View):
     template_name = 'analysis/home.html'
 
@@ -42,8 +68,8 @@ class ResultsPageView(View):
 
     def get(self, request):
         data = request.session.get('last_analysis') or {}
-        data['planet_tiles_url'] = self._planet_tiles_url()
-        data = self._format_data_map(data)
+        data['planet_tiles_url'] = planet_tiles_url()
+        data = format_data_map(data)
         return render(request, self.template_name, data)
 
     def post(self, request):
@@ -76,7 +102,7 @@ class ResultsPageView(View):
                 'uf': uf,
                 'sucesso': True
             }
-            print(data)
+            _save_search_history(request, data, SearchHistory.SearchType.COORDENADAS)
             request.session['last_analysis'] = data
             return redirect('results')
 
@@ -87,6 +113,7 @@ class ResultsPageView(View):
                 'car_input': car_input,
                 'sucesso': False
             }
+            _save_search_history(request, data, SearchHistory.SearchType.COORDENADAS)
             request.session['last_analysis'] = data
             return redirect('results')
 
@@ -95,49 +122,9 @@ class ResultsPageView(View):
             'erro': message,
             'car_input': car_input,
             'sucesso': False,
-            'planet_tiles_url': self._planet_tiles_url()
+            'planet_tiles_url': planet_tiles_url()
         })
 
-    def _planet_tiles_url(self):
-        try:
-            mosaic = getattr(settings, 'PLANET_BASEMAP_MOSAIC', '')
-            key = getattr(settings, 'PLANET_API_KEY', '')
-            if mosaic and key:
-                return f"https://tiles.planet.com/basemaps/v1/planet-tiles/{mosaic}/gmap/{{z}}/{{x}}/{{y}}.png?api_key={key}"
-        except Exception:
-            pass
-        return ''
-
-    def _format_data_map(self, data):
-        resultado = data.get('resultado') or {}
-        alvo_geojson = resultado.get('alvo_geojson')
-        tamanho_area = resultado.get('tamanho_area', 0)
-        poligonos_imoveis = resultado.get('poligonos_imoveis', [])
-
-        if not alvo_geojson:
-            return data
-
-        items = [
-            {
-                "gj": alvo_geojson,
-                "label": "Área da Propriedade",
-                "area": f'{tamanho_area:.4f} ha',
-                "color": "#000000",
-                "fonte": "Área da Propriedade",
-            }
-        ]
-
-        for p in poligonos_imoveis:
-            items.append({
-                "gj": p["polygon_geojson"],
-                "label": p["item_info"],
-                "area": f'{p["area"]:.4f} ha',
-                "color": p["color"],
-                "fonte": p["fonte"],
-            })
-
-        data['map_items'] = items
-        return data
 class ReportPrintView(View):
     template_name = 'analysis/report_print.html'
 
@@ -389,6 +376,11 @@ class UploadZipCarView(View):
                 pass
         return resultado, municipio, state
 
+    _DOC_SEARCH_TYPE = {
+        'demonstrativo': SearchHistory.SearchType.DEMONSTRATIVO,
+        'recibo': SearchHistory.SearchType.RECIBO,
+    }
+
     def _handle_document_upload(self, request, file_obj, doc_type, result_key, car_input, missing_msg, error_prefix, context):
         """Processa upload de documentos (Recibo ou Demonstrativo)."""
         if not file_obj:
@@ -415,14 +407,12 @@ class UploadZipCarView(View):
                 'sucesso': True
             }
 
-            import json
-
-            with open("car_data.json", "w") as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
-
+            _save_search_history(
+                request, data, self._DOC_SEARCH_TYPE.get(result_key, SearchHistory.SearchType.DEMONSTRATIVO)
+            )
             request.session['last_analysis'] = data
             return redirect('results')
-            
+
         except Exception as e:
             context['erro'] = f'{error_prefix}: {str(e)}'
             return render(request, self.template_upload, context)
@@ -439,6 +429,7 @@ class UploadZipCarView(View):
                 'uf': state,
                 'sucesso': True
             }
+            _save_search_history(request, data, SearchHistory.SearchType.CAR)
             request.session['last_analysis'] = data
             return redirect('results')
 
@@ -463,6 +454,7 @@ class UploadZipCarView(View):
                 'uf': uf,
                 'sucesso': True
             }
+            _save_search_history(request, data, SearchHistory.SearchType.SHAPEFILE)
             request.session['last_analysis'] = data
             return redirect('results')
         except Exception as e:
@@ -472,6 +464,7 @@ class UploadZipCarView(View):
                 'car_input': car_input,
                 'sucesso': False
             }
+            _save_search_history(request, data, SearchHistory.SearchType.SHAPEFILE)
             request.session['last_analysis'] = data
             return redirect('results')
 
