@@ -3,7 +3,7 @@ from functools import wraps
 from django.shortcuts import redirect
 from django.urls import path, reverse
 
-from . import views
+from . import custom_layer_views, views
 
 app_name = 'control_panel'
 
@@ -32,5 +32,13 @@ urlpatterns = [
     path('bases-de-dados/', _staff_only(views.bases_dados_view), name='bases_dados'),
     path('bases-de-dados/<str:modelo>/upload/', _staff_only(views.base_upload_view), name='base_upload'),
     path('bases-de-dados/<str:modelo>/processar/', _staff_only(views.base_processar_view), name='base_processar'),
+    path('bases-de-dados/<str:modelo>/colunas/', _staff_only(views.base_toggle_fields_view), name='base_toggle_fields'),
     path('bases-de-dados/<str:modelo>/excluir/', _staff_only(views.base_excluir_view), name='base_excluir'),
+
+    path('bases-de-dados/customizadas/nova/', _staff_only(custom_layer_views.custom_layer_create_view), name='custom_layer_create'),
+    path('bases-de-dados/customizadas/<int:layer_id>/colunas/', _staff_only(custom_layer_views.custom_layer_columns_view), name='custom_layer_columns'),
+    path('bases-de-dados/customizadas/<int:layer_id>/upload/', _staff_only(custom_layer_views.custom_layer_upload_view), name='custom_layer_upload'),
+    path('bases-de-dados/customizadas/<int:layer_id>/processar/', _staff_only(custom_layer_views.custom_layer_importar_view), name='custom_layer_importar'),
+    path('bases-de-dados/customizadas/<int:layer_id>/ativar/', _staff_only(custom_layer_views.custom_layer_ativar_view), name='custom_layer_ativar'),
+    path('bases-de-dados/customizadas/<int:layer_id>/excluir/', _staff_only(custom_layer_views.custom_layer_excluir_view), name='custom_layer_excluir'),
 ]

@@ -75,26 +75,43 @@
             </div>
 
             {% if base.colunas_extraidas %}
-            <div class="table-scroll">
-                <table class="users-table bd-columns-table">
-                    <thead>
-                        <tr>
-                            <th>Coluna original do SHP</th>
-                            <th>Campo no sistema</th>
-                            <th>O que representa</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for coluna in base.colunas_extraidas %}
-                        <tr>
-                            <td><code>{{ coluna.coluna_bd }}</code></td>
-                            <td><code>{{ coluna.campo }}</code></td>
-                            <td>{{ coluna.rotulo }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+            <form method="post" action="{% url 'control_panel:base_toggle_fields' base.modelo %}">
+                {% csrf_token %}
+                <div class="table-scroll">
+                    <table class="users-table bd-columns-table">
+                        <thead>
+                            <tr>
+                                <th>Coluna original do SHP</th>
+                                <th>Campo no sistema</th>
+                                <th>O que representa</th>
+                                <th>No resultado da análise</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for coluna in base.colunas_extraidas %}
+                            <tr>
+                                <td><code>{{ coluna.coluna_bd }}</code></td>
+                                <td><code>{{ coluna.campo }}</code></td>
+                                <td>{{ coluna.rotulo }}</td>
+                                <td>
+                                    {% if coluna.saida %}
+                                    <label class="bd-toggle">
+                                        <input type="checkbox" name="campo_{{ coluna.saida }}" {% if coluna.ativo %}checked{% endif %}>
+                                        Incluir
+                                    </label>
+                                    {% else %}
+                                    <span class="bd-toggle-fixed" title="Esse valor só aparece dentro do texto descritivo (item_info), não como campo separado — não pode ser desligado individualmente.">Sempre no texto descritivo</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if base.tem_colunas_togglable %}
+                <button type="submit" class="btn-processar bd-save-columns">Salvar colunas do resultado</button>
+                {% endif %}
+            </form>
             {% else %}
             <p class="empty-state">Nenhuma coluna do SHP é extraída para esta base — apenas a geometria é usada.</p>
             {% endif %}
@@ -111,6 +128,130 @@
             {% endif %}
         </div>
     </details>
+    {% endfor %}
+</div>
+
+<div class="page-header bd-custom-header">
+    <h2>Bases de Dados Customizadas</h2>
+    <button type="button" class="btn-refresh" onclick="document.getElementById('bd-nova-base-form').classList.toggle('bd-hidden')">
+        + Nova Base
+    </button>
+</div>
+
+<form id="bd-nova-base-form" class="card bd-nova-base bd-hidden" method="post"
+      action="{% url 'control_panel:custom_layer_create' %}" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="bd-nova-base-fields">
+        <label class="bd-field">
+            Nome da base
+            <input type="text" name="nome" placeholder="Ex: Nascentes Municipais" required>
+        </label>
+        <label class="bd-field bd-field-cor">
+            Cor
+            <input type="color" name="cor" value="#607D8B">
+        </label>
+        <label class="bd-field">
+            Arquivo SHP (.zip)
+            <input type="file" name="arquivo" accept=".zip" required>
+        </label>
+    </div>
+    <button type="submit" class="btn-processar">Criar e escolher colunas</button>
+    <p class="bd-manage-hint">Depois de criar, você escolhe quais colunas do arquivo aparecem no resultado da análise, processa os dados e só então ativa a base.</p>
+</form>
+
+<p class="bd-intro">
+    Bases criadas por aqui ficam <strong>desativadas</strong> até você conferir os dados importados e clicar em "Ativar" —
+    só a partir daí elas passam a entrar nas buscas de sobreposição de verdade.
+</p>
+
+<div class="bd-list">
+    {% for item in custom_layers %}
+    <details class="card bd-card">
+        <summary class="bd-summary">
+            <span class="bd-color-dot" style="background: {{ item.layer.cor }};"></span>
+            <span class="bd-nome">{{ item.layer.nome }}</span>
+            <span class="bd-status-badge bd-status-{{ item.status_code }}">{{ item.status_label }}</span>
+            <span class="bd-count-badge">{{ item.total_incluidas }} coluna{{ item.total_incluidas|pluralize }} escolhida{{ item.total_incluidas|pluralize }}</span>
+        </summary>
+
+        <div class="bd-body">
+            <div class="bd-manage">
+                <div class="bd-manage-status">
+                    {% if item.arquivo_nome %}
+                    <span>Arquivo atual: <code>{{ item.arquivo_nome }}</code>{% if item.arquivo_tamanho %} ({{ item.arquivo_tamanho }}){% endif %}</span>
+                    {% else %}
+                    <span class="empty-state">Nenhum arquivo enviado.</span>
+                    {% endif %}
+                </div>
+
+                <div class="bd-manage-actions">
+                    <form class="bd-upload-form" method="post" action="{% url 'control_panel:custom_layer_upload' item.layer.id %}" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <input type="file" name="arquivo" accept=".zip" required>
+                        <button type="submit" class="btn-refresh">Substituir arquivo</button>
+                    </form>
+
+                    <a class="btn-processar bd-link-button" href="{% url 'control_panel:custom_layer_columns' item.layer.id %}">
+                        Configurar colunas
+                    </a>
+
+                    <form method="post" action="{% url 'control_panel:custom_layer_importar' item.layer.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-processar" {% if not item.total_incluidas %}disabled title="Configure ao menos uma coluna antes de processar"{% endif %}>
+                            Processar
+                        </button>
+                    </form>
+
+                    <form method="post" action="{% url 'control_panel:custom_layer_ativar' item.layer.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-processar" {% if not item.total_features %}disabled title="Processe os dados antes de ativar"{% endif %}>
+                            {% if item.layer.ativo %}Desativar{% else %}Ativar{% endif %}
+                        </button>
+                    </form>
+
+                    <form method="post" action="{% url 'control_panel:custom_layer_excluir' item.layer.id %}"
+                          onsubmit="return confirm('Isso vai apagar a base {{ item.layer.nome|escapejs }} por completo (arquivo, colunas e dados importados). Essa ação não pode ser desfeita. Continuar?');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-excluir">Excluir base</button>
+                    </form>
+                </div>
+                <p class="bd-manage-hint">Processar substitui as feições já importadas desta base. Para arquivos grandes pode levar alguns minutos.</p>
+            </div>
+
+            {% if item.colunas %}
+            <div class="table-scroll">
+                <table class="users-table bd-columns-table">
+                    <thead>
+                        <tr>
+                            <th>Coluna original do SHP</th>
+                            <th>Rótulo</th>
+                            <th>No resultado da análise</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for coluna in item.colunas %}
+                        <tr>
+                            <td><code>{{ coluna.coluna_origem }}</code></td>
+                            <td>{{ coluna.rotulo }}</td>
+                            <td>
+                                {% if coluna.incluir %}
+                                <span class="status-badge status-seguro">Incluída</span>
+                                {% else %}
+                                <span class="status-badge status-quase_cheio">Oculta</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="empty-state">Nenhuma coluna configurada ainda — clique em "Configurar colunas".</p>
+            {% endif %}
+        </div>
+    </details>
+    {% empty %}
+    <p class="empty-state">Nenhuma base customizada criada ainda.</p>
     {% endfor %}
 </div>
 {% endblock %}

@@ -8,8 +8,10 @@ from django.views.decorators.http import require_POST
 from kernel.utils import reset_db
 
 from . import utils
-from .bases_config import BASES_CONFIG, get_bases_config
+from .bases_config import BASES_CONFIG, get_bases_config, get_toggleable_fields
+from .column_toggle_service import get_active_map_for_layer, set_field_active
 from .layer_registry import LAYER_REGISTRY
+from .models import CustomLayer
 
 CHART_WIDTH = 640
 CHART_HEIGHT = 200
@@ -153,13 +155,63 @@ def bases_dados_view(request):
             base['status_code'] = 'vazio'
             base['status_label'] = "Sem arquivo e sem dados"
 
+        campos_saida = [c['saida'] for c in base['colunas_extraidas'] if c.get('saida')]
+        estado = get_active_map_for_layer(base['modelo'], campos_saida)
+        # Novas dicts (não mutar os itens de BASES_CONFIG, que são compartilhados
+        # entre requisições) só para anotar o estado ligado/desligado de cada coluna.
+        base['colunas_extraidas'] = [
+            {**coluna, 'ativo': estado.get(coluna['saida']) if coluna.get('saida') else None}
+            for coluna in base['colunas_extraidas']
+        ]
+        base['tem_colunas_togglable'] = len(campos_saida) > 0
+
     context = {
         'active_nav': 'bases_dados',
         'bases': bases,
         'total_bases': len(bases),
         'total_colunas': sum(b['total_colunas'] for b in bases),
+        'custom_layers': _build_custom_layers_context(),
     }
     return render(request, 'control_panel/bases_dados.html', context)
+
+
+def _build_custom_layers_context():
+    custom_layers = []
+    for layer in CustomLayer.objects.all():
+        colunas = list(layer.colunas.all())
+        total_features = layer.features.count()
+
+        if not layer.arquivo:
+            status_code, status_label = 'vazio', "Sem arquivo enviado"
+        elif not colunas:
+            status_code, status_label = 'pendente', "Aguardando definição de colunas"
+        elif total_features == 0:
+            status_code, status_label = 'pendente', "Colunas definidas, aguardando processamento"
+        elif not layer.ativo:
+            status_code, status_label = 'revisao', f"{total_features} feições importadas — aguardando ativação"
+        else:
+            status_code, status_label = 'ok', f"{total_features} feições — ativa nas buscas de sobreposição"
+
+        arquivo_nome, arquivo_tamanho = None, None
+        if layer.arquivo:
+            try:
+                arquivo_nome = layer.arquivo.name.rsplit('/', 1)[-1]
+                arquivo_tamanho = utils.format_bytes(layer.arquivo.size)
+            except (FileNotFoundError, OSError, ValueError):
+                arquivo_nome = layer.arquivo.name.rsplit('/', 1)[-1]
+
+        custom_layers.append({
+            'layer': layer,
+            'colunas': colunas,
+            'total_colunas': len(colunas),
+            'total_incluidas': sum(1 for c in colunas if c.incluir),
+            'total_features': total_features,
+            'status_code': status_code,
+            'status_label': status_label,
+            'arquivo_nome': arquivo_nome,
+            'arquivo_tamanho': arquivo_tamanho,
+        })
+    return custom_layers
 
 
 @require_POST
@@ -204,6 +256,20 @@ def base_processar_view(request, modelo):
         total = model_cls.objects.count()
         messages.success(request, f"\"{base_cfg['nome_base']}\" processada com sucesso — {total} registros importados.")
 
+    return redirect('control_panel:bases_dados')
+
+
+@require_POST
+def base_toggle_fields_view(request, modelo):
+    base_cfg = _get_base_cfg(modelo)
+    togglable = get_toggleable_fields(modelo)
+
+    for campo_cfg in togglable:
+        campo = campo_cfg['saida']
+        ativo = bool(request.POST.get(f'campo_{campo}'))
+        set_field_active(modelo, campo, ativo)
+
+    messages.success(request, f"Colunas do resultado da análise atualizadas para \"{base_cfg['nome_base']}\".")
     return redirect('control_panel:bases_dados')
 
 

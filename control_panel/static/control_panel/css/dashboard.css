@@ -522,6 +522,15 @@ body {
     font-size: 0.82rem;
 }
 
+.bd-columns-table input[type="text"] {
+    font-size: 0.85rem;
+    padding: 6px 8px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    width: 100%;
+    max-width: 260px;
+}
+
 .bd-calculados {
     margin-top: 16px;
 }
@@ -629,4 +638,100 @@ body {
     margin: 12px 0 0;
     font-size: 0.78rem;
     color: #9ca3af;
+}
+
+.bd-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.82rem;
+    color: #374151;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.bd-toggle input {
+    accent-color: #2563eb;
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+}
+
+.bd-toggle-fixed {
+    font-size: 0.78rem;
+    color: #9ca3af;
+    font-style: italic;
+}
+
+.bd-save-columns {
+    margin-top: 12px;
+}
+
+.bd-status-revisao {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+/* Bases de Dados Customizadas */
+
+.bd-custom-header {
+    margin-top: 32px;
+}
+
+.bd-custom-header h2 {
+    font-size: 1.15rem;
+    margin: 0;
+}
+
+.bd-hidden {
+    display: none;
+}
+
+.bd-nova-base {
+    margin-bottom: 20px;
+}
+
+.bd-nova-base-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 14px;
+}
+
+.bd-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 0.82rem;
+    color: #374151;
+    flex: 1;
+    min-width: 200px;
+}
+
+.bd-field input[type="text"],
+.bd-field input[type="file"] {
+    font-size: 0.85rem;
+    padding: 6px 8px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+}
+
+.bd-field-cor {
+    flex: 0 0 auto;
+    min-width: 80px;
+}
+
+.bd-field-cor input[type="color"] {
+    width: 60px;
+    height: 34px;
+    padding: 2px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.bd-link-button {
+    text-decoration: none;
+    display: inline-block;
+    text-align: center;
 }

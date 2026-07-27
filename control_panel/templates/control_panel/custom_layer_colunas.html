@@ -1,0 +1,58 @@
+{% extends 'control_panel/base_dashboard.html' %}
+
+{% block title %}Colunas de {{ layer.nome }} — Painel Administrativo{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Colunas de "{{ layer.nome }}"</h1>
+    <a href="{% url 'control_panel:bases_dados' %}" class="btn-refresh bd-link-button">Voltar para Bases de Dados</a>
+</div>
+
+<p class="bd-intro">
+    Estas são as colunas encontradas no arquivo enviado para esta base. Marque quais devem aparecer
+    no resultado da análise de sobreposição e ajuste o rótulo exibido, se quiser. Depois de salvar,
+    volte para "Bases de Dados" e clique em "Processar".
+</p>
+
+{% if colunas %}
+<form method="post" class="card">
+    {% csrf_token %}
+    <div class="table-scroll">
+        <table class="users-table bd-columns-table">
+            <thead>
+                <tr>
+                    <th>Coluna no arquivo</th>
+                    <th>Rótulo exibido</th>
+                    <th>Incluir no resultado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for coluna in colunas %}
+                <tr>
+                    <td>
+                        <input type="hidden" name="coluna_origem" value="{{ coluna.coluna_origem }}">
+                        <code>{{ coluna.coluna_origem }}</code>
+                        {% if coluna.ausente_no_arquivo %}
+                        <span class="bd-toggle-fixed" title="Essa coluna não foi encontrada no arquivo atual, mas continua salva.">(não está no arquivo atual)</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <input type="text" name="rotulo_{{ coluna.coluna_origem }}" value="{{ coluna.rotulo }}">
+                    </td>
+                    <td>
+                        <label class="bd-toggle">
+                            <input type="checkbox" name="incluir_{{ coluna.coluna_origem }}" {% if coluna.incluir %}checked{% endif %}>
+                            Incluir
+                        </label>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <button type="submit" class="btn-processar bd-save-columns">Salvar colunas</button>
+</form>
+{% else %}
+<p class="empty-state">Não foi possível ler colunas do arquivo enviado. Volte e envie um novo arquivo .zip válido.</p>
+{% endif %}
+{% endblock %}
