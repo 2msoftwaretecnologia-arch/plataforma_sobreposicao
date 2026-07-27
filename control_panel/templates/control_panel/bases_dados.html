@@ -31,6 +31,7 @@
             <span class="bd-color-dot" style="background: {{ base.cor }};"></span>
             <span class="bd-nome">{{ base.nome_base }}</span>
             <span class="bd-tabela">{{ base.tabela }}</span>
+            <span class="bd-status-badge bd-status-{{ base.status_code }}">{{ base.status_label }}</span>
             <span class="bd-count-badge">{{ base.total_colunas }} coluna{{ base.total_colunas|pluralize }} extraída{{ base.total_colunas|pluralize }}</span>
         </summary>
 
@@ -39,6 +40,38 @@
                 <span><strong>Modelo:</strong> {{ base.modelo }}</span>
                 <span><strong>Tabela no banco:</strong> {{ base.tabela }}</span>
                 <span><strong>Upload do SHP:</strong> {{ base.arquivo_upload }}</span>
+            </div>
+
+            <div class="bd-manage">
+                <div class="bd-manage-status">
+                    {% if base.arquivo_nome %}
+                    <span>Arquivo atual: <code>{{ base.arquivo_nome }}</code>{% if base.arquivo_tamanho %} ({{ base.arquivo_tamanho }}){% endif %}</span>
+                    {% else %}
+                    <span class="empty-state">Nenhum arquivo enviado ainda.</span>
+                    {% endif %}
+                </div>
+
+                <div class="bd-manage-actions">
+                    <form class="bd-upload-form" method="post" action="{% url 'control_panel:base_upload' base.modelo %}" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <input type="file" name="arquivo" accept=".zip" required>
+                        <button type="submit" class="btn-refresh">Enviar SHP (.zip)</button>
+                    </form>
+
+                    <form method="post" action="{% url 'control_panel:base_processar' base.modelo %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-processar" {% if not base.arquivo_nome %}disabled title="Envie um arquivo antes de processar"{% endif %}>
+                            Processar / Reimportar
+                        </button>
+                    </form>
+
+                    <form method="post" action="{% url 'control_panel:base_excluir' base.modelo %}"
+                          onsubmit="return confirm('Isso vai apagar TODOS os registros de {{ base.nome_base|escapejs }} e remover o arquivo enviado. Essa ação não pode ser desfeita. Continuar?');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-excluir">Excluir camada</button>
+                    </form>
+                </div>
+                <p class="bd-manage-hint">Processar substitui todos os registros atuais desta base pelos dados do arquivo enviado. Para bases grandes isso pode levar alguns minutos — aguarde a página recarregar.</p>
             </div>
 
             {% if base.colunas_extraidas %}

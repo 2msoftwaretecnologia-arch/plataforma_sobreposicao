@@ -30,4 +30,7 @@ urlpatterns = [
     path('armazenamento/atualizar/', _staff_only(views.armazenamento_refresh_view), name='armazenamento_refresh'),
     path('usuarios/', _staff_only(views.usuarios_view), name='usuarios'),
     path('bases-de-dados/', _staff_only(views.bases_dados_view), name='bases_dados'),
+    path('bases-de-dados/<str:modelo>/upload/', _staff_only(views.base_upload_view), name='base_upload'),
+    path('bases-de-dados/<str:modelo>/processar/', _staff_only(views.base_processar_view), name='base_processar'),
+    path('bases-de-dados/<str:modelo>/excluir/', _staff_only(views.base_excluir_view), name='base_excluir'),
 ]

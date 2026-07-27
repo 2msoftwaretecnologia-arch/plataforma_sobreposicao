@@ -42,7 +42,7 @@ class DeforestationMapbiomasImporter:
         reset_db(DeforestationMapbiomas)
         user = self._get_user()
         archive_path = get_file_management()
-        if not archive_path or not archive_path.snic_total_zip_file.path:
+        if not archive_path or not archive_path.deforestation_mapbiomas_zip_file.path:
             raise ValueError("Nenhum arquivo de Deforestation Mapbiomas foi configurado.")
         df = gpd.read_file(archive_path.deforestation_mapbiomas_zip_file.path)
         for _, row in df.iterrows():

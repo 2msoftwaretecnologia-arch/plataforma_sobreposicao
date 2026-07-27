@@ -1,11 +1,15 @@
 from django.contrib import messages
 from django.contrib.auth.models import User
+from django.http import Http404
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
+from kernel.utils import reset_db
+
 from . import utils
-from .bases_config import get_bases_config
+from .bases_config import BASES_CONFIG, get_bases_config
+from .layer_registry import LAYER_REGISTRY
 
 CHART_WIDTH = 640
 CHART_HEIGHT = 200
@@ -115,8 +119,40 @@ def usuarios_view(request):
     return render(request, 'control_panel/usuarios.html', context)
 
 
+def _get_base_cfg(modelo):
+    base_cfg = next((b for b in BASES_CONFIG if b['modelo'] == modelo), None)
+    if base_cfg is None or modelo not in LAYER_REGISTRY:
+        raise Http404(f"Base '{modelo}' não encontrada.")
+    return base_cfg
+
+
+def _file_info(file_mgmt, field_name):
+    file_field = getattr(file_mgmt, field_name, None) if file_mgmt else None
+    if not file_field:
+        return None, None
+    try:
+        return file_field.name.rsplit('/', 1)[-1], utils.format_bytes(file_field.size)
+    except (FileNotFoundError, OSError, ValueError):
+        return file_field.name.rsplit('/', 1)[-1], None
+
+
 def bases_dados_view(request):
     bases = get_bases_config()
+    file_mgmt = utils.get_file_management()
+    for base in bases:
+        base['total_registros'] = LAYER_REGISTRY[base['modelo']]['model'].objects.count()
+        base['arquivo_nome'], base['arquivo_tamanho'] = _file_info(file_mgmt, base['arquivo_upload'])
+
+        if base['total_registros'] > 0:
+            base['status_code'] = 'ok'
+            base['status_label'] = f"{base['total_registros']} registros importados"
+        elif base['arquivo_nome']:
+            base['status_code'] = 'pendente'
+            base['status_label'] = "Arquivo enviado, aguardando processamento"
+        else:
+            base['status_code'] = 'vazio'
+            base['status_label'] = "Sem arquivo e sem dados"
+
     context = {
         'active_nav': 'bases_dados',
         'bases': bases,
@@ -124,3 +160,67 @@ def bases_dados_view(request):
         'total_colunas': sum(b['total_colunas'] for b in bases),
     }
     return render(request, 'control_panel/bases_dados.html', context)
+
+
+@require_POST
+def base_upload_view(request, modelo):
+    base_cfg = _get_base_cfg(modelo)
+
+    arquivo = request.FILES.get('arquivo')
+    if not arquivo:
+        messages.error(request, "Nenhum arquivo selecionado.")
+        return redirect('control_panel:bases_dados')
+    if not arquivo.name.lower().endswith('.zip'):
+        messages.error(request, "O arquivo precisa ser um .zip contendo o shapefile (.shp, .dbf, .shx, ...).")
+        return redirect('control_panel:bases_dados')
+
+    file_mgmt = utils.get_file_management()
+    if file_mgmt is None:
+        messages.error(request, "Nenhum registro de Gerenciamento de Arquivos existe ainda. Crie um em /admin/ primeiro.")
+        return redirect('control_panel:bases_dados')
+
+    setattr(file_mgmt, base_cfg['arquivo_upload'], arquivo)
+    file_mgmt.save()
+    messages.success(
+        request,
+        f"Arquivo enviado para \"{base_cfg['nome_base']}\". Clique em \"Processar\" para importar os dados."
+    )
+    return redirect('control_panel:bases_dados')
+
+
+@require_POST
+def base_processar_view(request, modelo):
+    base_cfg = _get_base_cfg(modelo)
+    importer_cls = LAYER_REGISTRY[modelo]['importer']
+    model_cls = LAYER_REGISTRY[modelo]['model']
+
+    try:
+        importer_cls(user=request.user).execute()
+    except ValueError as e:
+        messages.error(request, str(e))
+    except Exception as e:
+        messages.error(request, f"Erro ao processar \"{base_cfg['nome_base']}\": {e}")
+    else:
+        total = model_cls.objects.count()
+        messages.success(request, f"\"{base_cfg['nome_base']}\" processada com sucesso — {total} registros importados.")
+
+    return redirect('control_panel:bases_dados')
+
+
+@require_POST
+def base_excluir_view(request, modelo):
+    base_cfg = _get_base_cfg(modelo)
+    model_cls = LAYER_REGISTRY[modelo]['model']
+
+    reset_db(model_cls)
+
+    file_mgmt = utils.get_file_management()
+    if file_mgmt and getattr(file_mgmt, base_cfg['arquivo_upload']):
+        setattr(file_mgmt, base_cfg['arquivo_upload'], None)
+        file_mgmt.save()
+
+    messages.success(
+        request,
+        f"\"{base_cfg['nome_base']}\" excluída: arquivo removido e todos os registros apagados da tabela."
+    )
+    return redirect('control_panel:bases_dados')
