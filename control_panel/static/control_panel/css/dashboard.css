@@ -400,3 +400,127 @@ body {
     background: #dbeafe;
     color: #1e40af;
 }
+
+/* Bases de Dados (SHP) */
+
+.bd-intro {
+    color: #6b7280;
+    font-size: 0.9rem;
+    max-width: 780px;
+    margin: -8px 0 20px;
+}
+
+.bd-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.bd-card {
+    padding: 0;
+    overflow: hidden;
+}
+
+.bd-summary {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    cursor: pointer;
+    list-style: none;
+    font-size: 0.95rem;
+}
+
+.bd-summary::-webkit-details-marker {
+    display: none;
+}
+
+.bd-summary::before {
+    content: "▸";
+    color: #9ca3af;
+    transition: transform 0.15s ease;
+}
+
+.bd-card[open] .bd-summary::before {
+    transform: rotate(90deg);
+}
+
+.bd-color-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.bd-nome {
+    font-weight: 600;
+    color: #111827;
+}
+
+.bd-tabela {
+    font-family: "Consolas", "SFMono-Regular", monospace;
+    font-size: 0.8rem;
+    color: #6b7280;
+}
+
+.bd-count-badge {
+    margin-left: auto;
+    background: #eff6ff;
+    color: #2563eb;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.bd-body {
+    padding: 4px 20px 20px;
+    border-top: 1px solid #f3f4f6;
+}
+
+.bd-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 20px;
+    font-size: 0.82rem;
+    color: #6b7280;
+    margin: 14px 0;
+}
+
+.bd-meta strong {
+    color: #374151;
+}
+
+.bd-columns-table code {
+    background: #f3f4f6;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.82rem;
+}
+
+.bd-calculados {
+    margin-top: 16px;
+}
+
+.bd-calculados-label {
+    display: block;
+    font-size: 0.82rem;
+    color: #6b7280;
+    margin-bottom: 8px;
+}
+
+.bd-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.field-tag {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    color: #374151;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+}

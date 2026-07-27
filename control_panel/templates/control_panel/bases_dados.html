@@ -1,0 +1,83 @@
+{% extends 'control_panel/base_dashboard.html' %}
+
+{% block title %}Bases de Dados — Painel Administrativo{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Bases de Dados (SHP)</h1>
+</div>
+
+<div class="cards-row">
+    <div class="card">
+        <span class="card-label">Total de bases cadastradas</span>
+        <span class="card-value">{{ total_bases }}</span>
+    </div>
+    <div class="card">
+        <span class="card-label">Total de colunas extraídas (todas as bases)</span>
+        <span class="card-value">{{ total_colunas }}</span>
+    </div>
+</div>
+
+<p class="bd-intro">
+    Cada base abaixo corresponde a um shapefile (SHP) importado para o banco de dados.
+    Ao abrir uma base, veja quais colunas do SHP original são efetivamente lidas pela
+    análise de sobreposição, e quais campos são calculados automaticamente (não vêm do arquivo).
+</p>
+
+<div class="bd-list">
+    {% for base in bases %}
+    <details class="card bd-card">
+        <summary class="bd-summary">
+            <span class="bd-color-dot" style="background: {{ base.cor }};"></span>
+            <span class="bd-nome">{{ base.nome_base }}</span>
+            <span class="bd-tabela">{{ base.tabela }}</span>
+            <span class="bd-count-badge">{{ base.total_colunas }} coluna{{ base.total_colunas|pluralize }} extraída{{ base.total_colunas|pluralize }}</span>
+        </summary>
+
+        <div class="bd-body">
+            <div class="bd-meta">
+                <span><strong>Modelo:</strong> {{ base.modelo }}</span>
+                <span><strong>Tabela no banco:</strong> {{ base.tabela }}</span>
+                <span><strong>Upload do SHP:</strong> {{ base.arquivo_upload }}</span>
+            </div>
+
+            {% if base.colunas_extraidas %}
+            <div class="table-scroll">
+                <table class="users-table bd-columns-table">
+                    <thead>
+                        <tr>
+                            <th>Coluna original do SHP</th>
+                            <th>Campo no sistema</th>
+                            <th>O que representa</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for coluna in base.colunas_extraidas %}
+                        <tr>
+                            <td><code>{{ coluna.coluna_bd }}</code></td>
+                            <td><code>{{ coluna.campo }}</code></td>
+                            <td>{{ coluna.rotulo }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="empty-state">Nenhuma coluna do SHP é extraída para esta base — apenas a geometria é usada.</p>
+            {% endif %}
+
+            {% if base.campos_calculados %}
+            <div class="bd-calculados">
+                <span class="bd-calculados-label">Campos calculados automaticamente (não vêm do SHP):</span>
+                <div class="bd-tags">
+                    {% for campo in base.campos_calculados %}
+                    <span class="field-tag">{{ campo }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </details>
+    {% endfor %}
+</div>
+{% endblock %}

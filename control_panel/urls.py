@@ -1,5 +1,7 @@
-from django.contrib.admin.views.decorators import staff_member_required
-from django.urls import path, reverse_lazy
+from functools import wraps
+
+from django.shortcuts import redirect
+from django.urls import path, reverse
 
 from . import views
 
@@ -7,7 +9,19 @@ app_name = 'control_panel'
 
 
 def _staff_only(view):
-    return staff_member_required(view, login_url=reverse_lazy('authentication:login'))
+    """Exige usuário staff. Diferente de `staff_member_required`, não manda um
+    usuário autenticado-mas-sem-permissão de volta para o login: isso criaria
+    um loop infinito, já que `CustomLoginView` (redirect_authenticated_user=True)
+    devolveria esse mesmo usuário para `next` (o próprio painel)."""
+    @wraps(view)
+    def wrapped(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            login_url = f"{reverse('authentication:login')}?next={request.path}"
+            return redirect(login_url)
+        if not (request.user.is_active and request.user.is_staff):
+            return redirect('landing_page')
+        return view(request, *args, **kwargs)
+    return wrapped
 
 
 urlpatterns = [
@@ -15,4 +29,5 @@ urlpatterns = [
     path('armazenamento/', _staff_only(views.armazenamento_view), name='armazenamento'),
     path('armazenamento/atualizar/', _staff_only(views.armazenamento_refresh_view), name='armazenamento_refresh'),
     path('usuarios/', _staff_only(views.usuarios_view), name='usuarios'),
+    path('bases-de-dados/', _staff_only(views.bases_dados_view), name='bases_dados'),
 ]

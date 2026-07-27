@@ -5,6 +5,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from . import utils
+from .bases_config import get_bases_config
 
 CHART_WIDTH = 640
 CHART_HEIGHT = 200
@@ -112,3 +113,14 @@ def usuarios_view(request):
         'total_usuarios': usuarios.count(),
     }
     return render(request, 'control_panel/usuarios.html', context)
+
+
+def bases_dados_view(request):
+    bases = get_bases_config()
+    context = {
+        'active_nav': 'bases_dados',
+        'bases': bases,
+        'total_bases': len(bases),
+        'total_colunas': sum(b['total_colunas'] for b in bases),
+    }
+    return render(request, 'control_panel/bases_dados.html', context)
