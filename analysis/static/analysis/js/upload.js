@@ -1,4 +1,9 @@
 (function () {
+    // Formato oficial do número do CAR: UF (2 letras) + código IBGE do
+    // município (7 dígitos) + hash (32 caracteres hexadecimais), sem pontos.
+    // Ex.: TO-1721000-61FBE1B58B0243E68F515CBD6C2A2CC5
+    const CAR_REGEX = /^[A-Za-z]{2}-\d{7}-[0-9A-Fa-f]{32}$/;
+
     const groupZip = document.getElementById('group_zip');
     const groupCar = document.getElementById('group_car');
     const groupDemo = document.getElementById('group_demo');
@@ -227,17 +232,23 @@
             carInput.value = carInput.value.replace(/\./g, '');
         }
 
+        const carValue = carInput.value.trim();
         const zipSelectedEmpty = mode === 'zip' && (!zipInput.files || zipInput.files.length === 0);
-        const carSelectedEmpty = mode === 'car' && (carInput.value.trim() === '');
+        const carSelectedEmpty = mode === 'car' && carValue === '';
         const carHasDots = mode === 'car' && carInput.value.includes('.'); // Será false se limpo acima
+        const carInvalidFormat = mode === 'car' && carValue !== '' && !CAR_REGEX.test(carValue);
         const demoInvalidPdf = mode === 'demostrativo' && demoInput && demoInput.files && demoInput.files.length > 0 && !isPdf(demoInput.files[0]);
         const reciboInvalidPdf = mode === 'recibo' && reciboInput && reciboInput.files && reciboInput.files.length > 0 && !isPdf(reciboInput.files[0]);
 
-        if (zipSelectedEmpty || carSelectedEmpty || demoInvalidPdf || reciboInvalidPdf || carHasDots) {
+        if (zipSelectedEmpty || carSelectedEmpty || demoInvalidPdf || reciboInvalidPdf || carHasDots || carInvalidFormat) {
             e.preventDefault();
             clientError.style.display = 'block';
             if (carHasDots) {
                 clientError.textContent = '❌ Não é permitido o uso de pontos no número do CAR.';
+            } else if (carSelectedEmpty) {
+                clientError.textContent = '❌ Por favor, informe o número do CAR.';
+            } else if (carInvalidFormat) {
+                clientError.textContent = '❌ Número do CAR inválido. Utilize o formato UF-0000000-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX (sem pontos).';
             } else {
                 clientError.textContent = (demoInvalidPdf || reciboInvalidPdf) ? '❌ Por favor, selecione um arquivo PDF.' : '❌ Por favor, envie um ZIP ou informe o número do CAR.';
             }

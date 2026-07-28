@@ -177,11 +177,13 @@
                                 <div class="form-group" id="group_car">
                                     <label class="field-label" for="car_input">Número do CAR</label>
                                     <input type="text" class="text-input" id="car_input" name="car_input"
-                                        placeholder="Digite o número do CAR"
+                                        placeholder="UF-0000000-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+                                        pattern="[A-Za-z]{2}-[0-9]{7}-[0-9A-Fa-f]{32}"
+                                        title="Formato: UF-0000000-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX (sem pontos)"
                                         value="{% if car_input %}{{ car_input }}{% endif %}">
                                     <div class="note-box car-warning-message">
                                         <svg class="ico"><use href="#i-alert"/></svg>
-                                        <p>Utilize o CAR do <strong>Recibo Federal</strong>. Digite apenas números e letras, <strong>sem pontos</strong>.</p>
+                                        <p>Utilize o CAR do <strong>Recibo Federal</strong>, no formato <strong>UF-0000000-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX</strong>. Digite apenas números e letras, <strong>sem pontos</strong>.</p>
                                     </div>
                                 </div>
 

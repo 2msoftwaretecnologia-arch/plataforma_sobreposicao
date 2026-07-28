@@ -6,6 +6,7 @@ import zipfile
 from dataclasses import asdict
 
 # Django
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import HttpResponse
@@ -25,6 +26,7 @@ from analysis.services.view_services.result_map_formatter import (
     planet_tiles_url,
 )
 from analysis.services.view_services.zip_upload_service import ZipUploadService
+from analysis.validators import validate_car_number
 
 # Local apps – car_system / kernel
 from car_system.utils import get_sicar_record
@@ -369,9 +371,18 @@ class UploadZipCarView(View):
             )
 
         # --------------------------------------
-        # 1) Caso só CAR informado (sem ZIP)
+        # 1) Busca pelo número do CAR (sem ZIP): o número é obrigatório e
+        #    precisa seguir o formato oficial do CAR (ver `analysis/validators.py`).
         # --------------------------------------
-        if not zip_file and car_input:
+        if mode == 'car' or (not zip_file and car_input):
+            try:
+                car_input = validate_car_number(car_input)
+            except ValidationError as e:
+                context['erro'] = e.message
+                context['car_input'] = car_input
+                return render(request, self.template_upload, context)
+
+            context['car_input'] = car_input
             return self._handle_only_car(request, car_input, context)
 
         # --------------------------------------
