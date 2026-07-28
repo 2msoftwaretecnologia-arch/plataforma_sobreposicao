@@ -1,5 +1,8 @@
 import json
 import time
+
+from django.conf import settings
+
 from analysis.services.analyze_coordinates.overlap.final_result_builder import FinalResultBuilder
 from analysis.services.analyze_coordinates.overlap.formatter_register import FormatterRegister
 from analysis.services.analyze_coordinates.overlap.geometry_target import GeometryTarget
@@ -50,13 +53,15 @@ class SearchAll:
         performance["time_total"] = total_seconds
         self._attach_timing_to_output(final_output, performance, total_seconds)
 
-        # 5) Persistir log de performance para depuração
-        self._save_performance_log(performance)
+        # 5) Persistir log de performance para depuração (só em DEBUG: em
+        # produção isso é I/O síncrono por busca, com nome de arquivo fixo
+        # que corrompe sob buscas concorrentes de usuários diferentes).
+        if settings.DEBUG:
+            self._save_performance_log(performance)
+            if final_output:
+                with open("final_output.json", "w") as f:
+                    json.dump(final_output, f, indent=2, ensure_ascii=False)
 
-        if final_output:
-            with open("final_output.json", "w") as f:
-                json.dump(final_output, f, indent=2, ensure_ascii=False)
-                
         return final_output
 
     def _create_target_and_type(self, geometry_or_car):

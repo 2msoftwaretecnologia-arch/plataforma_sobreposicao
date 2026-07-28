@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.postgres',
     'leaflet',
     'django_celery_results',
     'django_celery_beat',
@@ -122,8 +123,23 @@ DATABASES = {
         'PASSWORD': config('DB_PASSWORD'),
         'HOST': config('HOST_BD'),
         'PORT': config('PORT_BD'),
+        # Reaproveita a conexão TCP com o Postgres entre requisições em vez
+        # de abrir/fechar uma a cada request.
+        'CONN_MAX_AGE': config('DB_CONN_MAX_AGE', default=60, cast=int),
+        'CONN_HEALTH_CHECKS': True,
     }
-} 
+}
+
+
+# Cache
+# https://docs.djangoproject.com/en/5.2/topics/cache/
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': config('REDIS_URL', default='redis://127.0.0.1:6379/1'),
+    }
+}
 
 
 # Password validation

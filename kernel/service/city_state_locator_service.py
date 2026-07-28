@@ -4,6 +4,15 @@ from shapely import wkt
 from shapely.geometry import Polygon, MultiPolygon
 from typing import Optional, Tuple
 
+from django.core.cache import cache
+
+# Cidade/UF de um ponto não muda; cachear evita bater no Nominatim (serviço
+# público, ~1 req/s, timeout de 20s) de novo para buscas na mesma região.
+CACHE_TIMEOUT = 60 * 60 * 24 * 30  # 30 dias
+# Arredondar a ~11m de precisão é suficiente para identificar o mesmo
+# município/UF e agrupa buscas vizinhas no mesmo cache.
+COORD_PRECISION = 4
+
 
 class CityStateLocatorService:
     """
@@ -86,6 +95,11 @@ class CityStateLocatorService:
         return point.x, point.y  # lon, lat
 
     def _query_nominatim(self, lat: float, lon: float):
+        cache_key = f"nominatim_reverse:{lat:.{COORD_PRECISION}f}:{lon:.{COORD_PRECISION}f}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+
         params = {
             "lat": lat,
             "lon": lon,
@@ -102,9 +116,12 @@ class CityStateLocatorService:
                 timeout=20
             )
             response.raise_for_status()
-            return response.json()
+            data = response.json()
         except Exception:
             return None
+
+        cache.set(cache_key, data, CACHE_TIMEOUT)
+        return data
 
     def _extract_city(self, data: dict) -> Optional[str]:
         address = data.get("address", {})

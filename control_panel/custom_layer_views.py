@@ -4,6 +4,7 @@ from django.views.decorators.http import require_POST
 
 from .custom_layer_importer import CustomLayerImporter
 from .models import CustomLayer, CustomLayerColumn, CustomLayerFeature
+from .tasks import process_custom_layer_task
 
 
 @require_POST
@@ -101,18 +102,12 @@ def custom_layer_upload_view(request, layer_id):
 def custom_layer_importar_view(request, layer_id):
     layer = get_object_or_404(CustomLayer, id=layer_id)
 
-    try:
-        total = CustomLayerImporter(layer, user=request.user).execute()
-    except ValueError as e:
-        messages.error(request, str(e))
-    except Exception as e:
-        messages.error(request, f"Erro ao processar \"{layer.nome}\": {e}")
-    else:
-        messages.success(
-            request,
-            f"\"{layer.nome}\" processada com sucesso — {total} feições importadas. "
-            f"Confira os dados e clique em \"Ativar\" para ela valer nas buscas de sobreposição."
-        )
+    process_custom_layer_task.delay(layer.id, request.user.id if request.user.is_authenticated else None)
+    messages.success(
+        request,
+        f"Processamento de \"{layer.nome}\" iniciado em segundo plano. "
+        "Atualize esta página em alguns instantes para conferir os dados importados."
+    )
 
     return redirect('control_panel:bases_dados')
 

@@ -23,7 +23,7 @@ class GeometryProcessingService:
     # ============================================================
     # 1) CONVERT WKT → GEOSGeometry
     # ============================================================
-    def convert_wkt_to_geometry(self):
+    def convert_wkt_to_geometry(self, batch_size=500):
         """
         Reads WKT from geometry field and converts it into a
         GEOSGeometry MultiPolygon with SRID=4674.
@@ -34,7 +34,8 @@ class GeometryProcessingService:
         )
 
         count = 0
-        for obj in queryset:
+        pending = []
+        for obj in queryset.iterator(chunk_size=batch_size):
             try:
                 geom = GEOSGeometry(obj.geometry, srid=4674)
 
@@ -42,18 +43,24 @@ class GeometryProcessingService:
                     geom = geom.buffer(0)
 
                 obj.usable_geometry = geom
-                obj.save(update_fields=["usable_geometry"])    
+                pending.append(obj)
                 count += 1
-
             except Exception:
                 continue
+
+            if len(pending) >= batch_size:
+                self.model.objects.bulk_update(pending, ["usable_geometry"], batch_size=batch_size)
+                pending = []
+
+        if pending:
+            self.model.objects.bulk_update(pending, ["usable_geometry"], batch_size=batch_size)
 
         return count
 
     # ============================================================
     # 2) FIX WRONG SRID
     # ============================================================
-    def fix_srid(self):
+    def fix_srid(self, batch_size=500):
         """
         Ensures usable_geometry always has SRID 4674.
         """
@@ -64,20 +71,28 @@ class GeometryProcessingService:
         )
 
         count = 0
-        for obj in queryset:
+        pending = []
+        for obj in queryset.iterator(chunk_size=batch_size):
             try:
                 obj.usable_geometry.srid = 4674
-                obj.save(update_fields=["usable_geometry"])
+                pending.append(obj)
                 count += 1
             except Exception:
                 continue
+
+            if len(pending) >= batch_size:
+                self.model.objects.bulk_update(pending, ["usable_geometry"], batch_size=batch_size)
+                pending = []
+
+        if pending:
+            self.model.objects.bulk_update(pending, ["usable_geometry"], batch_size=batch_size)
 
         return count
 
     # ============================================================
     # 3) CALCULATE AREAS IN UTM ZONE 22S (EPSG:31982)
     # ============================================================
-    def calculate_fixed_areas(self):
+    def calculate_fixed_areas(self, batch_size=500):
         """
         Calculates fixed areas in m² and hectares using
         UTM Zone 22S projection (EPSG:31982).
@@ -85,21 +100,24 @@ class GeometryProcessingService:
         queryset = self.model.objects.exclude(usable_geometry__isnull=True)
 
         count = 0
-        for obj in queryset:
+        pending = []
+        for obj in queryset.iterator(chunk_size=batch_size):
             try:
                 geom_utm = obj.usable_geometry.transform(31982, clone=True)
 
-                area_m2 = geom_utm.area
-                area_ha = area_m2 / 10000
-
-                obj.area_m2 = area_m2
-                obj.area_ha = area_ha
-
-                obj.save(update_fields=["area_m2", "area_ha"])
+                obj.area_m2 = geom_utm.area
+                obj.area_ha = geom_utm.area / 10000
+                pending.append(obj)
                 count += 1
-
             except Exception:
                 continue
+
+            if len(pending) >= batch_size:
+                self.model.objects.bulk_update(pending, ["area_m2", "area_ha"], batch_size=batch_size)
+                pending = []
+
+        if pending:
+            self.model.objects.bulk_update(pending, ["area_m2", "area_ha"], batch_size=batch_size)
 
         return count
 

@@ -6,6 +6,7 @@ from typing import Any, Callable, Dict, List, Optional
 from kernel.service.city_state_locator_service import CityStateLocatorService
 from django.contrib.gis.geos import GEOSGeometry
 from decimal import Decimal, InvalidOperation
+from django.core.cache import cache
 from django.db import models
 from kernel.service.database_maintenance_service import DatabaseMaintenanceService
 
@@ -124,5 +125,27 @@ def parse_decimal_br(valor: str) -> Decimal:
     except InvalidOperation:
         return Decimal("0")
 
+def model_count_cache_key(model) -> str:
+    # `model` costuma ser uma classe de Model Django, mas o pipeline de
+    # sobreposição também passa classes "proxy" dinâmicas para bases
+    # customizadas (ver `control_panel.custom_layer_proxy`), que não têm
+    # `_meta`. `__name__` é único nos dois casos (proxies usam
+    # "CustomLayer__<id>").
+    return f"layer_count:{model.__name__}"
+
+
+def cached_model_count(model: models.Model, timeout: int = 300) -> int:
+    """Conta registros de uma camada com cache curto — usado em telas
+    (bases_dados, resumo_bases) que hoje somam um `count()` por camada a cada
+    carregamento/busca. Invalidado automaticamente por `reset_db`."""
+    key = model_count_cache_key(model)
+    count = cache.get(key)
+    if count is None:
+        count = model.objects.count()
+        cache.set(key, count, timeout)
+    return count
+
+
 def reset_db(model: models.Model):
     DatabaseMaintenanceService().truncate_and_reset(model._meta.db_table, 'public', cascade=True)
+    cache.delete(model_count_cache_key(model))

@@ -115,6 +115,7 @@ class OverlapService:
 
         return {
             "id": obj.id,
+            "instance": obj,
             "intersection_area_m2": inter_area_m2,
             "intersection_area_ha": inter_area_ha,
             "percent_overlap": percent_overlap_target,

@@ -1,7 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -12,13 +12,14 @@ from analysis.services.view_services.result_map_formatter import (
     format_data_map,
     planet_tiles_url,
 )
-from kernel.utils import reset_db
+from kernel.utils import cached_model_count, reset_db
 
 from . import utils
 from .bases_config import BASES_CONFIG, get_bases_config, get_toggleable_fields
 from .column_toggle_service import get_active_map_for_layer, set_field_active
 from .layer_registry import LAYER_REGISTRY
 from .models import CustomLayer
+from .tasks import process_layer_task
 
 CHART_WIDTH = 640
 CHART_HEIGHT = 200
@@ -119,11 +120,15 @@ def armazenamento_refresh_view(request):
 
 
 def usuarios_view(request):
-    usuarios = User.objects.select_related('profile').order_by('-date_joined')
+    usuarios_qs = User.objects.select_related('profile').order_by('-date_joined')
+    paginator = Paginator(usuarios_qs, 25)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
     context = {
         'active_nav': 'usuarios',
-        'usuarios': usuarios,
-        'total_usuarios': usuarios.count(),
+        'usuarios': page_obj,
+        'page_obj': page_obj,
+        'total_usuarios': paginator.count,
     }
     return render(request, 'control_panel/usuarios.html', context)
 
@@ -200,7 +205,7 @@ def bases_dados_view(request):
     bases = get_bases_config()
     file_mgmt = utils.get_file_management()
     for base in bases:
-        base['total_registros'] = LAYER_REGISTRY[base['modelo']]['model'].objects.count()
+        base['total_registros'] = cached_model_count(LAYER_REGISTRY[base['modelo']]['model'])
         base['arquivo_nome'], base['arquivo_tamanho'] = _file_info(file_mgmt, base['arquivo_upload'])
 
         if base['total_registros'] > 0:
@@ -235,9 +240,14 @@ def bases_dados_view(request):
 
 def _build_custom_layers_context():
     custom_layers = []
-    for layer in CustomLayer.objects.all():
+    layers_qs = (
+        CustomLayer.objects
+        .prefetch_related('colunas')
+        .annotate(total_features=Count('features', distinct=True))
+    )
+    for layer in layers_qs:
         colunas = list(layer.colunas.all())
-        total_features = layer.features.count()
+        total_features = layer.total_features
 
         if not layer.arquivo:
             status_code, status_label = 'vazio', "Sem arquivo enviado"
@@ -301,18 +311,13 @@ def base_upload_view(request, modelo):
 @require_POST
 def base_processar_view(request, modelo):
     base_cfg = _get_base_cfg(modelo)
-    importer_cls = LAYER_REGISTRY[modelo]['importer']
-    model_cls = LAYER_REGISTRY[modelo]['model']
 
-    try:
-        importer_cls(user=request.user).execute()
-    except ValueError as e:
-        messages.error(request, str(e))
-    except Exception as e:
-        messages.error(request, f"Erro ao processar \"{base_cfg['nome_base']}\": {e}")
-    else:
-        total = model_cls.objects.count()
-        messages.success(request, f"\"{base_cfg['nome_base']}\" processada com sucesso — {total} registros importados.")
+    process_layer_task.delay(modelo, request.user.id if request.user.is_authenticated else None)
+    messages.success(
+        request,
+        f"Processamento de \"{base_cfg['nome_base']}\" iniciado em segundo plano. "
+        "Atualize esta página em alguns instantes para ver o resultado."
+    )
 
     return redirect('control_panel:bases_dados')
 

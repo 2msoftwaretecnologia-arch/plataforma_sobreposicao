@@ -1,6 +1,7 @@
 from django.contrib.gis.geos import GEOSGeometry
 
 from control_panel.models import CustomLayer
+from kernel.utils import cached_model_count
 
 class FinalResultBuilder:
 
@@ -161,9 +162,13 @@ class FinalResultBuilder:
     def _build_summary_counts(self, layers):
         """
         Calcula o resumo de quantidade total de registros disponíveis por base.
+
+        Usa cache curto (`cached_model_count`, invalidado quando uma base é
+        reprocessada/excluída) — sem isso, toda busca de sobreposição disparava
+        um `COUNT(*)` extra por camada (~16 queries) só para este resumo.
         """
         return {
-            self._base_name(layer): layer.objects.count()
+            self._base_name(layer): cached_model_count(layer)
             for layer in layers
         }
 

@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.contrib.postgres.indexes import GinIndex
 from django.db import models
 
 
@@ -21,7 +22,7 @@ class SearchHistory(models.Model):
         settings.AUTH_USER_MODEL, null=True, blank=True,
         on_delete=models.SET_NULL, related_name='search_history',
     )
-    search_type = models.CharField(max_length=20, choices=SearchType.choices)
+    search_type = models.CharField(max_length=20, choices=SearchType.choices, db_index=True)
     car_input = models.CharField(max_length=100, blank=True, default='')
     municipio = models.CharField(max_length=150, blank=True, default='')
     uf = models.CharField(max_length=2, blank=True, default='')
@@ -37,6 +38,14 @@ class SearchHistory(models.Model):
         verbose_name = "Histórico de Busca"
         verbose_name_plural = "Histórico de Buscas"
         ordering = ['-created_at']
+        indexes = [
+            # `car_input`/`municipio` são filtrados com `icontains` (busca
+            # livre no painel administrativo) — um índice btree comum não
+            # acelera isso; GIN + pg_trgm sim, inclusive para o padrão
+            # `%termo%` (não só prefixo).
+            GinIndex(fields=['car_input'], name='idx_search_car_input_trgm', opclasses=['gin_trgm_ops']),
+            GinIndex(fields=['municipio'], name='idx_search_municipio_trgm', opclasses=['gin_trgm_ops']),
+        ]
 
     def __str__(self):
         alvo = self.car_input or self.municipio or 'busca'
