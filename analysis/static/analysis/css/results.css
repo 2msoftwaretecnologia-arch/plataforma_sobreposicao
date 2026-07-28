@@ -811,6 +811,70 @@ body { background: var(--cream-50); color: var(--ink-900); }
   padding: 40px 0;
 }
 
+/* ===== Meu Histórico ===== */
+.historico-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.historico-filtros input[type="text"],
+.historico-filtros select {
+  padding: 10px 14px;
+  border: 1px solid var(--cream-200);
+  border-radius: 10px;
+  font-family: var(--sans);
+  font-size: 13.5px;
+  color: var(--ink-900);
+  background: #fff;
+}
+
+.historico-filtros input[type="text"] {
+  min-width: 220px;
+}
+
+.historico-limpar-filtro {
+  font-size: 13px;
+  color: var(--ink-500);
+  text-decoration: underline;
+}
+
+.historico-table th,
+.historico-table td {
+  white-space: nowrap;
+  width: auto;
+}
+
+.historico-table tbody tr:hover {
+  background: var(--cream-100);
+}
+
+.historico-ver-link {
+  color: var(--green-700);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.historico-ver-link:hover {
+  text-decoration: underline;
+}
+
+.historico-paginacao {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 18px 0 4px;
+  font-size: 13.5px;
+  color: var(--ink-600);
+}
+
+.historico-paginacao a {
+  color: var(--green-700);
+  font-weight: 700;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .summary-card,
   .base-card,

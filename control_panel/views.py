@@ -172,6 +172,9 @@ def busca_detalhe_view(request, pk):
     data = format_data_map(data)
     data['is_historico'] = True
     data['historico'] = historico
+    data['historico_back_url'] = reverse('control_panel:buscas')
+    data['historico_back_label'] = 'Voltar para Buscas'
+    data['historico_eyebrow'] = 'Histórico de busca — painel administrativo'
 
     return render(request, 'analysis/results.html', data)
 

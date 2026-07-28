@@ -50,6 +50,7 @@
                     <a href="{% url 'landing_page' %}#como-funciona">Como funciona</a>
                 </div>
                 <div class="nav-actions">
+                    <a href="{% url 'historico' %}" class="btn btn-outline-green">Meu histórico</a>
                     <a href="{% url 'upload_zip_car' %}" class="btn btn-outline-green">Nova análise</a>
                     <form method="post" action="{% url 'authentication:logout' %}" class="nav-logout-form">
                         {% csrf_token %}
@@ -136,7 +137,7 @@
         <section class="panel reveal">
             <div class="panel-header">
                 <div>
-                    <p class="eyebrow">Histórico de busca — painel administrativo</p>
+                    <p class="eyebrow">{{ historico_eyebrow|default:"Histórico de busca" }}</p>
                     <h2 class="panel-title">Busca de {{ historico.user.username|default:"usuário removido" }}</h2>
                 </div>
                 <span class="badge badge-strong">{{ historico.created_at|date:"d/m/Y H:i" }}</span>
@@ -145,9 +146,11 @@
                 Tipo: {{ historico.get_search_type_display }}
                 {% if historico.car_input %} • CAR: {{ historico.car_input }}{% endif %}
             </p>
+            {% if historico_back_url %}
             <p style="margin-top:12px;">
-                <a href="{% url 'control_panel:buscas' %}" class="btn btn-outline-green" style="display:inline-block;">&laquo; Voltar para Buscas</a>
+                <a href="{{ historico_back_url }}" class="btn btn-outline-green" style="display:inline-block;">&laquo; {{ historico_back_label|default:"Voltar" }}</a>
             </p>
+            {% endif %}
         </section>
         {% endif %}
 

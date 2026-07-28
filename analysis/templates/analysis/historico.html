@@ -1,0 +1,178 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meu Histórico | TerraView Tocantins</title>
+    <icon type="image/x-icon" href="{% static 'analysis/images/icon_page.svg' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/landing_page.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/results.css' %}">
+</head>
+<body>
+
+    <!-- ===== Definições de ícones SVG ===== -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <defs>
+            <symbol id="i-wheat" viewBox="0 0 24 24"><path d="M12 21V9"/><path d="M12 9c-2.8 0-4.5-1.8-4.5-4.5C10.2 4.5 12 6.2 12 9zM12 9c2.8 0 4.5-1.8 4.5-4.5C13.8 4.5 12 6.2 12 9zM12 14c-2.8 0-4.5-1.8-4.5-4.5 2.7 0 4.5 1.7 4.5 4.5zM12 14c2.8 0 4.5-1.8 4.5-4.5-2.7 0-4.5 1.7-4.5 4.5zM12 19c-2.8 0-4.5-1.8-4.5-4.5 2.7 0 4.5 1.7 4.5 4.5zM12 19c2.8 0 4.5-1.8 4.5-4.5-2.7 0-4.5 1.7-4.5 4.5z"/></symbol>
+            <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2.5"/></symbol>
+            <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.2 12.4 2.5 2.5 5-5.4"/></symbol>
+            <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4 2.8 19.6h18.4z"/><path d="M12 10v4.4M12 17.1v.1"/></symbol>
+            <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></symbol>
+        </defs>
+    </svg>
+
+    <!-- ===== Navegação ===== -->
+    <div class="topbar">
+        <div class="container">
+            <nav class="nav">
+                <a href="{% url 'landing_page' %}" class="brand">
+                    <div class="brand-mark">
+                        <svg class="ico"><use href="#i-wheat"/></svg>
+                    </div>
+                    <div>
+                        <div class="brand-title">TerraView Tocantins</div>
+                        <div class="brand-subtitle">Geoanálise rural inteligente</div>
+                    </div>
+                </a>
+                <div class="nav-links">
+                    <a href="{% url 'landing_page' %}#funcionalidades">Funcionalidades</a>
+                    <a href="{% url 'landing_page' %}#bases">Bases de dados</a>
+                    <a href="{% url 'landing_page' %}#como-funciona">Como funciona</a>
+                </div>
+                <div class="nav-actions">
+                    <a href="{% url 'upload_zip_car' %}" class="btn btn-outline-green">Nova análise</a>
+                    <form method="post" action="{% url 'authentication:logout' %}" class="nav-logout-form">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-green">Sair</button>
+                    </form>
+                </div>
+            </nav>
+        </div>
+    </div>
+
+    <!-- ===== Hero ===== -->
+    <header class="hero hero-results">
+        <div class="container">
+            <div class="hero-grid">
+                <div class="reveal">
+                    <div class="hero-badge">
+                        <svg class="ico"><use href="#i-clock"/></svg>
+                        Meu histórico
+                    </div>
+                    <h1>Bases de dados que você já <em>pesquisou</em>.</h1>
+                    <p class="hero-text">
+                        Acompanhe todas as análises que você já executou nesta conta: tipo de busca, município, área e o resultado obtido em cada uma.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <svg class="fence-divider" viewBox="0 0 1440 44" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M0 44 L0 30 Q 360 8 720 22 T 1440 18 L1440 44 Z" fill="#fbf8f0"/>
+        </svg>
+    </header>
+
+    <div class="page">
+
+        <section class="panel reveal">
+            <div class="panel-header">
+                <div>
+                    <p class="eyebrow">Histórico de busca</p>
+                    <h2 class="panel-title">Minhas buscas</h2>
+                </div>
+                <span class="badge badge-strong">{{ total_buscas }} busca{{ total_buscas|pluralize }}</span>
+            </div>
+
+            <form method="get" class="historico-filtros">
+                <input type="text" name="q" value="{{ busca_texto }}" placeholder="CAR ou município...">
+                <select name="tipo">
+                    <option value="">Todos os tipos</option>
+                    {% for valor, rotulo in search_types %}
+                    <option value="{{ valor }}" {% if filtro_tipo == valor %}selected{% endif %}>{{ rotulo }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="ghost-button ghost-button--small">
+                    <svg class="ico" style="width:16px;height:16px"><use href="#i-search"/></svg>
+                    Filtrar
+                </button>
+                {% if filtro_tipo or busca_texto %}
+                <a href="{% url 'historico' %}" class="historico-limpar-filtro">Limpar filtros</a>
+                {% endif %}
+            </form>
+
+            {% if page_obj %}
+            <div class="table-scroll">
+                <table class="data-table historico-table">
+                    <thead>
+                        <tr>
+                            <th>Tipo</th>
+                            <th>CAR / Alvo</th>
+                            <th>Município</th>
+                            <th>Área (ha)</th>
+                            <th>Conflitos</th>
+                            <th>Status</th>
+                            <th>Data</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for busca in page_obj %}
+                        <tr>
+                            <td>{{ busca.get_search_type_display }}</td>
+                            <td>{{ busca.car_input|default:"—" }}</td>
+                            <td>{{ busca.municipio|default:"—" }}{% if busca.uf %} / {{ busca.uf }}{% endif %}</td>
+                            <td>{% if busca.area_ha != None %}{{ busca.area_ha|floatformat:2 }}{% else %}—{% endif %}</td>
+                            <td>{{ busca.conflitos_count }}</td>
+                            <td>
+                                {% if busca.sucesso %}
+                                <span class="pill">Sucesso</span>
+                                {% else %}
+                                <span class="pill pill--critical">Erro</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ busca.created_at|date:"d/m/Y H:i" }}</td>
+                            <td>
+                                {% if busca.sucesso %}
+                                <a href="{% url 'historico_detalhe' busca.pk %}" class="historico-ver-link">Ver resultado</a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if page_obj.has_other_pages %}
+            <div class="historico-paginacao">
+                {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}&tipo={{ filtro_tipo }}&q={{ busca_texto }}">&laquo; Anterior</a>
+                {% endif %}
+                <span>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}&tipo={{ filtro_tipo }}&q={{ busca_texto }}">Próxima &raquo;</a>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            {% elif total_buscas == 0 %}
+            <p class="empty-state">Você ainda não realizou nenhuma busca. <a href="{% url 'upload_zip_car' %}">Comece uma análise agora</a>.</p>
+            {% else %}
+            <p class="empty-state">Nenhuma busca encontrada para os filtros aplicados. <a href="{% url 'historico' %}">Limpar filtros</a>.</p>
+            {% endif %}
+        </section>
+
+    </div>
+
+    <!-- ===== Rodapé ===== -->
+    <footer class="site-footer">
+        <div class="container">
+            TerraView Tocantins &copy; 2026 &mdash; Análise geoambiental e fundiária para imóveis rurais no Tocantins.
+        </div>
+    </footer>
+
+    <script src="{% static 'analysis/js/landing_page.js' %}"></script>
+</body>
+</html>

@@ -6,8 +6,11 @@ import zipfile
 from dataclasses import asdict
 
 # Django
+from django.core.paginator import Paginator
+from django.db.models import Q
 from django.http import HttpResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views import View
 
 import geopandas as gpd
@@ -124,6 +127,54 @@ class ResultsPageView(View):
             'sucesso': False,
             'planet_tiles_url': planet_tiles_url()
         })
+
+class HistoricoView(View):
+    """Lista as buscas que o próprio usuário logado já realizou."""
+    template_name = 'analysis/historico.html'
+
+    def get(self, request):
+        historico_qs = SearchHistory.objects.filter(user=request.user)
+
+        filtro_tipo = request.GET.get('tipo', '').strip()
+        if filtro_tipo:
+            historico_qs = historico_qs.filter(search_type=filtro_tipo)
+
+        busca_texto = request.GET.get('q', '').strip()
+        if busca_texto:
+            historico_qs = historico_qs.filter(
+                Q(car_input__icontains=busca_texto) | Q(municipio__icontains=busca_texto)
+            )
+
+        paginator = Paginator(historico_qs, 10)
+        page_obj = paginator.get_page(request.GET.get('page'))
+
+        context = {
+            'page_obj': page_obj,
+            'total_buscas': SearchHistory.objects.filter(user=request.user).count(),
+            'search_types': SearchHistory.SearchType.choices,
+            'filtro_tipo': filtro_tipo,
+            'busca_texto': busca_texto,
+        }
+        return render(request, self.template_name, context)
+
+
+class HistoricoDetalheView(View):
+    """Reabre o resultado de uma busca do próprio usuário logado."""
+
+    def get(self, request, pk):
+        historico = get_object_or_404(SearchHistory, pk=pk, user=request.user)
+
+        data = dict(historico.result_data or {})
+        data['planet_tiles_url'] = planet_tiles_url()
+        data = format_data_map(data)
+        data['is_historico'] = True
+        data['historico'] = historico
+        data['historico_back_url'] = reverse('historico')
+        data['historico_back_label'] = 'Voltar para Meu Histórico'
+        data['historico_eyebrow'] = 'Histórico de busca'
+
+        return render(request, 'analysis/results.html', data)
+
 
 class ReportPrintView(View):
     template_name = 'analysis/report_print.html'

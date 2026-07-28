@@ -65,6 +65,7 @@
         </div>
         <div class="nav-actions">
           {% if user.is_authenticated %}
+          <a href="{% url 'historico' %}" class="btn btn-outline-green">Meu histórico</a>
           <form method="post" action="{% url 'authentication:logout' %}" class="nav-logout-form">
             {% csrf_token %}
             <button type="submit" class="btn btn-outline-green">Sair</button>
