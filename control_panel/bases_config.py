@@ -85,6 +85,19 @@ BASES_CONFIG = [
         "campos_calculados": ["Área de interseção (ha)", "Texto descritivo", "Geometria da interseção"],
     },
     {
+        "modelo": "DeclaredHydrography",
+        "nome_base": "Base de Dados de Hidrografia Declarada",
+        "tabela": "tb_hidrografia_declarada",
+        "arquivo_upload": "hydrography_zip_file",
+        "cor": "#0288D1",
+        "colunas_extraidas": [
+            {"campo": "category_source", "coluna_bd": "nom_tema", "rotulo": "Categoria do Recurso", "saida": "categoria"},
+            {"campo": "car_number", "coluna_bd": "cod_imovel", "rotulo": "Número do CAR", "saida": None},
+            {"campo": "pending", "coluna_bd": "des_condic", "rotulo": "Pendentes de Declaração", "saida": "pendencia"},
+        ],
+        "campos_calculados": ["Área de interseção (ha)", "Texto descritivo", "Geometria da interseção"],
+    },
+    {
         "modelo": "Quilombolas",
         "nome_base": "Base de Dados de Quilombolas",
         "tabela": "tb_area_quilombolas",

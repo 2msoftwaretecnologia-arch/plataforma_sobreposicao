@@ -177,6 +177,7 @@ class FinalResultBuilder:
         """
         mapping = {
             "SicarRecord": "Base de Dados Sicar",
+            "DeclaredHydrography": "Base de Dados de Hidrografia Declarada",
             "ZoningArea": "Base de Dados de Zoneamento",
             "PhytoecologyArea": "Base de Dados de Fitoecologias",
             "EnvironmentalProtectionArea": "Base de Dados de APAs",
@@ -198,6 +199,7 @@ class FinalResultBuilder:
     def _base_color(self, layer):
         mapping = {
             "SicarRecord": "#efff00",
+            "DeclaredHydrography": "#0288D1",
             "ZoningArea": "#F57C00",
             "PhytoecologyArea": "#6A1B9A",
             "EnvironmentalProtectionArea": "#C62828",

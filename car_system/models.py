@@ -34,3 +34,40 @@ class SicarRecord(GeoBaseModel):
 
     def __str__(self):
         return self.car_number
+    
+
+class DeclaredHydrography(GeoBaseModel):
+    category_source = models.CharField(
+        max_length=100, 
+        verbose_name="Categoria do Recurso", 
+        db_column='nom_tema'
+    )
+    
+    car_number = models.CharField(
+        max_length=50, 
+        verbose_name="Número do CAR", 
+        db_column='cod_imovel'
+    )
+
+    pending = models.CharField(
+        max_length=100,
+        verbose_name="Pendentes de Declaração",
+        db_column='des_condic'
+    )
+    
+    hash_id = models.CharField(
+        max_length=64, 
+        verbose_name="Hash ID", 
+        db_column='hash_id', 
+        unique=True, 
+        null=True, 
+        blank=True
+    )
+   
+    class Meta:
+        db_table = 'tb_hidrografia_declarada'
+        verbose_name = "hidrográfia declarada"
+        verbose_name_plural = "hidrográfias declaradas"
+
+    def __str__(self):
+        return self.category_source

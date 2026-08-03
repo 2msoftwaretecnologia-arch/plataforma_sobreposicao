@@ -1,7 +1,7 @@
 import geopandas as gpd
 from django.contrib.auth.models import User
 from django.contrib.gis.geos import GEOSGeometry
-from django.db import transaction
+from django.db import connection, transaction
 
 from control_panel.utils import get_file_management
 from kernel.utils import reset_db
@@ -106,6 +106,16 @@ class BulkShapefileImporter:
                     continue
                 seen_keys.add(key)
             instances.append(self._build_instance(row, user))
+
+        # Bases grandes (dezenas/centenas de milhares de linhas) podem levar
+        # minutos só para montar as instâncias em memória, e nesse meio-tempo
+        # a conexão com o banco (aberta desde o início do processo) pode cair
+        # por timeout de rede/idle. `close_if_unusable_or_obsolete` não é
+        # suficiente aqui: se a conexão ficou "meio aberta" (o outro lado
+        # derrubou sem enviar FIN, comum atrás de NAT/firewall), o ping de
+        # usabilidade trava esperando resposta em vez de detectar a falha —
+        # por isso fechamos incondicionalmente para forçar reconexão.
+        connection.close()
 
         reset_db(self.model)
 

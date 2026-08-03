@@ -18,8 +18,9 @@ class FileManagementAdmin(admin.ModelAdmin):
         'deforestation_mapbiomas_zip_file',
         'adm_embargos_ibama_a_zip_file',
         'prodes_zip_file',
+        'hydrography_zip_file',
     )
-    
+
     list_display_links = (
         'phytoecology_zip_file',
         'environmental_protection_zip_file',
@@ -35,8 +36,9 @@ class FileManagementAdmin(admin.ModelAdmin):
         'deforestation_mapbiomas_zip_file',
         'adm_embargos_ibama_a_zip_file',
         'prodes_zip_file',
+        'hydrography_zip_file',
     )
-    
+
     search_fields = (
         'phytoecology_zip_file',
         'environmental_protection_zip_file',
@@ -52,8 +54,9 @@ class FileManagementAdmin(admin.ModelAdmin):
         'deforestation_mapbiomas_zip_file',
         'adm_embargos_ibama_a_zip_file',
         'prodes_zip_file',
+        'hydrography_zip_file',
     )
-    
+
     def has_add_permission(self, request):
         return not FileManagement.objects.exists()
 

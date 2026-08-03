@@ -19,6 +19,7 @@ _BASE_ICONS = (
     ("CAR", "📄"),
     ("Fitoecologias", "🌳"),
     ("Veredas", "💧"),
+    ("Hidrografia", "💧"),
     ("IPUCA", "🌱"),
     ("Unidades de Conservação", "🏞️"),
     ("SNIC", "🏭"),
@@ -55,6 +56,7 @@ _BASE_SEVERITY = (
     ("Quilombolas", "warning"),
     ("Unidades de Conservação", "warning"),
     ("Veredas", "warning"),
+    ("Hidrografia", "warning"),
     ("IPUCA", "warning"),
     ("Assentamentos", "warning"),
 )
