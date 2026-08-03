@@ -126,11 +126,6 @@ def parse_decimal_br(valor: str) -> Decimal:
         return Decimal("0")
 
 def model_count_cache_key(model) -> str:
-    # `model` costuma ser uma classe de Model Django, mas o pipeline de
-    # sobreposição também passa classes "proxy" dinâmicas para bases
-    # customizadas (ver `control_panel.custom_layer_proxy`), que não têm
-    # `_meta`. `__name__` é único nos dois casos (proxies usam
-    # "CustomLayer__<id>").
     return f"layer_count:{model.__name__}"
 
 

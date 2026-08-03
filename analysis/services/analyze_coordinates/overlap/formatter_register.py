@@ -28,8 +28,6 @@ from seplan.services.formatter.ipuca import IpucaFormatter
 from seplan.services.formatter.Highways import HighwaysFormatter
 
 from control_panel.column_toggle_service import get_disabled_fields_map
-from control_panel.custom_layer_formatter import CustomLayerFormatter
-from control_panel.custom_layer_proxy import build_active_layer_proxies
 
 # Chaves estruturais do resultado: sempre presentes, nunca podem ser
 # desligadas pelo painel de "Colunas do Resultado da Análise" (área/geometria
@@ -88,11 +86,6 @@ class FormatterRegister:
             model: _ColumnFilteredFormatter(formatter, disabled_map.get(model.__name__, set()))
             for model, formatter in raw_formatters.items()
         }
-
-        # Bases customizadas (criadas pelo painel, sem Model/Formatter fixos)
-        # que o usuário já ativou explicitamente após revisar os dados importados.
-        for proxy, custom_layer in build_active_layer_proxies():
-            self._formatters[proxy] = CustomLayerFormatter(custom_layer)
 
     @property
     def formatters(self):

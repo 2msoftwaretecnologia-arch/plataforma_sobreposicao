@@ -1,6 +1,5 @@
 from django.contrib.gis.geos import GEOSGeometry
 
-from control_panel.models import CustomLayer
 from kernel.utils import cached_model_count
 
 class FinalResultBuilder:
@@ -194,27 +193,7 @@ class FinalResultBuilder:
             "Ipuca": "Base de Dados IPUCA",
             "Prodes": "Base de Dados Prodes",
         }
-        if layer.__name__ in mapping:
-            return mapping[layer.__name__]
-        custom_layer = self._get_custom_layer(layer)
-        return custom_layer.nome if custom_layer else layer.__name__
-
-    def _get_custom_layer(self, layer):
-        """Resolve uma camada customizada (criada no painel "Bases de Dados",
-        ver `control_panel.custom_layer_proxy`) a partir do `__name__` do
-        proxy usado no pipeline. Retorna None para as camadas fixas."""
-        if not hasattr(self, "_custom_layer_cache"):
-            self._custom_layer_cache = {}
-        if layer.__name__ not in self._custom_layer_cache:
-            self._custom_layer_cache[layer.__name__] = None
-            if layer.__name__.startswith("CustomLayer__"):
-                try:
-                    layer_id = int(layer.__name__.split("__", 1)[1])
-                except (ValueError, IndexError):
-                    layer_id = None
-                if layer_id is not None:
-                    self._custom_layer_cache[layer.__name__] = CustomLayer.objects.filter(id=layer_id).first()
-        return self._custom_layer_cache[layer.__name__]
+        return mapping.get(layer.__name__, layer.__name__)
 
     def _base_color(self, layer):
         mapping = {
@@ -235,7 +214,4 @@ class FinalResultBuilder:
             "Ipuca": "#673AB7",
             "Prodes": "#D84315",
         }
-        if layer.__name__ in mapping:
-            return mapping[layer.__name__]
-        custom_layer = self._get_custom_layer(layer)
-        return custom_layer.cor if custom_layer else "#9E9E9E"
+        return mapping.get(layer.__name__, "#9E9E9E")

@@ -1,7 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.core.paginator import Paginator
-from django.db.models import Count, Q
+from django.db.models import Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -18,7 +18,6 @@ from . import utils
 from .bases_config import BASES_CONFIG, get_bases_config, get_toggleable_fields
 from .column_toggle_service import get_active_map_for_layer, set_field_active
 from .layer_registry import LAYER_REGISTRY
-from .models import CustomLayer
 from .tasks import process_layer_task
 
 CHART_WIDTH = 640
@@ -233,53 +232,8 @@ def bases_dados_view(request):
         'bases': bases,
         'total_bases': len(bases),
         'total_colunas': sum(b['total_colunas'] for b in bases),
-        'custom_layers': _build_custom_layers_context(),
     }
     return render(request, 'control_panel/bases_dados.html', context)
-
-
-def _build_custom_layers_context():
-    custom_layers = []
-    layers_qs = (
-        CustomLayer.objects
-        .prefetch_related('colunas')
-        .annotate(total_features=Count('features', distinct=True))
-    )
-    for layer in layers_qs:
-        colunas = list(layer.colunas.all())
-        total_features = layer.total_features
-
-        if not layer.arquivo:
-            status_code, status_label = 'vazio', "Sem arquivo enviado"
-        elif not colunas:
-            status_code, status_label = 'pendente', "Aguardando definição de colunas"
-        elif total_features == 0:
-            status_code, status_label = 'pendente', "Colunas definidas, aguardando processamento"
-        elif not layer.ativo:
-            status_code, status_label = 'revisao', f"{total_features} feições importadas — aguardando ativação"
-        else:
-            status_code, status_label = 'ok', f"{total_features} feições — ativa nas buscas de sobreposição"
-
-        arquivo_nome, arquivo_tamanho = None, None
-        if layer.arquivo:
-            try:
-                arquivo_nome = layer.arquivo.name.rsplit('/', 1)[-1]
-                arquivo_tamanho = utils.format_bytes(layer.arquivo.size)
-            except (FileNotFoundError, OSError, ValueError):
-                arquivo_nome = layer.arquivo.name.rsplit('/', 1)[-1]
-
-        custom_layers.append({
-            'layer': layer,
-            'colunas': colunas,
-            'total_colunas': len(colunas),
-            'total_incluidas': sum(1 for c in colunas if c.incluir),
-            'total_features': total_features,
-            'status_code': status_code,
-            'status_label': status_label,
-            'arquivo_nome': arquivo_nome,
-            'arquivo_tamanho': arquivo_tamanho,
-        })
-    return custom_layers
 
 
 @require_POST

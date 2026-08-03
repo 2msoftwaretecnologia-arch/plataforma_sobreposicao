@@ -33,31 +33,3 @@ def process_layer_task(self, modelo, user_id=None):
         return {"ok": False, "error": str(exc)}
 
     return {"ok": True, "total": total}
-
-
-@shared_task(bind=True)
-def process_custom_layer_task(self, layer_id, user_id=None):
-    """Mesma ideia de `process_layer_task`, mas para bases customizadas
-    criadas pelo painel (`CustomLayer` / `CustomLayerImporter`)."""
-    from django.contrib.auth import get_user_model
-
-    from .custom_layer_importer import CustomLayerImporter
-    from .models import CustomLayer
-
-    layer = CustomLayer.objects.filter(pk=layer_id).first()
-    if layer is None:
-        logger.error("CustomLayer id=%s não encontrada.", layer_id)
-        return {"ok": False, "error": "Base customizada não encontrada."}
-
-    user = None
-    if user_id is not None:
-        User = get_user_model()
-        user = User.objects.filter(pk=user_id).first()
-
-    try:
-        total = CustomLayerImporter(layer, user=user).execute()
-    except Exception as exc:
-        logger.exception("Falha ao processar base customizada '%s'.", layer.nome)
-        return {"ok": False, "error": str(exc)}
-
-    return {"ok": True, "total": total}
