@@ -1,6 +1,25 @@
 version: "3.9"
 
 services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: overlay-db
+    environment:
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - overlay-db-data:/var/lib/postgresql/data
+    # Só no próprio servidor (use um túnel SSH para acessar da sua máquina).
+    ports:
+      - "127.0.0.1:${OVERLAY_DB_PORT:-5433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   rabbitmq:
     image: rabbitmq:3.13-management
     container_name: overlay-rabbitmq
@@ -44,6 +63,8 @@ services:
       - DJANGO_SETTINGS_MODULE=kernel.settings
       - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
       - CELERY_RESULT_BACKEND=django-db
+      - HOST_BD=db
+      - PORT_BD=5432
       - REDIS_URL=redis://redis:6379/1
       - GDAL_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/libgdal.so
       - GEOS_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/libgeos_c.so
@@ -58,6 +79,8 @@ services:
       retries: 5
       start_period: 20s
     depends_on:
+      db:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
       redis:
@@ -76,12 +99,16 @@ services:
       - DJANGO_SETTINGS_MODULE=kernel.settings
       - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
       - CELERY_RESULT_BACKEND=django-db
+      - HOST_BD=db
+      - PORT_BD=5432
       - REDIS_URL=redis://redis:6379/1
       - GDAL_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/libgdal.so
       - GEOS_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/libgeos_c.so
     env_file:
       - .env
     depends_on:
+      db:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
       redis:
@@ -100,12 +127,16 @@ services:
       - DJANGO_SETTINGS_MODULE=kernel.settings
       - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
       - CELERY_RESULT_BACKEND=django-db
+      - HOST_BD=db
+      - PORT_BD=5432
       - REDIS_URL=redis://redis:6379/1
       - GDAL_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/libgdal.so
       - GEOS_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/libgeos_c.so
     env_file:
       - .env
     depends_on:
+      db:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
       redis:
@@ -127,3 +158,6 @@ services:
       app:
         condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  overlay-db-data:

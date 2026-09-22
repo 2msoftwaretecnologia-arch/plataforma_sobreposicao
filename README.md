@@ -46,6 +46,7 @@ docker compose up --build
 
 Serviços criados:
 
+- `db`: PostgreSQL 16 + PostGIS, dados no volume `overlay-db-data`, publicado em `127.0.0.1:5433`.
 - `rabbitmq`: broker Celery, com painel em `http://localhost:15673` (só no próprio servidor).
 - `redis`: cache, publicado em `127.0.0.1:6380`.
 - `app`: Django rodando via uWSGI, publicado em `http://127.0.0.1:8001` (só no próprio servidor).
@@ -59,6 +60,7 @@ As portas do host podem ser trocadas no `.env`:
 |---|---|---|
 | `OVERLAY_HTTP_PORT` | `8020` | nginx (porta pública) |
 | `OVERLAY_APP_PORT` | `8001` | Django/uWSGI (127.0.0.1) |
+| `OVERLAY_DB_PORT` | `5433` | PostgreSQL/PostGIS (127.0.0.1) |
 | `OVERLAY_REDIS_PORT` | `6380` | Redis (127.0.0.1) |
 | `OVERLAY_RABBITMQ_PORT` | `5673` | RabbitMQ AMQP (127.0.0.1) |
 | `OVERLAY_RABBITMQ_ADMIN_PORT` | `15673` | Painel do RabbitMQ (127.0.0.1) |
