@@ -41,7 +41,7 @@ SECRET_KEY = config('SECRET_KEY')
 DEBUG = config_bool('DEBUG', default=False)
 
 ALLOWED_HOSTS = [
-    "69.62.126.40",
+    "82.25.66.238",
     "localhost",
     "127.0.0.1",
     "overlay-app",
@@ -188,11 +188,11 @@ PLANET_BASEMAP_MOSAIC = config('PLANET_BASEMAP_MOSAIC', default='')
 OVERLAY_HTTP_PORT = config('OVERLAY_HTTP_PORT', default='8020')
 
 CSRF_TRUSTED_ORIGINS = [
-    f"http://69.62.126.40:{OVERLAY_HTTP_PORT}",
+    f"http://82.25.66.238:{OVERLAY_HTTP_PORT}",
     f"http://localhost:{OVERLAY_HTTP_PORT}",
-    "http://69.62.126.40:8000",
+    "http://82.25.66.238:8000",
     "http://localhost:8000",
-    "http://69.62.126.40",
+    "http://82.25.66.238",
 ]
 
 # Static files (CSS, JavaScript, Images)
