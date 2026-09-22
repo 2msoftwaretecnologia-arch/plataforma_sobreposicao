@@ -45,7 +45,8 @@ ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
     "overlay-app",
-    "nginx"
+    "nginx",
+    "overlay-nginx",
 ]
 
 # Application definition
@@ -183,10 +184,13 @@ PLANET_API_KEY = config('PLANET_API_KEY', default='')
 PLANET_BASEMAP_MOSAIC = config('PLANET_BASEMAP_MOSAIC', default='')
 
 
+# Porta pública do nginx no host (mesma variável usada no docker-compose.yml).
+OVERLAY_HTTP_PORT = config('OVERLAY_HTTP_PORT', default='8020')
+
 CSRF_TRUSTED_ORIGINS = [
-    "http://69.62.126.40:8080",
+    f"http://69.62.126.40:{OVERLAY_HTTP_PORT}",
+    f"http://localhost:{OVERLAY_HTTP_PORT}",
     "http://69.62.126.40:8000",
-    "http://localhost:8080",
     "http://localhost:8000",
     "http://69.62.126.40",
 ]

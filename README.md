@@ -46,11 +46,24 @@ docker compose up --build
 
 Serviços criados:
 
-- `rabbitmq`: broker Celery, com painel em `http://localhost:15672`.
-- `app`: Django rodando via uWSGI em `http://localhost:8000`.
+- `rabbitmq`: broker Celery, com painel em `http://localhost:15673` (só no próprio servidor).
+- `redis`: cache, publicado em `127.0.0.1:6380`.
+- `app`: Django rodando via uWSGI, publicado em `http://127.0.0.1:8001` (só no próprio servidor).
 - `worker`: worker Celery.
 - `beat`: agendador Celery Beat.
-- `nginx`: proxy na porta `80`, servindo estáticos e mídia.
+- `nginx`: proxy público na porta `8020`, servindo estáticos e mídia.
+
+As portas do host podem ser trocadas no `.env`:
+
+| Variável | Padrão | Serviço |
+|---|---|---|
+| `OVERLAY_HTTP_PORT` | `8020` | nginx (porta pública) |
+| `OVERLAY_APP_PORT` | `8001` | Django/uWSGI (127.0.0.1) |
+| `OVERLAY_REDIS_PORT` | `6380` | Redis (127.0.0.1) |
+| `OVERLAY_RABBITMQ_PORT` | `5673` | RabbitMQ AMQP (127.0.0.1) |
+| `OVERLAY_RABBITMQ_ADMIN_PORT` | `15673` | Painel do RabbitMQ (127.0.0.1) |
+
+Dentro da rede Docker os serviços continuam se falando pelas portas padrão (`app:8000`, `redis:6379`, `rabbitmq:5672`).
 
 ## Como rodar localmente
 
