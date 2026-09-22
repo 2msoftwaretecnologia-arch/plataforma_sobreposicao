@@ -38,7 +38,7 @@ Aplicação Django para análise geoespacial de imóveis rurais. Ela recebe uma 
 
 ## Como rodar com Docker
 
-Crie um arquivo `.env` na raiz com as variáveis necessárias e execute:
+Copie `.env.example` para `.env`, preencha os valores e execute:
 
 ```bash
 docker compose up --build

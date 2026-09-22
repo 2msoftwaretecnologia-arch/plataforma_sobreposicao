@@ -15,6 +15,8 @@ ENV/
 .env
 # Variantes de .env (dev, test, etc.)
 .env.*
+# Modelo versionado das variáveis (sem segredos)
+!.env.example
 
 #AI, Agents, LLMs
 .claude
