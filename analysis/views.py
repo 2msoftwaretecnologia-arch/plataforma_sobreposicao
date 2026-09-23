@@ -25,6 +25,7 @@ from analysis.services.view_services.result_map_formatter import (
     format_data_map,
     planet_tiles_url,
 )
+from analysis.services.view_services.bases_3d import bases_summary, render_tile
 from analysis.services.view_services.zip_upload_service import ZipUploadService
 from analysis.validators import validate_car_number
 
@@ -538,3 +539,32 @@ class Lading_PageView(View):
     def get(self, request):
         return render(request, 'analysis/lading_page.html')
         
+
+
+class Bases3DView(View):
+    """Mapa 3D (MapLibre) das bases no Tocantins, com tour animado passando
+    de base em base. Os dados vêm de `BaseTileView`."""
+    template_name = 'analysis/bases_3d.html'
+
+    def get(self, request):
+        # MapLibre exige URL absoluta; os placeholders {z}/{x}/{y} e {base}
+        # não passam pelo `reverse`, então trocamos um tile fictício por eles.
+        sample = request.build_absolute_uri(reverse('base_tiles', args=('BASE', 0, 0, 0)))
+        return render(request, self.template_name, {
+            'bases_3d_config': {
+                'tilesUrl': sample.replace('/BASE/0/0/0.pbf', '/{base}/{z}/{x}/{y}.pbf'),
+                'bases': bases_summary(),
+            },
+        })
+
+
+class BaseTileView(View):
+    """Vector tile (MVT) de uma base, recortado pelo Tocantins."""
+
+    def get(self, request, modelo, z, x, y):
+        tile = render_tile(modelo, z, x, y)
+        if not tile:
+            return HttpResponse(status=204)
+        response = HttpResponse(tile, content_type='application/vnd.mapbox-vector-tile')
+        response['Cache-Control'] = 'private, max-age=3600'
+        return response

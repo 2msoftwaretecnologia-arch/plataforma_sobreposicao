@@ -1,0 +1,69 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bases em 3D | TerraView Tocantins</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
+    <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/landing_page.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/bases_3d.css' %}">
+</head>
+
+<body class="bases3d-page">
+
+    <div id="map" aria-label="Mapa 3D das bases de dados no Tocantins"></div>
+
+    <div class="panel">
+        <a href="{% url 'upload_zip_car' %}" class="panel-back">&larr; Voltar à análise</a>
+        <h1>Bases em 3D</h1>
+        <p class="panel-text">Tocantins sobre o relevo. Clique numa feição para ver os detalhes.</p>
+
+        <div class="tour-controls" role="group" aria-label="Tour pelas bases">
+            <button type="button" id="tour_prev" class="tour-btn" aria-label="Base anterior">&#8249;</button>
+            <button type="button" id="tour_play" class="tour-btn tour-play" aria-label="Pausar tour">&#10074;&#10074;</button>
+            <button type="button" id="tour_next" class="tour-btn" aria-label="Próxima base">&#8250;</button>
+            <span class="tour-label">Tour pelas bases</span>
+        </div>
+
+        <ul id="base_list" class="base-list"></ul>
+
+        <div id="sicar_legend" class="status-legend" hidden>
+            <span class="status-legend-title">SICAR · situação do CAR</span>
+            <span class="status-item"><span class="dash" style="--c:#5fe08a"></span>Ativo</span>
+            <span class="status-item"><span class="dash" style="--c:#ffd23f"></span>Pendente</span>
+            <span class="status-item"><span class="dash" style="--c:#ff6b3d"></span>Suspenso</span>
+            <span class="status-item"><span class="dash" style="--c:#d9d3c7"></span>Cancelado</span>
+        </div>
+
+        <div class="toggles">
+            <label class="toggle"><input type="checkbox" id="toggle_terrain" checked /> Relevo</label>
+            <label class="relief" for="relief_exaggeration">
+                <span>Exagero do relevo <strong id="relief_value">2,5×</strong></span>
+                <input type="range" id="relief_exaggeration" min="1" max="6" step="0.5" value="2.5" />
+            </label>
+        </div>
+    </div>
+
+    <div id="caption" class="caption" aria-live="polite">
+        <span id="caption_step" class="caption-step"></span>
+        <strong id="caption_title"></strong>
+        <span id="caption_text"></span>
+        <span class="caption-progress"><span id="caption_bar"></span></span>
+    </div>
+
+    <div id="zoom_hint" class="zoom-hint">Aproxime o mapa para carregar as feições.</div>
+
+    {{ bases_3d_config|json_script:"bases-3d-config" }}
+    <script>
+        window.TOCANTINS_GEOJSON_URL = "{% static 'analysis/data/tocantins.geojson' %}";
+    </script>
+    <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+    <script src="{% static 'analysis/js/bases_3d.js' %}"></script>
+</body>
+
+</html>

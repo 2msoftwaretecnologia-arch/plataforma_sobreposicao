@@ -30,6 +30,7 @@
             <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3.5 8.5 4.5L12 12.5 3.5 8z"/><path d="m3.5 12.5 8.5 4.5 8.5-4.5M3.5 16.5 12 21l8.5-4.5"/></symbol>
             <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2.5"/></symbol>
             <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4.5 12h15M14 6.5l5.5 5.5-5.5 5.5"/></symbol>
+            <symbol id="i-cube" viewBox="0 0 24 24"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9"/></symbol>
             <symbol id="i-map" viewBox="0 0 24 24"><path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6z"/><path d="M9 4v14M15 6v14"/></symbol>
         </defs>
     </svg>
@@ -47,12 +48,6 @@
                         <div class="brand-subtitle">Geoanálise rural inteligente</div>
                     </div>
                 </a>
-                <div class="nav-links">
-                    <a href="{% url 'landing_page' %}#funcionalidades">Funcionalidades</a>
-                    <a href="{% url 'landing_page' %}#bases">Bases de dados</a>
-                    <a href="{% url 'landing_page' %}#como-funciona">Como funciona</a>
-                    <a href="{% url 'landing_page' %}#relatorio">Relatório</a>
-                </div>
                 <div class="nav-actions">
                     <a href="{% url 'historico' %}" class="btn btn-outline-green">Meu histórico</a>
                     <a href="{% url 'landing_page' %}" class="btn btn-outline-green">Voltar ao início</a>
@@ -65,38 +60,11 @@
         </div>
     </div>
 
-    <!-- ===== Hero com formulário ===== -->
+    <!-- ===== Entrada de dados ===== -->
     <header class="hero hero-upload">
         <div class="container">
-            <div class="hero-grid">
-                <div>
-                    <div class="reveal">
-                        <div class="hero-badge">
-                            <svg class="ico"><use href="#i-pin"/></svg>
-                            Exclusivo para análises no Tocantins
-                        </div>
-                        <h1>Envie os dados da sua <em>propriedade rural</em>.</h1>
-                        <p class="hero-text">
-                            Escolha o modo de análise: arquivo ZIP do shapefile, número do CAR, demonstrativo ou recibo do CAR Federal. Em minutos você recebe o mapa interativo e o relatório técnico completo.
-                        </p>
-                    </div>
-                    <div class="hero-footnote reveal reveal-delay-1">
-                        <div class="footnote-item">
-                            <svg class="ico"><use href="#i-layers"/></svg>
-                            16+ bases oficiais integradas
-                        </div>
-                        <div class="footnote-item">
-                            <svg class="ico"><use href="#i-clock"/></svg>
-                            Resultado em minutos
-                        </div>
-                        <div class="footnote-item">
-                            <svg class="ico"><use href="#i-doc"/></svg>
-                            Relatório técnico completo
-                        </div>
-                    </div>
-                </div>
-
-                <div class="map-card form-card reveal reveal-delay-2">
+            <div class="entry-grid">
+                <div class="map-card form-card reveal">
                     <div class="map-box">
                         <div class="map-header">
                             <div>
@@ -207,36 +175,18 @@
                         </div>
                     </div>
                 </div>
+
+                <a href="{% url 'bases_3d' %}" class="sicar3d-card reveal reveal-delay-1">
+                    <span class="sicar3d-icon"><svg class="ico"><use href="#i-cube"/></svg></span>
+                    <span class="sicar3d-text">
+                        <strong>Bases de dados em 3D</strong>
+                        <span>Um tour animado pelo SICAR e pelas demais bases sobre o relevo do Tocantins.</span>
+                    </span>
+                    <svg class="ico sicar3d-arrow"><use href="#i-arrow"/></svg>
+                </a>
             </div>
         </div>
-        <svg class="fence-divider" viewBox="0 0 1440 44" preserveAspectRatio="none" aria-hidden="true">
-            <path d="M0 44 L0 30 Q 360 8 720 22 T 1440 18 L1440 44 Z" fill="#fbf8f0"/>
-        </svg>
     </header>
-
-    <!-- ===== Formatos aceitos ===== -->
-    <section class="contour-bg formats-section">
-        <div class="container">
-            <p class="section-label reveal">Entrada de dados</p>
-            <h2 class="section-title reveal">O que você pode enviar.</h2>
-            <div class="input-list formats-list">
-                <div class="input-item reveal"><svg class="ico"><use href="#i-check"/></svg> Arquivo .shp (em ZIP)</div>
-                <div class="input-item reveal"><svg class="ico"><use href="#i-check"/></svg> Número do CAR Federal</div>
-                <div class="input-item reveal reveal-delay-1"><svg class="ico"><use href="#i-check"/></svg> Recibo do CAR Federal</div>
-                <div class="input-item reveal reveal-delay-1"><svg class="ico"><use href="#i-check"/></svg> Demonstrativo Federal</div>
-            </div>
-
-            <div class="legal-box reveal">
-                <div class="legal-icon"><svg class="ico"><use href="#i-alert"/></svg></div>
-                <div>
-                    <h2>Aviso legal</h2>
-                    <p>
-                        A análise realizada pela TerraView Tocantins é válida exclusivamente para imóveis localizados no estado do Tocantins. Os resultados possuem caráter técnico-informativo e devem ser interpretados por profissional habilitado quando utilizados em processos administrativos, ambientais, fundiários ou jurídicos.
-                    </p>
-                </div>
-            </div>
-        </div>
-    </section>
 
     <!-- ===== Rodapé ===== -->
     <footer class="site-footer">
