@@ -21,13 +21,13 @@
     <div class="panel">
         <a href="{% url 'upload_zip_car' %}" class="panel-back">&larr; Voltar à análise</a>
         <h1>SICAR em 3D</h1>
-        <p class="panel-text">Perímetro dos imóveis do CAR sobre o relevo do Tocantins. Clique num imóvel para ver os detalhes.</p>
+        <p class="panel-text">Perímetro dos imóveis do CAR da cidade em que o tour está, sobre o relevo do Tocantins. Clique num imóvel para ver os detalhes.</p>
 
-        <div class="tour-controls" role="group" aria-label="Tour de CAR em CAR">
-            <button type="button" id="tour_prev" class="tour-btn" aria-label="CAR anterior">&#8249;</button>
+        <div class="tour-controls" role="group" aria-label="Tour de cidade em cidade">
+            <button type="button" id="tour_prev" class="tour-btn" aria-label="Cidade anterior">&#8249;</button>
             <button type="button" id="tour_play" class="tour-btn tour-play" aria-label="Pausar tour">&#10074;&#10074;</button>
-            <button type="button" id="tour_next" class="tour-btn" aria-label="Próximo CAR">&#8250;</button>
-            <span class="tour-label">De CAR em CAR</span>
+            <button type="button" id="tour_next" class="tour-btn" aria-label="Próxima cidade">&#8250;</button>
+            <span class="tour-label">De cidade em cidade</span>
         </div>
 
         <ul id="base_list" class="base-list"></ul>
@@ -41,6 +41,7 @@
         </div>
 
         <div class="toggles">
+            <label class="toggle"><input type="checkbox" id="toggle_water" checked /> Água (rios e lagos)</label>
             <label class="toggle"><input type="checkbox" id="toggle_terrain" checked /> Relevo</label>
             <label class="relief" for="relief_exaggeration">
                 <span>Exagero do relevo <strong id="relief_value">2,5×</strong></span>

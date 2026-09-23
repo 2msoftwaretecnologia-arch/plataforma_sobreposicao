@@ -8,8 +8,6 @@ imóveis do estado, e algumas bases importadas trazem feições de fora dele.
 """
 
 import json
-import struct
-from array import array
 from functools import lru_cache
 from pathlib import Path
 
@@ -17,7 +15,6 @@ from django.contrib.gis.geos import GEOSGeometry
 from django.core.cache import cache
 from django.db import connection
 
-from car_system.models import SicarRecord
 from control_panel.bases_config import BASES_CONFIG
 from control_panel.layer_registry import LAYER_REGISTRY
 
@@ -37,11 +34,28 @@ MAX_PROPS = 2
 # SICAR; para incluir outra camada basta acrescentar o `modelo` aqui.
 BASES_3D = ('SicarRecord',)
 
+# Nível máximo de tile gerado. Acima disso o mapa amplia os tiles do nível
+# 12 (4096 unidades por ~10 km, ~2,4 m de precisão) em vez de pedir novos:
+# trocar de nível no meio do tour fazia as linhas pontilhadas "pularem".
+MAX_TILE_ZOOM = 12
+
+# Tiles prontos ficam em cache: gerar um tile custa ~0,5–1 s no PostGIS e,
+# enquanto ele não chega, o mapa mostra a versão de outro nível (piscando).
+TILE_CACHE_SECONDS = 60 * 60 * 6
+
+# Propriedades extras por base nos tiles. No SICAR, o código IBGE do
+# município (vem dentro do número do CAR: UF-<7 dígitos>-<hash>), usado pelo
+# tour para mostrar só os imóveis da cidade da vez.
+TILE_EXTRA_SQL = {
+    'SicarRecord': "SUBSTRING(s.numero_car FROM 4 FOR 7) AS mun",
+}
+
 SUMMARY_CACHE_KEY = 'bases_3d:summary:v3'
 
-# Tour "de CAR em CAR": um ponto por imóvel, empacotado em binário.
-SICAR_POINTS_CACHE_KEY = 'bases_3d:sicar_points:v1'
-SICAR_STATUS_CODES = {'AT': 1, 'PE': 2, 'SU': 3, 'CA': 4}
+# Tour de cidade em cidade: sedes dos 139 municípios do Tocantins (IBGE,
+# coordenadas do projeto kelvins/municipios-brasileiros).
+MUNICIPIOS_JSON = TOCANTINS_GEOJSON.with_name('tocantins_municipios.json')
+CITIES_CACHE_KEY = 'bases_3d:cities:v1'
 SUMMARY_CACHE_SECONDS = 60 * 60
 
 _GEOM_KIND = {'POLYGON': 'polygon', 'MULTIPOLYGON': 'polygon',
@@ -151,18 +165,35 @@ def render_tile(modelo, z, x, y):
     """MVT da base `modelo` para o tile z/x/y, ou None se vazio/desconhecido."""
     base = catalog().get(modelo)
     summary = next((b for b in bases_summary() if b['modelo'] == modelo), None)
-    if not base or not summary or z < summary['min_zoom']:
+    if not base or not summary or not (summary['min_zoom'] <= z <= MAX_TILE_ZOOM):
         return None
     if not (0 <= x < 2 ** z and 0 <= y < 2 ** z):
         return None
 
+    # A contagem entra na chave para uma reimportação da base não servir
+    # tiles antigos (o resumo, com a contagem, é refeito a cada hora).
+    cache_key = f"bases_3d:tile:v2:{modelo}:{summary['count']}:{z}:{x}:{y}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached or None
+    tile = _query_tile(base, summary, z, x, y)
+    cache.set(cache_key, tile or b'', TILE_CACHE_SECONDS)
+    return tile
+
+
+def _query_tile(base, summary, z, x, y):
     q = connection.ops.quote_name
     extra = ''.join(f", s.{q(p['column'])}::text AS {p['key']}" for p in base['props'])
+    if base['modelo'] in TILE_EXTRA_SQL:
+        extra += ', ' + TILE_EXTRA_SQL[base['modelo']]
     sql = f"""
         WITH {_TO_CTE},
         bounds AS (
-            SELECT ST_TileEnvelope(%(z)s, %(x)s, %(y)s) AS geom_3857,
-                   ST_Transform(ST_TileEnvelope(%(z)s, %(x)s, %(y)s), 4674) AS geom_4674
+            SELECT e.geom_3857, e.geom_4674, ST_Within(e.geom_4674, t.geom) AS inside
+            FROM tocantins t, LATERAL (
+                SELECT ST_TileEnvelope(%(z)s, %(x)s, %(y)s) AS geom_3857,
+                       ST_Transform(ST_TileEnvelope(%(z)s, %(x)s, %(y)s), 4674) AS geom_4674
+            ) e
         ),
         mvt AS (
             SELECT ST_AsMVTGeom(
@@ -174,8 +205,7 @@ def render_tile(modelo, z, x, y):
                    {extra}
             FROM {q(base['table'])} s, bounds b, tocantins t
             WHERE s.geometria_util && b.geom_4674
-              AND s.geometria_util && t.geom
-              AND ST_Intersects(s.geometria_util, t.geom)
+              AND (b.inside OR (s.geometria_util && t.geom AND ST_Intersects(s.geometria_util, t.geom)))
         )
         SELECT ST_AsMVT(mvt, 'layer', 4096, 'geom', 'fid') FROM mvt WHERE geom IS NOT NULL
     """
@@ -185,49 +215,24 @@ def render_tile(modelo, z, x, y):
     return bytes(tile) if tile else None
 
 
-def sicar_points_blob():
-    """Um ponto (ST_PointOnSurface) por imóvel do SICAR no Tocantins, para o
-    tour percorrer os CARs pelo vizinho mais próximo no navegador.
+def cities_summary():
+    """Sedes municipais com o número de imóveis do CAR de cada município.
 
-    Binário little-endian, em blocos para virar TypedArray direto no JS:
-    uint32 n | float32 lon[n] | float32 lat[n] | int32 id[n] |
-    float32 area_ha[n] | uint8 status[n] (ver `SICAR_STATUS_CODES`; 0 = outro).
-    ~17 bytes por imóvel, contra vários MB se fosse GeoJSON."""
-    blob = cache.get(SICAR_POINTS_CACHE_KEY)
-    if blob is not None:
-        return blob
-
+    O código IBGE do município está no próprio número do CAR
+    (UF-<7 dígitos>-<hash>), então não é preciso cruzar geometrias."""
+    cities = cache.get(CITIES_CACHE_KEY)
+    if cities is not None:
+        return cities
     with connection.cursor() as cursor:
-        cursor.execute(f"""
-            WITH {_TO_CTE}
-            SELECT s.id, ST_X(p.geom), ST_Y(p.geom), COALESCE(s.area_ha, 0), UPPER(COALESCE(s.status, ''))
-            FROM tb_registro_sicar s
-            CROSS JOIN tocantins t
-            CROSS JOIN LATERAL (SELECT ST_PointOnSurface(s.geometria_util) AS geom) p
-            WHERE s.geometria_util && t.geom AND ST_Intersects(s.geometria_util, t.geom)
-        """, {'to': tocantins_wkt()})
-        rows = cursor.fetchall()
-
-    lon, lat, ids, area = array('f'), array('f'), array('i'), array('f')
-    status = bytearray()
-    for pk, x, y, a, st in rows:
-        ids.append(pk)
-        lon.append(x)
-        lat.append(y)
-        area.append(a)
-        status.append(SICAR_STATUS_CODES.get(st, 0))
-
-    parts = [struct.pack('<I', len(rows))]
-    for arr in (lon, lat, ids, area):
-        if arr.itemsize != 4:
-            raise RuntimeError('array com itemsize inesperado')
-        parts.append(arr.tobytes())  # plataformas suportadas são little-endian
-    parts.append(bytes(status))
-    blob = b''.join(parts)
-    cache.set(SICAR_POINTS_CACHE_KEY, blob, SUMMARY_CACHE_SECONDS)
-    return blob
-
-
-def sicar_detail(pk):
-    """Número do CAR, situação e área de um imóvel (legenda do tour)."""
-    return SicarRecord.objects.filter(pk=pk).values('car_number', 'status', 'area_ha').first()
+        cursor.execute("""
+            SELECT SUBSTRING(numero_car FROM 4 FOR 7), COUNT(*)
+            FROM tb_registro_sicar
+            GROUP BY 1
+        """)
+        cars = dict(cursor.fetchall())
+    cities = [
+        dict(city, cars=cars.get(city['codigo'], 0))
+        for city in json.loads(MUNICIPIOS_JSON.read_text(encoding='utf-8'))
+    ]
+    cache.set(CITIES_CACHE_KEY, cities, SUMMARY_CACHE_SECONDS)
+    return cities

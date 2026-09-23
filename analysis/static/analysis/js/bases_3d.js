@@ -44,8 +44,6 @@
     }
 
     var HOVER = ['boolean', ['feature-state', 'hover'], false];
-    // Imóvel em que o tour está parado no momento.
-    var CURRENT = ['boolean', ['feature-state', 'current'], false];
 
     function hoverColor(b) {
         return ['case', HOVER, '#f3e3bc', baseColor(b)];
@@ -72,12 +70,11 @@
             // funcionarem também no interior do imóvel.
             return [
                 Object.assign({ id: id + '-hit', type: 'fill', paint: {
-                    'fill-color': SICAR_COLOR,
-                    'fill-opacity': ['case', CURRENT, 0.22, 0]
+                    'fill-color': '#000', 'fill-opacity': 0
                 } }, common),
                 Object.assign({ id: id + '-ln', type: 'line', paint: {
-                    'line-color': ['case', CURRENT, '#ffffff', hoverColor(b)],
-                    'line-width': ['case', CURRENT, 4, HOVER, 3.2, 1.6],
+                    'line-color': hoverColor(b),
+                    'line-width': ['case', HOVER, 3.2, 1.6],
                     'line-dasharray': [2, 1.5]
                 } }, common)
             ];
@@ -101,11 +98,14 @@
             maxzoom: 18,
             attribution: 'Imagens &copy; Esri'
         },
+        // O terreno usa um DEM mais grosso (nível 11, ~75 m/pixel): com níveis
+        // mais finos a malha do relevo era refeita a cada tile que chegava
+        // durante o tour e tudo que está sobre ela "pulava".
         terrain: {
             type: 'raster-dem',
             tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
             tileSize: 256,
-            maxzoom: 14,
+            maxzoom: 11,
             encoding: 'terrarium',
             attribution: 'Relevo &copy; Mapzen/AWS Terrain Tiles'
         },
@@ -115,7 +115,7 @@
             type: 'raster-dem',
             tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
             tileSize: 256,
-            maxzoom: 14,
+            maxzoom: 11,  // mesmo nível do terreno: sombra estável durante o tour
             encoding: 'terrarium'
         }
     };
@@ -135,7 +135,7 @@
             type: 'vector',
             tiles: [cfg.tilesUrl.replace('{base}', b.modelo)],
             minzoom: b.min_zoom,
-            maxzoom: 14,
+            maxzoom: cfg.maxTileZoom,
             // Só pede tiles dentro do Tocantins.
             bounds: [TO_BOUNDS[0][0], TO_BOUNDS[0][1], TO_BOUNDS[1][0], TO_BOUNDS[1][1]]
         };
@@ -193,6 +193,61 @@
                 map.addLayer({ id: 'tocantins-outline', type: 'line', source: 'tocantins',
                     paint: { 'line-color': '#dba63f', 'line-width': 2.2 } }, firstBase);
             });
+    });
+
+    // =====================================================================
+    // Água em azul: rios, lagos e represas do OpenStreetMap (OpenFreeMap)
+    // =====================================================================
+
+    var WATER_TILEJSON = 'https://tiles.openfreemap.org/planet';
+    var WATER_LAYERS = ['water-fill', 'waterway-line'];
+    var WATER_COLOR = '#2f8fe6';
+
+    map.on('load', function () {
+        // O caminho dos tiles muda a cada atualização do OpenFreeMap, por
+        // isso vem do TileJSON. Os tiles são declarados aqui (e não via `url`)
+        // para limitar ao nível 12, como o SICAR: sem troca de nível no tour.
+        fetch(WATER_TILEJSON)
+            .then(function (r) { return r.json(); })
+            .then(function (tj) {
+                map.addSource('water', {
+                    type: 'vector',
+                    tiles: tj.tiles,
+                    minzoom: 0,
+                    maxzoom: 12,
+                    bounds: [TO_BOUNDS[0][0], TO_BOUNDS[0][1], TO_BOUNDS[1][0], TO_BOUNDS[1][1]],
+                    attribution: tj.attribution
+                });
+                // Abaixo da máscara (se já existir), para a água fora do
+                // Tocantins também ficar escurecida.
+                var before = map.getLayer('mask') ? 'mask' : (bases.length ? bases[0].layerIds[0] : undefined);
+                var visibility = document.getElementById('toggle_water').checked ? 'visible' : 'none';
+                map.addLayer({
+                    id: 'water-fill', type: 'fill', source: 'water', 'source-layer': 'water',
+                    filter: ['!=', ['get', 'brunnel'], 'tunnel'],
+                    layout: { visibility: visibility },
+                    paint: {
+                        'fill-color': WATER_COLOR,
+                        'fill-opacity': ['case', ['==', ['get', 'intermittent'], 1], 0.4, 0.72]
+                    }
+                }, before);
+                map.addLayer({
+                    id: 'waterway-line', type: 'line', source: 'water', 'source-layer': 'waterway',
+                    filter: ['!=', ['get', 'brunnel'], 'tunnel'],
+                    layout: { visibility: visibility, 'line-cap': 'round', 'line-join': 'round' },
+                    paint: {
+                        'line-color': WATER_COLOR,
+                        'line-opacity': ['case', ['==', ['get', 'intermittent'], 1], 0.5, 0.9],
+                        // Rios mais grossos que córregos, engrossando com o zoom.
+                        'line-width': ['interpolate', ['linear'], ['zoom'],
+                            7, ['match', ['get', 'class'], 'river', 1.2, 0.3],
+                            12, ['match', ['get', 'class'], 'river', 3, 1],
+                            16, ['match', ['get', 'class'], 'river', 7, 2.5]
+                        ]
+                    }
+                }, before);
+            })
+            .catch(function () { /* sem água se o OpenFreeMap estiver fora */ });
     });
 
     // =====================================================================
@@ -279,12 +334,13 @@
     map.on('zoomend', updateZoomHint);
 
     // =====================================================================
-    // Tour animado: visão geral do estado -> de CAR em CAR, sempre para o
-    // imóvel ainda não visitado mais próximo (vizinho mais próximo guloso).
+    // Tour animado: visão geral do estado -> voo contínuo de cidade em cidade
+    // (sedes dos 139 municípios), sempre para a mais próxima ainda não
+    // visitada. Depois de passar por todas, recomeça o circuito.
     // =====================================================================
 
     var playing = false;
-    var token = 0;  // invalida callbacks de passos anteriores
+    var token = 0;  // invalida callbacks/animações anteriores
     var ready = false;  // estilo carregado: camadas já podem ser alteradas
     var userTookOver = false;  // usuário mexeu no mapa antes do tour começar
 
@@ -295,22 +351,16 @@
     var captionBar = document.getElementById('caption_bar');
     var playBtn = document.getElementById('tour_play');
 
-    var sicarBase = bases.filter(function (b) { return b.modelo === SICAR; })[0];
-    var STATUS_BY_CODE = { 1: 'AT', 2: 'PE', 3: 'SU', 4: 'CA' };
-    var START_POINT = [-48.33, -10.18];  // Palmas
+    var FAR_HOP_MS = 4500;  // voo em arco até uma cidade (início, anterior/próxima)
 
-    var HOP_MS = 1800;     // salto até o CAR vizinho
-    var FAR_HOP_MS = 4000; // quando os vizinhos acabam e ele precisa ir longe
-    var DWELL_MS = 1200;   // tempo parado em cada CAR
-    var bearing = -20;
+    var sicarBase = bases.filter(function (b) { return b.modelo === SICAR; })[0];
+    var cities = cfg.cities;
 
     function showOverviewCaption() {
         captionStep.textContent = 'Visão geral';
         captionTitle.textContent = 'Tocantins';
-        captionTitle.classList.remove('caption-car');
-        captionText.textContent = sicarBase
-            ? fmt(sicarBase.count) + ' imóveis do CAR'
-            : 'Nenhuma base com dados ainda';
+        captionText.textContent = cities.length + ' municípios'
+            + (sicarBase ? ' · ' + fmt(sicarBase.count) + ' imóveis do CAR' : '');
         caption.classList.add('visible');
     }
 
@@ -324,183 +374,241 @@
         }
     }
 
+    function setProgress(fraction) {
+        captionBar.style.transition = 'none';
+        captionBar.style.width = (fraction * 100).toFixed(1) + '%';
+    }
+
     function afterMove(myToken, fn) {
         map.once('moveend', function () { if (myToken === token) fn(); });
     }
 
-    // ----- Pontos dos imóveis + grade espacial para o vizinho mais próximo -----
+    // ----- Rota: vizinho mais próximo entre as cidades -----
 
-    var pts = null;
-    var GRID = { size: 0.02, minLon: -50.9, minLat: -13.7, cols: 0, rows: 0, cells: null };
+    var route = [];          // índices em `cities`, na ordem do voo
+    var pos = -1;            // posição atual em `route`
+    var visited = new Uint8Array(cities.length);
+    var visitedCount = 0;
 
-    function clampInt(v, max) { return Math.max(0, Math.min(max - 1, Math.floor(v))); }
-
-    function cellOf(lon, lat) {
-        return clampInt((lat - GRID.minLat) / GRID.size, GRID.rows) * GRID.cols
-            + clampInt((lon - GRID.minLon) / GRID.size, GRID.cols);
+    function distMeters(a, b) {
+        var k = Math.cos(a[1] * Math.PI / 180);
+        var dx = (b[0] - a[0]) * k * 111320, dy = (b[1] - a[1]) * 110540;
+        return Math.sqrt(dx * dx + dy * dy);
     }
 
-    // Formato em `sicar_points_blob` (analysis/services/view_services/bases_3d.py).
-    function loadPoints() {
-        return fetch(cfg.sicarPointsUrl, { credentials: 'same-origin' })
-            .then(function (r) { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
-            .then(function (buf) {
-                var n = new DataView(buf).getUint32(0, true);
-                var off = 4;
-                function take(Type, bytes) {
-                    var arr = new Type(buf, off, n);
-                    off += n * bytes;
-                    return arr;
-                }
-                pts = {
-                    n: n,
-                    lon: take(Float32Array, 4),
-                    lat: take(Float32Array, 4),
-                    id: take(Int32Array, 4),
-                    area: take(Float32Array, 4),
-                    status: take(Uint8Array, 1),
-                    visitedCount: 0,
-                    order: [],   // índices na ordem em que foram visitados
-                    pos: -1      // posição atual em `order` (volta com "anterior")
-                };
-                GRID.cols = Math.ceil((-45.4 - GRID.minLon) / GRID.size);
-                GRID.rows = Math.ceil((-4.9 - GRID.minLat) / GRID.size);
-                GRID.cells = new Array(GRID.cols * GRID.rows);
-                for (var i = 0; i < n; i++) {
-                    var c = cellOf(pts.lon[i], pts.lat[i]);
-                    (GRID.cells[c] || (GRID.cells[c] = [])).push(i);
-                }
-            });
+    function cityPoint(i) { return [cities[i].lon, cities[i].lat]; }
+
+    function visit(i) {
+        visited[i] = 1;
+        visitedCount++;
+        route.push(i);
     }
 
-    // A grade só guarda os não visitados. Busca em anéis de células crescentes
-    // até que nenhum anel mais distante possa ter um ponto mais perto que o
-    // melhor já encontrado.
-    function nearestUnvisited(lon, lat) {
-        if (pts.visitedCount >= pts.n) return -1;
-        var k = Math.cos(lat * Math.PI / 180);
-        var cx = clampInt((lon - GRID.minLon) / GRID.size, GRID.cols);
-        var cy = clampInt((lat - GRID.minLat) / GRID.size, GRID.rows);
-        var best = -1, bestD2 = Infinity;
-        var maxR = Math.max(GRID.cols, GRID.rows);
-
-        function scan(x, y) {
-            if (x < 0 || y < 0 || x >= GRID.cols || y >= GRID.rows) return;
-            var cell = GRID.cells[y * GRID.cols + x];
-            if (!cell) return;
-            for (var j = 0; j < cell.length; j++) {
-                var i = cell[j];
-                var dx = (pts.lon[i] - lon) * k, dy = pts.lat[i] - lat;
-                var d2 = dx * dx + dy * dy;
-                if (d2 < bestD2) { bestD2 = d2; best = i; }
-            }
+    function nearestCity(from) {
+        if (visitedCount >= cities.length) {  // circuito completo: recomeça
+            visited = new Uint8Array(cities.length);
+            visited[from] = 1;
+            visitedCount = 1;
         }
-
-        for (var r = 0; r <= maxR; r++) {
-            var minDist = (r - 1) * GRID.size * k;
-            if (best >= 0 && minDist > 0 && minDist * minDist > bestD2) break;
-            if (r === 0) { scan(cx, cy); continue; }
-            for (var d = -r; d <= r; d++) {
-                scan(cx + d, cy - r);
-                scan(cx + d, cy + r);
-                if (d > -r && d < r) { scan(cx - r, cy + d); scan(cx + r, cy + d); }
-            }
+        var best = -1, bestD = Infinity, p = cityPoint(from);
+        for (var i = 0; i < cities.length; i++) {
+            if (visited[i]) continue;
+            var d = distMeters(p, cityPoint(i));
+            if (d < bestD) { bestD = d; best = i; }
         }
         return best;
     }
 
-    function markVisited(i) {
-        pts.visitedCount++;
-        var cell = GRID.cells[cellOf(pts.lon[i], pts.lat[i])];
-        var at = cell.indexOf(i);
-        if (at >= 0) { cell[at] = cell[cell.length - 1]; cell.pop(); }
+    // Garante `n` cidades já escolhidas à frente da posição `k`.
+    function ensureAhead(k, n) {
+        while (route.length - 1 < k + n) visit(nearestCity(route[route.length - 1]));
     }
 
-    // ----- Câmera, destaque e legenda do imóvel atual -----
-
-    // Zoom para o imóvel caber com folga na tela (lado ~ raiz da área).
-    function zoomForArea(areaHa, lat) {
-        var side = Math.sqrt(Math.max(areaHa, 1) * 10000);
-        var canvas = map.getCanvas();
-        var px = Math.min(canvas.clientWidth, canvas.clientHeight) || 800;
-        var metersPerPixel = (side * 3.5) / px;
-        var z = Math.log2(156543.03 * Math.cos(lat * Math.PI / 180) / metersPerPixel);
-        return Math.max(sicarBase.min_zoom + 1.5, Math.min(16, z));
+    function ensureStarted() {
+        if (pos >= 0) return true;
+        if (!cities.length) return false;
+        var capital = cities.findIndex(function (c) { return c.capital; });
+        visit(capital >= 0 ? capital : 0);
+        pos = 0;
+        return true;
     }
 
-    var currentFeature = null;
-    function setCurrent(i) {
-        if (currentFeature) map.setFeatureState(currentFeature, { current: false });
-        currentFeature = i >= 0 ? { source: 'b-' + SICAR, sourceLayer: 'layer', id: pts.id[i] } : null;
-        if (currentFeature) map.setFeatureState(currentFeature, { current: true });
+    // ----- Geometria da curva -----
+
+    function point(k) { return cityPoint(route[k]); }
+
+    // Rumo de a para b em graus a partir do norte, no sentido horário (o
+    // mesmo referencial do `bearing` do mapa).
+    function headingDeg(a, b) {
+        var k = Math.cos(a[1] * Math.PI / 180);
+        return Math.atan2((b[0] - a[0]) * k, b[1] - a[1]) * 180 / Math.PI;
     }
 
-    var detailRequest = 0;
-    function showCaptionFor(i) {
-        var code = STATUS_BY_CODE[pts.status[i]];
-        captionStep.textContent = 'CAR ' + fmt(pts.pos + 1) + ' de ' + fmt(pts.n);
-        captionTitle.textContent = '…';
-        captionTitle.classList.add('caption-car');
-        captionText.textContent = (STATUS_LABEL[code] || 'Sem situação') + ' · ' + fmt(pts.area[i], 2) + ' ha';
+    function angleDiff(from, to) { return ((to - from + 540) % 360) - 180; }
+
+    // Catmull-Rom centrípeta: curva suave passando por todas as cidades, sem
+    // os laços que a versão uniforme faz quando as distâncias variam muito.
+    function centripetal(p0, p1, p2, p3, t) {
+        function knot(ti, a, b) {
+            var dx = b[0] - a[0], dy = b[1] - a[1];
+            return ti + Math.max(Math.pow(dx * dx + dy * dy, 0.25), 1e-9);
+        }
+        var t0 = 0, t1 = knot(t0, p0, p1), t2 = knot(t1, p1, p2), t3 = knot(t2, p2, p3);
+        var u = t1 + (t2 - t1) * t;
+        function lerp(a, b, ta, tb) {
+            var w = (u - ta) / (tb - ta);
+            return [a[0] + (b[0] - a[0]) * w, a[1] + (b[1] - a[1]) * w];
+        }
+        var a1 = lerp(p0, p1, t0, t1), a2 = lerp(p1, p2, t1, t2), a3 = lerp(p2, p3, t2, t3);
+        var b1 = lerp(a1, a2, t0, t2), b2 = lerp(a2, a3, t1, t3);
+        return lerp(b1, b2, t1, t2);
+    }
+
+    // Ponto da curva no trecho k (da cidade k à k+1), t em [0, 1].
+    function pathAt(k, t) {
+        var p1 = point(k), p2 = point(k + 1);
+        var p0 = k > 0 ? point(k - 1) : [2 * p1[0] - p2[0], 2 * p1[1] - p2[1]];
+        return centripetal(p0, p1, p2, point(k + 2), t);
+    }
+
+    // ----- Voo contínuo -----
+
+    // Mais alto que no voo entre imóveis: as cidades ficam a dezenas de km.
+    // O zoom oscila só dentro do mesmo nível (11,0–11,9) para não trocar os
+    // tiles de nível no meio do voo.
+    var CITY_ZOOM = 11.45;
+    var ZOOM_SWING = 0.45;
+    var GROUND_SPEED = 3500;      // m/s no chão (média)
+    var MIN_SEGMENT_MS = 7000;
+    var MAX_SEGMENT_MS = 20000;
+    var ARRIVAL_SLOWDOWN = 0.7;   // desacelera ao passar sobre cada cidade
+    var LOOK_AHEAD = 0.3;
+    var RAMP_MS = 2000;           // aceleração suave ao (re)começar
+
+    function segmentMs(k) {
+        var ms = distMeters(point(k), point(k + 1)) / GROUND_SPEED * 1000;
+        return Math.max(MIN_SEGMENT_MS, Math.min(MAX_SEGMENT_MS, ms));
+    }
+
+    // Tempo do trecho (u) -> posição na curva (t). A velocidade fica
+    // 1 - A·cos(2πu): devagar sobre as cidades, mais rápida entre elas, sem
+    // nunca parar.
+    function warp(u) {
+        return u - ARRIVAL_SLOWDOWN * Math.sin(2 * Math.PI * u) / (2 * Math.PI);
+    }
+
+    var clock = 0;  // tempo total de voo: move as oscilações de câmera
+
+    // Oscilações lentas com períodos diferentes (e não múltiplos entre si):
+    // o enquadramento nunca se repete de uma cidade para outra. Os voos em
+    // arco usam os mesmos valores para o voo contínuo emendar sem tranco.
+    function wanderAt(c) { return 22 * Math.sin(c / 9100) + 9 * Math.sin(c / 3700 + 1.3); }
+    function pitchAt(c) { return TOUR_PITCH + 6 * Math.sin(c / 13300 + 0.7); }
+    function zoomAt(u) { return CITY_ZOOM + ZOOM_SWING * Math.cos(2 * Math.PI * u); }
+
+    // Mostra só os perímetros dos CARs do município `code` (null = todos).
+    // A propriedade `mun` vem nos tiles (ver TILE_EXTRA_SQL no servidor).
+    function setCityFilter(code) {
+        if (!sicarBase) return;
+        var filter = code ? ['==', ['get', 'mun'], code] : null;
+        sicarBase.layerIds.forEach(function (id) { map.setFilter(id, filter); });
+    }
+
+    var shownIndex = -1;
+    function showCity(k) {
+        if (k === shownIndex) return;
+        shownIndex = k;
+        var c = cities[route[k]];
+        setCityFilter(c.codigo);
+        captionStep.textContent = (c.capital ? 'Capital · ' : '')
+            + 'Cidade ' + fmt(k % cities.length + 1) + ' de ' + fmt(cities.length);
+        captionTitle.textContent = c.nome;
+        captionText.textContent = fmt(c.cars) + (c.cars === 1 ? ' imóvel' : ' imóveis') + ' do CAR';
         caption.classList.add('visible');
-
-        var myRequest = ++detailRequest;
-        fetch(cfg.sicarDetailUrl.replace('{id}', pts.id[i]), { credentials: 'same-origin' })
-            .then(function (r) { return r.ok ? r.json() : null; })
-            .then(function (d) {
-                if (myRequest === detailRequest) captionTitle.textContent = d ? d.car_number : '-';
-            })
-            .catch(function () {
-                if (myRequest === detailRequest) captionTitle.textContent = '-';
-            });
     }
 
-    function visit(i, myToken, durationMs) {
-        setCurrent(i);
-        showCaptionFor(i);
-        runProgress(0);
+    function startDrive() {
+        if (!playing) return;
+        ensureAhead(pos, 3);
+        var myToken = ++token;
+        var k = pos, u = 0, dur = segmentMs(k), last = null, elapsed = 0;
+        var camBearing = map.getBearing();
+
+        function frame(ts) {
+            if (myToken !== token || !playing) return;
+            var dt = last === null ? 0 : Math.min(ts - last, 100);
+            last = ts;
+            clock += dt;
+            elapsed += dt;
+            var ramp = Math.min(1, elapsed / RAMP_MS);
+            ramp = ramp * ramp * (3 - 2 * ramp);  // smoothstep
+
+            u += dt / dur * ramp;
+            while (u >= 1) {
+                u -= 1;
+                k++;
+                pos = k;
+                ensureAhead(k, 3);
+                dur = segmentMs(k);
+            }
+
+            var t = warp(u);
+            var here = pathAt(k, t);
+            var ta = t + LOOK_AHEAD;
+            var ahead = ta <= 1 ? pathAt(k, ta) : pathAt(k + 1, ta - 1);
+            var target = distMeters(here, ahead) > 1 ? headingDeg(here, ahead) + wanderAt(clock) : camBearing;
+            camBearing += angleDiff(camBearing, target) * (1 - Math.exp(-dt / 1200));
+
+            map.jumpTo({ center: here, bearing: camBearing, pitch: pitchAt(clock), zoom: zoomAt(u) });
+
+            // A legenda mostra a cidade de que a câmera está se aproximando
+            // (a partir da metade do trecho); a barra, quanto falta até ela.
+            showCity(u < 0.5 ? k : k + 1);
+            setProgress((u + 0.5) % 1);
+
+            requestAnimationFrame(frame);
+        }
+        requestAnimationFrame(frame);
+    }
+
+    // Voo em arco até a cidade k, chegando já virado para a próxima e com a
+    // mesma câmera do voo contínuo.
+    function flyToCity(k, durationMs) {
+        var myToken = ++token;
+        map.stop();
+        ensureOnlySicar();
+        ensureAhead(k, 3);
+        showCity(k);
+        setProgress(0);
+        var here = point(k);
         map.flyTo({
-            center: [pts.lon[i], pts.lat[i]],
-            zoom: zoomForArea(pts.area[i], pts.lat[i]),
-            pitch: TOUR_PITCH,
-            bearing: bearing,
+            center: here,
+            zoom: zoomAt(0),
+            pitch: pitchAt(clock),
+            bearing: headingDeg(here, point(k + 1)) + wanderAt(clock),
             duration: durationMs,
             essential: true
         });
-        afterMove(myToken, function () {
-            if (!playing) return;
-            runProgress(DWELL_MS);
-            bearing += 6;
-            map.easeTo({ bearing: bearing, duration: DWELL_MS, easing: function (t) { return t; }, essential: true });
-            afterMove(myToken, function () { if (playing) step(1); });
-        });
+        return myToken;
     }
 
-    // Avança (+1) ou volta (-1) um CAR. Avançar além do histórico escolhe o
-    // vizinho não visitado mais próximo do CAR atual.
+    // Anterior/próxima cidade com o tour pausado.
     function step(dir) {
-        if (!ready || !pts || !sicarBase) return;
-        var from = pts.pos >= 0 ? pts.order[pts.pos] : -1;
-        if (dir < 0) {
-            if (pts.pos <= 0) return;
-            pts.pos--;
-        } else if (pts.pos < pts.order.length - 1) {
-            pts.pos++;
-        } else {
-            var origin = from >= 0 ? [pts.lon[from], pts.lat[from]] : START_POINT;
-            var next = nearestUnvisited(origin[0], origin[1]);
-            if (next < 0) { pauseTour(); return; }  // todos os CARs visitados
-            markVisited(next);
-            pts.order.push(next);
-            pts.pos = pts.order.length - 1;
+        if (!ready || !sicarBase) return;
+        pauseTour();
+        if (pos < 0) {
+            if (ensureStarted()) flyToCity(0, FAR_HOP_MS);
+            return;
         }
+        if (dir < 0 && pos <= 0) return;
+        pos += dir < 0 ? -1 : 1;
+        flyToCity(pos, FAR_HOP_MS);
+    }
 
-        var myToken = ++token;
-        map.stop();
-        showOnly(sicarBase);
-        var i = pts.order[pts.pos];
-        var far = from < 0 || Math.abs(pts.lon[i] - pts.lon[from]) + Math.abs(pts.lat[i] - pts.lat[from]) > 0.15;
-        visit(i, myToken, far ? FAR_HOP_MS : HOP_MS);
+    // Só mexe no estilo se algo mudou.
+    function ensureOnlySicar() {
+        var ok = bases.every(function (b) { return visible[b.modelo] === (b === sicarBase); });
+        if (!ok) showOnly(sicarBase);
     }
 
     function goToOverview() {
@@ -508,7 +616,8 @@
         token++;
         map.stop();
         runProgress(0);
-        if (pts) setCurrent(-1);
+        shownIndex = -1;
+        setCityFilter(null);
         showOverviewCaption();
         var cam = map.cameraForBounds(TO_BOUNDS, { padding: 40 });
         map.flyTo({ center: cam.center, zoom: cam.zoom, pitch: 55, bearing: 0, duration: FLY_MS * 0.7, essential: true });
@@ -527,21 +636,16 @@
         setPlaying(false);
         token++;
         map.stop();
-        runProgress(0);
+        setProgress(0);
     }
 
     function playTour() {
-        if (!ready || !pts) return;
+        if (!ready || !sicarBase) return;
         setPlaying(true);
-        // Retoma no CAR atual (ou começa pelo mais próximo de Palmas).
-        if (pts.pos >= 0) {
-            var myToken = ++token;
-            map.stop();
-            showOnly(sicarBase);
-            visit(pts.order[pts.pos], myToken, FAR_HOP_MS);
-        } else {
-            step(1);
-        }
+        if (!ensureStarted()) { pauseTour(); return; }
+        // Voa até a cidade atual (a câmera pode ter sido movida) e segue dali.
+        var myToken = flyToCity(pos, FAR_HOP_MS);
+        afterMove(myToken, startDrive);
     }
 
     playBtn.addEventListener('click', function () { playing ? pauseTour() : playTour(); });
@@ -557,17 +661,15 @@
     });
 
     var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    var pointsReady = sicarBase ? loadPoints().catch(function () { pts = null; }) : Promise.resolve();
 
     map.on('load', function () {
         ready = true;
         showOverviewCaption();
         setPlaying(false);
-        // Mostra a visão geral por alguns segundos e então começa a andar.
-        var pause = new Promise(function (resolve) { setTimeout(resolve, 2500); });
-        Promise.all([pointsReady, pause]).then(function () {
-            if (pts && !reduceMotion && !userTookOver) playTour();
-        });
+        // Mostra a visão geral por alguns segundos e então começa a voar.
+        setTimeout(function () {
+            if (!reduceMotion && !userTookOver) playTour();
+        }, 2500);
     });
 
     // =====================================================================
@@ -648,6 +750,12 @@
         reliefValue.textContent = fmt(terrainExaggeration, 1) + '×';
         if (terrainToggle.checked) map.setTerrain(terrainSpec());
     });
+    document.getElementById('toggle_water').addEventListener('change', function (e) {
+        WATER_LAYERS.forEach(function (id) {
+            if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', e.target.checked ? 'visible' : 'none');
+        });
+    });
+
     terrainToggle.addEventListener('change', function () {
         var on = terrainToggle.checked;
         map.setTerrain(on ? terrainSpec() : null);

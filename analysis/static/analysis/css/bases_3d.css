@@ -246,13 +246,6 @@ html, body.bases3d-page {
 
 .caption strong { font-family: var(--serif); font-size: 22px; font-weight: 600; }
 
-/* Número do CAR (43 caracteres): menor e monoespaçado para não pular a cada troca */
-.caption strong.caption-car {
-  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
-  font-size: 15px;
-  letter-spacing: 0.2px;
-  word-break: break-all;
-}
 .caption > span:not(.caption-step):not(.caption-progress) { font-size: 13px; color: rgba(251, 248, 240, 0.75); }
 
 .caption-progress {
