@@ -396,7 +396,9 @@
         return Math.sqrt(dx * dx + dy * dy);
     }
 
-    function cityPoint(i) { return [cities[i].lon, cities[i].lat]; }
+    // Ponto de parada: o trecho com mais imóveis do CAR do município (calculado
+    // no servidor), não a sede — a área urbana quase não tem CAR.
+    function cityPoint(i) { return cities[i].focus; }
 
     function visit(i) {
         visited[i] = 1;

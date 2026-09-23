@@ -56,7 +56,11 @@ SUMMARY_CACHE_KEY = 'bases_3d:summary:v3'
 # Tour de cidade em cidade: sedes dos 139 municípios do Tocantins (IBGE,
 # coordenadas do projeto kelvins/municipios-brasileiros).
 MUNICIPIOS_JSON = TOCANTINS_GEOJSON.with_name('tocantins_municipios.json')
-CITIES_CACHE_KEY = 'bases_3d:cities:v1'
+CITIES_CACHE_KEY = 'bases_3d:cities:v2'
+
+# Onde o tour para em cada município: não na sede (área urbana, quase sem
+# CAR), mas no trecho de ~5 km com mais imóveis do CAR daquele município.
+FOCUS_CELL_DEG = 0.05
 SUMMARY_CACHE_SECONDS = 60 * 60
 
 _GEOM_KIND = {'POLYGON': 'polygon', 'MULTIPOLYGON': 'polygon',
@@ -217,7 +221,8 @@ def _query_tile(base, summary, z, x, y):
 
 
 def cities_summary():
-    """Sedes municipais com o número de imóveis do CAR de cada município.
+    """Municípios com o número de imóveis do CAR e o ponto de parada do tour
+    (`focus`: centro dos imóveis na célula da grade com mais imóveis).
 
     O código IBGE do município está no próprio número do CAR
     (UF-<7 dígitos>-<hash>), então não é preciso cruzar geometrias."""
@@ -231,8 +236,24 @@ def cities_summary():
             GROUP BY 1
         """)
         cars = dict(cursor.fetchall())
+        cursor.execute("""
+            WITH p AS (
+                SELECT SUBSTRING(numero_car FROM 4 FOR 7) AS mun,
+                       ST_PointOnSurface(geometria_util) AS g
+                FROM tb_registro_sicar
+                WHERE geometria_util IS NOT NULL
+            ),
+            cells AS (
+                SELECT mun, COUNT(*) AS n, AVG(ST_X(g)) AS x, AVG(ST_Y(g)) AS y
+                FROM p
+                GROUP BY mun, FLOOR(ST_X(g) / %(cell)s), FLOOR(ST_Y(g) / %(cell)s)
+            )
+            SELECT DISTINCT ON (mun) mun, x, y FROM cells ORDER BY mun, n DESC
+        """, {'cell': FOCUS_CELL_DEG})
+        focus = {mun: [x, y] for mun, x, y in cursor.fetchall()}
     cities = [
-        dict(city, cars=cars.get(city['codigo'], 0))
+        dict(city, cars=cars.get(city['codigo'], 0),
+             focus=focus.get(city['codigo'], [city['lon'], city['lat']]))
         for city in json.loads(MUNICIPIOS_JSON.read_text(encoding='utf-8'))
     ]
     cache.set(CITIES_CACHE_KEY, cities, SUMMARY_CACHE_SECONDS)
