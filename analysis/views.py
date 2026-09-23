@@ -9,7 +9,7 @@ from dataclasses import asdict
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db.models import Q
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views import View
@@ -25,7 +25,12 @@ from analysis.services.view_services.result_map_formatter import (
     format_data_map,
     planet_tiles_url,
 )
-from analysis.services.view_services.bases_3d import bases_summary, render_tile
+from analysis.services.view_services.bases_3d import (
+    bases_summary,
+    render_tile,
+    sicar_detail,
+    sicar_points_blob,
+)
 from analysis.services.view_services.zip_upload_service import ZipUploadService
 from analysis.validators import validate_car_number
 
@@ -553,6 +558,8 @@ class Bases3DView(View):
         return render(request, self.template_name, {
             'bases_3d_config': {
                 'tilesUrl': sample.replace('/BASE/0/0/0.pbf', '/{base}/{z}/{x}/{y}.pbf'),
+                'sicarPointsUrl': reverse('sicar_points'),
+                'sicarDetailUrl': reverse('sicar_detail', args=(0,)).replace('/0/', '/{id}/'),
                 'bases': bases_summary(),
             },
         })
@@ -568,3 +575,20 @@ class BaseTileView(View):
         response = HttpResponse(tile, content_type='application/vnd.mapbox-vector-tile')
         response['Cache-Control'] = 'private, max-age=3600'
         return response
+
+
+class SicarPointsView(View):
+    """Pontos de todos os imóveis do SICAR (binário) para o tour de CAR em CAR."""
+
+    def get(self, request):
+        response = HttpResponse(sicar_points_blob(), content_type='application/octet-stream')
+        response['Cache-Control'] = 'private, max-age=3600'
+        return response
+
+
+class SicarDetailView(View):
+    def get(self, request, pk):
+        detail = sicar_detail(pk)
+        if not detail:
+            raise Http404
+        return JsonResponse(detail)

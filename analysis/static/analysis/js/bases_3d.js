@@ -15,10 +15,8 @@
         return { source: 'terrain', exaggeration: terrainExaggeration };
     }
 
-    var FLY_MS = 6000;     // voo até a próxima base
-    var DWELL_MS = 8000;   // tempo girando em volta de cada base
-    var TOUR_ZOOM = 11.5;
-    var TOUR_PITCH = 62;
+    var FLY_MS = 6000;     // voo da visão geral
+    var TOUR_PITCH = 60;
 
     var SICAR = 'SicarRecord';
     var STATUS_LABEL = { AT: 'Ativo', PE: 'Pendente', SU: 'Suspenso', CA: 'Cancelado' };
@@ -46,6 +44,8 @@
     }
 
     var HOVER = ['boolean', ['feature-state', 'hover'], false];
+    // Imóvel em que o tour está parado no momento.
+    var CURRENT = ['boolean', ['feature-state', 'current'], false];
 
     function hoverColor(b) {
         return ['case', HOVER, '#f3e3bc', baseColor(b)];
@@ -72,11 +72,12 @@
             // funcionarem também no interior do imóvel.
             return [
                 Object.assign({ id: id + '-hit', type: 'fill', paint: {
-                    'fill-color': '#000', 'fill-opacity': 0
+                    'fill-color': SICAR_COLOR,
+                    'fill-opacity': ['case', CURRENT, 0.22, 0]
                 } }, common),
                 Object.assign({ id: id + '-ln', type: 'line', paint: {
-                    'line-color': hoverColor(b),
-                    'line-width': ['case', HOVER, 3.2, 1.6],
+                    'line-color': ['case', CURRENT, '#ffffff', hoverColor(b)],
+                    'line-width': ['case', CURRENT, 4, HOVER, 3.2, 1.6],
                     'line-dasharray': [2, 1.5]
                 } }, common)
             ];
@@ -240,7 +241,7 @@
         var btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'base-go';
-        btn.title = 'Ir até esta camada';
+        btn.title = 'Ver o Tocantins inteiro';
         var name = document.createElement('span');
         name.className = 'base-name';
         name.textContent = b.nome;
@@ -250,8 +251,8 @@
         btn.appendChild(name);
         btn.appendChild(count);
         btn.addEventListener('click', function () {
-            var idx = steps.findIndex(function (st) { return st.base === b; });
-            if (idx >= 0) goTo(idx);
+            pauseTour();
+            goToOverview();
         });
 
         li.appendChild(cb);
@@ -278,21 +279,14 @@
     map.on('zoomend', updateZoomHint);
 
     // =====================================================================
-    // Tour animado: visão geral do estado -> voo até cada base -> giro
+    // Tour animado: visão geral do estado -> de CAR em CAR, sempre para o
+    // imóvel ainda não visitado mais próximo (vizinho mais próximo guloso).
     // =====================================================================
 
-    // Uma parada por item de `stops` (no SICAR, uma por situação do CAR).
-    var OVERVIEW = { overview: true };
-    var steps = [OVERVIEW];
-    bases.forEach(function (b) {
-        b.stops.forEach(function (stop) {
-            steps.push({ base: b, focus: stop.focus, label: stop.label, value: stop.value, count: stop.count });
-        });
-    });
-    var current = 0;
     var playing = false;
     var token = 0;  // invalida callbacks de passos anteriores
     var ready = false;  // estilo carregado: camadas já podem ser alteradas
+    var userTookOver = false;  // usuário mexeu no mapa antes do tour começar
 
     var caption = document.getElementById('caption');
     var captionStep = document.getElementById('caption_step');
@@ -301,23 +295,23 @@
     var captionBar = document.getElementById('caption_bar');
     var playBtn = document.getElementById('tour_play');
 
-    var totalFeatures = bases.reduce(function (acc, b) { return acc + b.count; }, 0);
+    var sicarBase = bases.filter(function (b) { return b.modelo === SICAR; })[0];
+    var STATUS_BY_CODE = { 1: 'AT', 2: 'PE', 3: 'SU', 4: 'CA' };
+    var START_POINT = [-48.33, -10.18];  // Palmas
 
-    function setCaption(step, index) {
-        if (step.overview) {
-            captionStep.textContent = 'Visão geral';
-            captionTitle.textContent = 'Tocantins';
-            captionText.textContent = bases.length
-                ? bases.length + (bases.length === 1 ? ' base' : ' bases') + ' com dados · ' + fmt(totalFeatures) + ' feições'
-                : 'Nenhuma base com dados ainda';
-        } else {
-            var b = step.base;
-            captionStep.textContent = 'Parada ' + index + ' de ' + (steps.length - 1);
-            captionTitle.textContent = step.label ? b.nome + ' · ' + step.label : b.nome;
-            captionText.textContent = fmt(step.count) + (b.modelo === SICAR ? ' imóveis' : ' feições') + ' no Tocantins';
-        }
+    var HOP_MS = 1800;     // salto até o CAR vizinho
+    var FAR_HOP_MS = 4000; // quando os vizinhos acabam e ele precisa ir longe
+    var DWELL_MS = 1200;   // tempo parado em cada CAR
+    var bearing = -20;
+
+    function showOverviewCaption() {
+        captionStep.textContent = 'Visão geral';
+        captionTitle.textContent = 'Tocantins';
+        captionTitle.classList.remove('caption-car');
+        captionText.textContent = sicarBase
+            ? fmt(sicarBase.count) + ' imóveis do CAR'
+            : 'Nenhuma base com dados ainda';
         caption.classList.add('visible');
-        bases.forEach(function (b) { b.itemEl.classList.toggle('active', b === step.base); });
     }
 
     function runProgress(ms) {
@@ -334,39 +328,190 @@
         map.once('moveend', function () { if (myToken === token) fn(); });
     }
 
-    // Na parada de uma situação, esmaece os imóveis das demais.
-    var sicarBase = bases.filter(function (b) { return b.modelo === SICAR; })[0];
-    function highlightStatus(value) {
-        if (!sicarBase) return;
-        map.setPaintProperty('b-' + SICAR + '-ln', 'line-opacity',
-            value ? ['case', ['==', SICAR_STATUS, value], 1, 0.2] : 1);
+    // ----- Pontos dos imóveis + grade espacial para o vizinho mais próximo -----
+
+    var pts = null;
+    var GRID = { size: 0.02, minLon: -50.9, minLat: -13.7, cols: 0, rows: 0, cells: null };
+
+    function clampInt(v, max) { return Math.max(0, Math.min(max - 1, Math.floor(v))); }
+
+    function cellOf(lon, lat) {
+        return clampInt((lat - GRID.minLat) / GRID.size, GRID.rows) * GRID.cols
+            + clampInt((lon - GRID.minLon) / GRID.size, GRID.cols);
     }
 
-    function goTo(index) {
-        if (!ready) return;
-        var myToken = ++token;
-        current = (index + steps.length) % steps.length;
-        var step = steps[current];
-        map.stop();
-        runProgress(0);
-        setCaption(step, current);
-        showOnly(step.overview ? null : step.base);
-        highlightStatus(step.base === sicarBase ? step.value : null);
+    // Formato em `sicar_points_blob` (analysis/services/view_services/bases_3d.py).
+    function loadPoints() {
+        return fetch(cfg.sicarPointsUrl, { credentials: 'same-origin' })
+            .then(function (r) { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+            .then(function (buf) {
+                var n = new DataView(buf).getUint32(0, true);
+                var off = 4;
+                function take(Type, bytes) {
+                    var arr = new Type(buf, off, n);
+                    off += n * bytes;
+                    return arr;
+                }
+                pts = {
+                    n: n,
+                    lon: take(Float32Array, 4),
+                    lat: take(Float32Array, 4),
+                    id: take(Int32Array, 4),
+                    area: take(Float32Array, 4),
+                    status: take(Uint8Array, 1),
+                    visitedCount: 0,
+                    order: [],   // índices na ordem em que foram visitados
+                    pos: -1      // posição atual em `order` (volta com "anterior")
+                };
+                GRID.cols = Math.ceil((-45.4 - GRID.minLon) / GRID.size);
+                GRID.rows = Math.ceil((-4.9 - GRID.minLat) / GRID.size);
+                GRID.cells = new Array(GRID.cols * GRID.rows);
+                for (var i = 0; i < n; i++) {
+                    var c = cellOf(pts.lon[i], pts.lat[i]);
+                    (GRID.cells[c] || (GRID.cells[c] = [])).push(i);
+                }
+            });
+    }
 
-        var bearing = step.overview ? 0 : ((current * 67) % 120) - 60;
-        if (step.overview) {
-            var cam = map.cameraForBounds(TO_BOUNDS, { padding: 40 });
-            map.flyTo({ center: cam.center, zoom: cam.zoom, pitch: 55, bearing: 0, duration: FLY_MS * 0.7, essential: true });
-        } else {
-            map.flyTo({ center: step.focus, zoom: TOUR_ZOOM, pitch: TOUR_PITCH, bearing: bearing, duration: FLY_MS, essential: true });
+    // A grade só guarda os não visitados. Busca em anéis de células crescentes
+    // até que nenhum anel mais distante possa ter um ponto mais perto que o
+    // melhor já encontrado.
+    function nearestUnvisited(lon, lat) {
+        if (pts.visitedCount >= pts.n) return -1;
+        var k = Math.cos(lat * Math.PI / 180);
+        var cx = clampInt((lon - GRID.minLon) / GRID.size, GRID.cols);
+        var cy = clampInt((lat - GRID.minLat) / GRID.size, GRID.rows);
+        var best = -1, bestD2 = Infinity;
+        var maxR = Math.max(GRID.cols, GRID.rows);
+
+        function scan(x, y) {
+            if (x < 0 || y < 0 || x >= GRID.cols || y >= GRID.rows) return;
+            var cell = GRID.cells[y * GRID.cols + x];
+            if (!cell) return;
+            for (var j = 0; j < cell.length; j++) {
+                var i = cell[j];
+                var dx = (pts.lon[i] - lon) * k, dy = pts.lat[i] - lat;
+                var d2 = dx * dx + dy * dy;
+                if (d2 < bestD2) { bestD2 = d2; best = i; }
+            }
         }
 
-        afterMove(myToken, function () {
-            if (!playing || steps.length < 2) return;
-            runProgress(DWELL_MS);
-            map.easeTo({ bearing: bearing + 45, duration: DWELL_MS, easing: function (t) { return t; }, essential: true });
-            afterMove(myToken, function () { if (playing) goTo(current + 1); });
+        for (var r = 0; r <= maxR; r++) {
+            var minDist = (r - 1) * GRID.size * k;
+            if (best >= 0 && minDist > 0 && minDist * minDist > bestD2) break;
+            if (r === 0) { scan(cx, cy); continue; }
+            for (var d = -r; d <= r; d++) {
+                scan(cx + d, cy - r);
+                scan(cx + d, cy + r);
+                if (d > -r && d < r) { scan(cx - r, cy + d); scan(cx + r, cy + d); }
+            }
+        }
+        return best;
+    }
+
+    function markVisited(i) {
+        pts.visitedCount++;
+        var cell = GRID.cells[cellOf(pts.lon[i], pts.lat[i])];
+        var at = cell.indexOf(i);
+        if (at >= 0) { cell[at] = cell[cell.length - 1]; cell.pop(); }
+    }
+
+    // ----- Câmera, destaque e legenda do imóvel atual -----
+
+    // Zoom para o imóvel caber com folga na tela (lado ~ raiz da área).
+    function zoomForArea(areaHa, lat) {
+        var side = Math.sqrt(Math.max(areaHa, 1) * 10000);
+        var canvas = map.getCanvas();
+        var px = Math.min(canvas.clientWidth, canvas.clientHeight) || 800;
+        var metersPerPixel = (side * 3.5) / px;
+        var z = Math.log2(156543.03 * Math.cos(lat * Math.PI / 180) / metersPerPixel);
+        return Math.max(sicarBase.min_zoom + 1.5, Math.min(16, z));
+    }
+
+    var currentFeature = null;
+    function setCurrent(i) {
+        if (currentFeature) map.setFeatureState(currentFeature, { current: false });
+        currentFeature = i >= 0 ? { source: 'b-' + SICAR, sourceLayer: 'layer', id: pts.id[i] } : null;
+        if (currentFeature) map.setFeatureState(currentFeature, { current: true });
+    }
+
+    var detailRequest = 0;
+    function showCaptionFor(i) {
+        var code = STATUS_BY_CODE[pts.status[i]];
+        captionStep.textContent = 'CAR ' + fmt(pts.pos + 1) + ' de ' + fmt(pts.n);
+        captionTitle.textContent = '…';
+        captionTitle.classList.add('caption-car');
+        captionText.textContent = (STATUS_LABEL[code] || 'Sem situação') + ' · ' + fmt(pts.area[i], 2) + ' ha';
+        caption.classList.add('visible');
+
+        var myRequest = ++detailRequest;
+        fetch(cfg.sicarDetailUrl.replace('{id}', pts.id[i]), { credentials: 'same-origin' })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (d) {
+                if (myRequest === detailRequest) captionTitle.textContent = d ? d.car_number : '-';
+            })
+            .catch(function () {
+                if (myRequest === detailRequest) captionTitle.textContent = '-';
+            });
+    }
+
+    function visit(i, myToken, durationMs) {
+        setCurrent(i);
+        showCaptionFor(i);
+        runProgress(0);
+        map.flyTo({
+            center: [pts.lon[i], pts.lat[i]],
+            zoom: zoomForArea(pts.area[i], pts.lat[i]),
+            pitch: TOUR_PITCH,
+            bearing: bearing,
+            duration: durationMs,
+            essential: true
         });
+        afterMove(myToken, function () {
+            if (!playing) return;
+            runProgress(DWELL_MS);
+            bearing += 6;
+            map.easeTo({ bearing: bearing, duration: DWELL_MS, easing: function (t) { return t; }, essential: true });
+            afterMove(myToken, function () { if (playing) step(1); });
+        });
+    }
+
+    // Avança (+1) ou volta (-1) um CAR. Avançar além do histórico escolhe o
+    // vizinho não visitado mais próximo do CAR atual.
+    function step(dir) {
+        if (!ready || !pts || !sicarBase) return;
+        var from = pts.pos >= 0 ? pts.order[pts.pos] : -1;
+        if (dir < 0) {
+            if (pts.pos <= 0) return;
+            pts.pos--;
+        } else if (pts.pos < pts.order.length - 1) {
+            pts.pos++;
+        } else {
+            var origin = from >= 0 ? [pts.lon[from], pts.lat[from]] : START_POINT;
+            var next = nearestUnvisited(origin[0], origin[1]);
+            if (next < 0) { pauseTour(); return; }  // todos os CARs visitados
+            markVisited(next);
+            pts.order.push(next);
+            pts.pos = pts.order.length - 1;
+        }
+
+        var myToken = ++token;
+        map.stop();
+        showOnly(sicarBase);
+        var i = pts.order[pts.pos];
+        var far = from < 0 || Math.abs(pts.lon[i] - pts.lon[from]) + Math.abs(pts.lat[i] - pts.lat[from]) > 0.15;
+        visit(i, myToken, far ? FAR_HOP_MS : HOP_MS);
+    }
+
+    function goToOverview() {
+        if (!ready) return;
+        token++;
+        map.stop();
+        runProgress(0);
+        if (pts) setCurrent(-1);
+        showOverviewCaption();
+        var cam = map.cameraForBounds(TO_BOUNDS, { padding: 40 });
+        map.flyTo({ center: cam.center, zoom: cam.zoom, pitch: 55, bearing: 0, duration: FLY_MS * 0.7, essential: true });
     }
 
     function setPlaying(on) {
@@ -380,35 +525,49 @@
     function pauseTour() {
         if (!playing) return;
         setPlaying(false);
-        highlightStatus(null);
         token++;
         map.stop();
         runProgress(0);
     }
 
     function playTour() {
+        if (!ready || !pts) return;
         setPlaying(true);
-        goTo(current);
+        // Retoma no CAR atual (ou começa pelo mais próximo de Palmas).
+        if (pts.pos >= 0) {
+            var myToken = ++token;
+            map.stop();
+            showOnly(sicarBase);
+            visit(pts.order[pts.pos], myToken, FAR_HOP_MS);
+        } else {
+            step(1);
+        }
     }
 
     playBtn.addEventListener('click', function () { playing ? pauseTour() : playTour(); });
-    document.getElementById('tour_next').addEventListener('click', function () { goTo(current + 1); });
-    document.getElementById('tour_prev').addEventListener('click', function () { goTo(current - 1); });
+    document.getElementById('tour_next').addEventListener('click', function () { step(1); });
+    document.getElementById('tour_prev').addEventListener('click', function () { step(-1); });
 
     // Qualquer interação direta com o mapa assume o controle da câmera.
     ['mousedown', 'touchstart', 'wheel'].forEach(function (ev) {
-        map.on(ev, pauseTour);
+        map.on(ev, function () {
+            userTookOver = true;
+            pauseTour();
+        });
     });
 
     var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var pointsReady = sicarBase ? loadPoints().catch(function () { pts = null; }) : Promise.resolve();
+
     map.on('load', function () {
         ready = true;
-        if (reduceMotion || steps.length < 2) {
-            setPlaying(false);
-            setCaption(OVERVIEW, 0);
-        } else {
-            setTimeout(playTour, 800);
-        }
+        showOverviewCaption();
+        setPlaying(false);
+        // Mostra a visão geral por alguns segundos e então começa a andar.
+        var pause = new Promise(function (resolve) { setTimeout(resolve, 2500); });
+        Promise.all([pointsReady, pause]).then(function () {
+            if (pts && !reduceMotion && !userTookOver) playTour();
+        });
     });
 
     // =====================================================================

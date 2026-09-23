@@ -8,6 +8,8 @@ imóveis do estado, e algumas bases importadas trazem feições de fora dele.
 """
 
 import json
+import struct
+from array import array
 from functools import lru_cache
 from pathlib import Path
 
@@ -15,6 +17,7 @@ from django.contrib.gis.geos import GEOSGeometry
 from django.core.cache import cache
 from django.db import connection
 
+from car_system.models import SicarRecord
 from control_panel.bases_config import BASES_CONFIG
 from control_panel.layer_registry import LAYER_REGISTRY
 
@@ -34,13 +37,11 @@ MAX_PROPS = 2
 # SICAR; para incluir outra camada basta acrescentar o `modelo` aqui.
 BASES_3D = ('SicarRecord',)
 
-# Bases cujo tour tem uma parada por valor de uma coluna (em vez de uma só):
-# modelo -> (coluna no banco, rótulos dos valores).
-TOUR_GROUPS = {
-    'SicarRecord': ('status', {'AT': 'Ativo', 'PE': 'Pendente', 'SU': 'Suspenso', 'CA': 'Cancelado'}),
-}
+SUMMARY_CACHE_KEY = 'bases_3d:summary:v3'
 
-SUMMARY_CACHE_KEY = 'bases_3d:summary:v2'
+# Tour "de CAR em CAR": um ponto por imóvel, empacotado em binário.
+SICAR_POINTS_CACHE_KEY = 'bases_3d:sicar_points:v1'
+SICAR_STATUS_CODES = {'AT': 1, 'PE': 2, 'SU': 3, 'CA': 4}
 SUMMARY_CACHE_SECONDS = 60 * 60
 
 _GEOM_KIND = {'POLYGON': 'polygon', 'MULTIPOLYGON': 'polygon',
@@ -126,39 +127,8 @@ def _base_summary(cursor, base):
         'kind': kind,
         'count': count,
         'min_zoom': DENSE_MIN_ZOOM if count > DENSE_THRESHOLD else SPARSE_MIN_ZOOM,
-        'stops': _tour_stops(cursor, base, count),
         'props': [{'key': p['key'], 'label': p['label']} for p in base['props']],
     }
-
-
-def _tour_stops(cursor, base, count):
-    """Paradas do tour: a maior feição inteiramente dentro do estado — uma
-    por grupo quando a base está em `TOUR_GROUPS`, senão uma só."""
-    q = connection.ops.quote_name
-    group = TOUR_GROUPS.get(base['modelo'])
-    group_expr = f"UPPER(s.{q(group[0])})" if group else "''"
-    cursor.execute(f"""
-        WITH {_TO_CTE},
-        inside AS (
-            SELECT {group_expr} AS grp, s.geometria_util AS geom, COALESCE(s.area_ha, 0) AS area
-            FROM {q(base['table'])} s, tocantins t
-            WHERE s.geometria_util @ t.geom AND ST_Within(s.geometria_util, t.geom)
-        ),
-        largest AS (
-            SELECT DISTINCT ON (grp) grp, ST_PointOnSurface(geom) AS p
-            FROM inside ORDER BY grp, area DESC
-        )
-        SELECT l.grp, ST_X(l.p), ST_Y(l.p), c.n
-        FROM largest l
-        JOIN (SELECT grp, COUNT(*) AS n FROM inside GROUP BY grp) c USING (grp)
-        ORDER BY c.n DESC
-    """, {'to': tocantins_wkt()})
-    rows = cursor.fetchall()
-    if not group:
-        return [{'value': None, 'label': None, 'focus': [x, y], 'count': count} for _, x, y, _n in rows]
-    labels = group[1]
-    return [{'value': grp, 'label': labels.get(grp, grp or 'Sem situação'), 'focus': [x, y], 'count': n}
-            for grp, x, y, n in rows]
 
 
 def bases_summary():
@@ -213,3 +183,51 @@ def render_tile(modelo, z, x, y):
         cursor.execute(sql, {'to': tocantins_wkt(), 'z': z, 'x': x, 'y': y})
         tile = cursor.fetchone()[0]
     return bytes(tile) if tile else None
+
+
+def sicar_points_blob():
+    """Um ponto (ST_PointOnSurface) por imóvel do SICAR no Tocantins, para o
+    tour percorrer os CARs pelo vizinho mais próximo no navegador.
+
+    Binário little-endian, em blocos para virar TypedArray direto no JS:
+    uint32 n | float32 lon[n] | float32 lat[n] | int32 id[n] |
+    float32 area_ha[n] | uint8 status[n] (ver `SICAR_STATUS_CODES`; 0 = outro).
+    ~17 bytes por imóvel, contra vários MB se fosse GeoJSON."""
+    blob = cache.get(SICAR_POINTS_CACHE_KEY)
+    if blob is not None:
+        return blob
+
+    with connection.cursor() as cursor:
+        cursor.execute(f"""
+            WITH {_TO_CTE}
+            SELECT s.id, ST_X(p.geom), ST_Y(p.geom), COALESCE(s.area_ha, 0), UPPER(COALESCE(s.status, ''))
+            FROM tb_registro_sicar s
+            CROSS JOIN tocantins t
+            CROSS JOIN LATERAL (SELECT ST_PointOnSurface(s.geometria_util) AS geom) p
+            WHERE s.geometria_util && t.geom AND ST_Intersects(s.geometria_util, t.geom)
+        """, {'to': tocantins_wkt()})
+        rows = cursor.fetchall()
+
+    lon, lat, ids, area = array('f'), array('f'), array('i'), array('f')
+    status = bytearray()
+    for pk, x, y, a, st in rows:
+        ids.append(pk)
+        lon.append(x)
+        lat.append(y)
+        area.append(a)
+        status.append(SICAR_STATUS_CODES.get(st, 0))
+
+    parts = [struct.pack('<I', len(rows))]
+    for arr in (lon, lat, ids, area):
+        if arr.itemsize != 4:
+            raise RuntimeError('array com itemsize inesperado')
+        parts.append(arr.tobytes())  # plataformas suportadas são little-endian
+    parts.append(bytes(status))
+    blob = b''.join(parts)
+    cache.set(SICAR_POINTS_CACHE_KEY, blob, SUMMARY_CACHE_SECONDS)
+    return blob
+
+
+def sicar_detail(pk):
+    """Número do CAR, situação e área de um imóvel (legenda do tour)."""
+    return SicarRecord.objects.filter(pk=pk).values('car_number', 'status', 'area_ha').first()

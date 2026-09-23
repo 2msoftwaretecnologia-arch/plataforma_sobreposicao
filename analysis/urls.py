@@ -13,5 +13,7 @@ urlpatterns = [
     path('download/property-shp/', login_required(views.DownloadPropertyShapefileView.as_view()), name='download_property_shp'),
     path('bases-3d/', login_required(views.Bases3DView.as_view()), name='bases_3d'),
     path('bases-3d/tiles/<str:modelo>/<int:z>/<int:x>/<int:y>.pbf', login_required(views.BaseTileView.as_view()), name='base_tiles'),
+    path('bases-3d/sicar/pontos.bin', login_required(views.SicarPointsView.as_view()), name='sicar_points'),
+    path('bases-3d/sicar/<int:pk>/', login_required(views.SicarDetailView.as_view()), name='sicar_detail'),
     path('termos/', views.termos, name='termos_de_uso')
 ]
