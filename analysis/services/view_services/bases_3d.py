@@ -30,7 +30,17 @@ SPARSE_MIN_ZOOM = 5
 # leve e para não expor dados pessoais (ex.: CPF/CNPJ dos embargos).
 MAX_PROPS = 2
 
-SUMMARY_CACHE_KEY = 'bases_3d:summary'
+# Bases exibidas no mapa 3D. Por enquanto só o perímetro dos imóveis do
+# SICAR; para incluir outra camada basta acrescentar o `modelo` aqui.
+BASES_3D = ('SicarRecord',)
+
+# Bases cujo tour tem uma parada por valor de uma coluna (em vez de uma só):
+# modelo -> (coluna no banco, rótulos dos valores).
+TOUR_GROUPS = {
+    'SicarRecord': ('status', {'AT': 'Ativo', 'PE': 'Pendente', 'SU': 'Suspenso', 'CA': 'Cancelado'}),
+}
+
+SUMMARY_CACHE_KEY = 'bases_3d:summary:v2'
 SUMMARY_CACHE_SECONDS = 60 * 60
 
 _GEOM_KIND = {'POLYGON': 'polygon', 'MULTIPOLYGON': 'polygon',
@@ -64,6 +74,8 @@ def catalog():
     resolvidas a partir do Model (os nomes vêm do código, nunca do request)."""
     bases = {}
     for cfg in BASES_CONFIG:
+        if cfg['modelo'] not in BASES_3D:
+            continue
         entry = LAYER_REGISTRY.get(cfg['modelo'])
         if not entry:
             continue
@@ -106,19 +118,6 @@ def _base_summary(cursor, base):
     if not count:
         return None
 
-    # Ponto de parada do tour: a maior feição inteiramente dentro do estado.
-    cursor.execute(f"""
-        WITH {_TO_CTE}
-        SELECT ST_X(p), ST_Y(p) FROM (
-            SELECT ST_PointOnSurface(s.geometria_util) AS p
-            FROM {table} s, tocantins t
-            WHERE s.geometria_util @ t.geom AND ST_Within(s.geometria_util, t.geom)
-            ORDER BY COALESCE(s.area_ha, 0) DESC
-            LIMIT 1
-        ) x
-    """, {'to': tocantins_wkt()})
-    row = cursor.fetchone()
-
     kind = _GEOM_KIND.get((geom_type or '').upper(), 'polygon')
     return {
         'modelo': base['modelo'],
@@ -127,9 +126,39 @@ def _base_summary(cursor, base):
         'kind': kind,
         'count': count,
         'min_zoom': DENSE_MIN_ZOOM if count > DENSE_THRESHOLD else SPARSE_MIN_ZOOM,
-        'focus': [row[0], row[1]] if row else None,
+        'stops': _tour_stops(cursor, base, count),
         'props': [{'key': p['key'], 'label': p['label']} for p in base['props']],
     }
+
+
+def _tour_stops(cursor, base, count):
+    """Paradas do tour: a maior feição inteiramente dentro do estado — uma
+    por grupo quando a base está em `TOUR_GROUPS`, senão uma só."""
+    q = connection.ops.quote_name
+    group = TOUR_GROUPS.get(base['modelo'])
+    group_expr = f"UPPER(s.{q(group[0])})" if group else "''"
+    cursor.execute(f"""
+        WITH {_TO_CTE},
+        inside AS (
+            SELECT {group_expr} AS grp, s.geometria_util AS geom, COALESCE(s.area_ha, 0) AS area
+            FROM {q(base['table'])} s, tocantins t
+            WHERE s.geometria_util @ t.geom AND ST_Within(s.geometria_util, t.geom)
+        ),
+        largest AS (
+            SELECT DISTINCT ON (grp) grp, ST_PointOnSurface(geom) AS p
+            FROM inside ORDER BY grp, area DESC
+        )
+        SELECT l.grp, ST_X(l.p), ST_Y(l.p), c.n
+        FROM largest l
+        JOIN (SELECT grp, COUNT(*) AS n FROM inside GROUP BY grp) c USING (grp)
+        ORDER BY c.n DESC
+    """, {'to': tocantins_wkt()})
+    rows = cursor.fetchall()
+    if not group:
+        return [{'value': None, 'label': None, 'focus': [x, y], 'count': count} for _, x, y, _n in rows]
+    labels = group[1]
+    return [{'value': grp, 'label': labels.get(grp, grp or 'Sem situação'), 'focus': [x, y], 'count': n}
+            for grp, x, y, n in rows]
 
 
 def bases_summary():

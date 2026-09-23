@@ -22,8 +22,9 @@
 
     var SICAR = 'SicarRecord';
     var STATUS_LABEL = { AT: 'Ativo', PE: 'Pendente', SU: 'Suspenso', CA: 'Cancelado' };
+    var SICAR_STATUS = ['upcase', ['coalesce', ['get', 'p1'], '']];
     var SICAR_COLOR = [
-        'match', ['upcase', ['coalesce', ['get', 'p1'], '']],
+        'match', SICAR_STATUS,
         // Cores vivas: o contorno pontilhado é fino e fica sobre o satélite.
         'AT', '#5fe08a',
         'PE', '#ffd23f',
@@ -239,7 +240,7 @@
         var btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'base-go';
-        btn.title = 'Ir até esta base';
+        btn.title = 'Ir até esta camada';
         var name = document.createElement('span');
         name.className = 'base-name';
         name.textContent = b.nome;
@@ -249,7 +250,7 @@
         btn.appendChild(name);
         btn.appendChild(count);
         btn.addEventListener('click', function () {
-            var idx = steps.indexOf(b);
+            var idx = steps.findIndex(function (st) { return st.base === b; });
             if (idx >= 0) goTo(idx);
         });
 
@@ -280,8 +281,14 @@
     // Tour animado: visão geral do estado -> voo até cada base -> giro
     // =====================================================================
 
+    // Uma parada por item de `stops` (no SICAR, uma por situação do CAR).
     var OVERVIEW = { overview: true };
-    var steps = [OVERVIEW].concat(bases.filter(function (b) { return b.focus; }));
+    var steps = [OVERVIEW];
+    bases.forEach(function (b) {
+        b.stops.forEach(function (stop) {
+            steps.push({ base: b, focus: stop.focus, label: stop.label, value: stop.value, count: stop.count });
+        });
+    });
     var current = 0;
     var playing = false;
     var token = 0;  // invalida callbacks de passos anteriores
@@ -304,12 +311,13 @@
                 ? bases.length + (bases.length === 1 ? ' base' : ' bases') + ' com dados · ' + fmt(totalFeatures) + ' feições'
                 : 'Nenhuma base com dados ainda';
         } else {
-            captionStep.textContent = 'Base ' + index + ' de ' + (steps.length - 1);
-            captionTitle.textContent = step.nome;
-            captionText.textContent = fmt(step.count) + ' feições no Tocantins';
+            var b = step.base;
+            captionStep.textContent = 'Parada ' + index + ' de ' + (steps.length - 1);
+            captionTitle.textContent = step.label ? b.nome + ' · ' + step.label : b.nome;
+            captionText.textContent = fmt(step.count) + (b.modelo === SICAR ? ' imóveis' : ' feições') + ' no Tocantins';
         }
         caption.classList.add('visible');
-        bases.forEach(function (b) { b.itemEl.classList.toggle('active', b === step); });
+        bases.forEach(function (b) { b.itemEl.classList.toggle('active', b === step.base); });
     }
 
     function runProgress(ms) {
@@ -326,6 +334,14 @@
         map.once('moveend', function () { if (myToken === token) fn(); });
     }
 
+    // Na parada de uma situação, esmaece os imóveis das demais.
+    var sicarBase = bases.filter(function (b) { return b.modelo === SICAR; })[0];
+    function highlightStatus(value) {
+        if (!sicarBase) return;
+        map.setPaintProperty('b-' + SICAR + '-ln', 'line-opacity',
+            value ? ['case', ['==', SICAR_STATUS, value], 1, 0.2] : 1);
+    }
+
     function goTo(index) {
         if (!ready) return;
         var myToken = ++token;
@@ -334,7 +350,8 @@
         map.stop();
         runProgress(0);
         setCaption(step, current);
-        showOnly(step.overview ? null : step);
+        showOnly(step.overview ? null : step.base);
+        highlightStatus(step.base === sicarBase ? step.value : null);
 
         var bearing = step.overview ? 0 : ((current * 67) % 120) - 60;
         if (step.overview) {
@@ -363,6 +380,7 @@
     function pauseTour() {
         if (!playing) return;
         setPlaying(false);
+        highlightStatus(null);
         token++;
         map.stop();
         runProgress(0);
