@@ -1,10 +1,11 @@
 import geopandas as gpd
 from django.contrib.auth.models import User
 from django.contrib.gis.geos import GEOSGeometry
+from django.core.cache import cache
 from django.db import connection, transaction
 
 from control_panel.utils import get_file_management
-from kernel.utils import reset_db
+from kernel.utils import model_count_cache_key, reset_db
 
 SRID = 4674
 UTM_SRID = 31982
@@ -15,16 +16,16 @@ class BulkShapefileImporter:
     Importador genérico para as bases fixas de SHP (SICAR, Zoneamento, APAs,
     Fitoecologia, etc.).
 
-    Lê o arquivo inteiro com geopandas, monta todas as instâncias do Model em
-    memória (já com `usable_geometry`/`area_m2`/`area_ha` calculados) e grava
-    tudo em lotes com `bulk_create`, em vez de um INSERT + SELECT de dedup por
+    Lê o arquivo inteiro com geopandas, monta as instâncias do Model (já com
+    `usable_geometry`/`area_m2`/`area_ha` calculados) em blocos e grava cada
+    bloco com `bulk_create`, em vez de um INSERT + SELECT de dedup por
     linha — para uma base com dezenas/centenas de milhares de registros isso é
     a diferença entre segundos e horas.
 
-    `reset_db` só é chamado depois que o arquivo foi lido e as instâncias
-    montadas com sucesso, para não truncar a tabela existente quando o
-    arquivo enviado está ausente/corrompido. Reprocessar sempre recarrega a
-    base do zero — por isso não há checagem de duplicados contra o banco.
+    `reset_db` e a gravação rodam numa única transação, para não perder a
+    tabela existente quando o arquivo enviado está corrompido ou a
+    importação falha no meio. Reprocessar sempre recarrega a base do zero —
+    por isso não há checagem de duplicados contra o banco.
     """
 
     model = None
@@ -102,19 +103,15 @@ class BulkShapefileImporter:
         if df.crs is not None and df.crs.to_epsg() != SRID:
             df = df.to_crs(epsg=SRID)
 
-        instances = []
-        seen_keys = set()
-        for _, row in df.iterrows():
-            key = self.natural_key(row)
-            if key is not None:
-                if key in seen_keys:
-                    continue
-                seen_keys.add(key)
-            instances.append(self._build_instance(row, user))
+        # Cada instância carrega a geometria duas vezes (WKT em `geometry` e
+        # GEOS em `usable_geometry`); para bases pesadas como a hidrografia
+        # (dezenas de milhões de vértices) montar tudo antes de gravar passa
+        # de 10 GB de RAM. Por isso monta e grava bloco a bloco, mantendo em
+        # memória só um bloco por vez.
+        rows = self._iter_unique_rows(df)
 
-        # Bases grandes (dezenas/centenas de milhares de linhas) podem levar
-        # minutos só para montar as instâncias em memória, e nesse meio-tempo
-        # a conexão com o banco (aberta desde o início do processo) pode cair
+        # A leitura do arquivo pode levar minutos, e nesse meio-tempo a
+        # conexão com o banco (aberta desde o início do processo) pode cair
         # por timeout de rede/idle. `close_if_unusable_or_obsolete` não é
         # suficiente aqui: se a conexão ficou "meio aberta" (o outro lado
         # derrubou sem enviar FIN, comum atrás de NAT/firewall), o ping de
@@ -122,9 +119,34 @@ class BulkShapefileImporter:
         # por isso fechamos incondicionalmente para forçar reconexão.
         connection.close()
 
-        reset_db(self.model)
-
+        # `reset_db` e todos os blocos rodam na mesma transação: se o
+        # arquivo estiver corrompido ou algo falhar no meio, o TRUNCATE
+        # também é desfeito e a tabela continua com os dados anteriores.
+        total = 0
         with transaction.atomic():
-            self.model.objects.bulk_create(instances, batch_size=self.batch_size)
+            reset_db(self.model)
+            chunk = []
+            for row in rows:
+                chunk.append(self._build_instance(row, user))
+                if len(chunk) >= self.batch_size:
+                    self.model.objects.bulk_create(chunk, batch_size=self.batch_size)
+                    total += len(chunk)
+                    chunk = []
+            if chunk:
+                self.model.objects.bulk_create(chunk, batch_size=self.batch_size)
+                total += len(chunk)
 
-        return len(instances)
+        # O painel pode ter recolocado a contagem antiga no cache enquanto a
+        # transação ainda não tinha sido confirmada.
+        cache.delete(model_count_cache_key(self.model))
+        return total
+
+    def _iter_unique_rows(self, df):
+        seen_keys = set()
+        for _, row in df.iterrows():
+            key = self.natural_key(row)
+            if key is not None:
+                if key in seen_keys:
+                    continue
+                seen_keys.add(key)
+            yield row
