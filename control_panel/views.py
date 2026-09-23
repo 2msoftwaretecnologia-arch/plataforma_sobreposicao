@@ -244,8 +244,8 @@ def base_upload_view(request, modelo):
     if not arquivo:
         messages.error(request, "Nenhum arquivo selecionado.")
         return redirect('control_panel:bases_dados')
-    if not arquivo.name.lower().endswith('.zip'):
-        messages.error(request, "O arquivo precisa ser um .zip contendo o shapefile (.shp, .dbf, .shx, ...).")
+    if not arquivo.name.lower().endswith(('.zip', '.gpkg')):
+        messages.error(request, "O arquivo precisa ser um .zip contendo o shapefile (.shp, .dbf, .shx, ...) ou um GeoPackage (.gpkg).")
         return redirect('control_panel:bases_dados')
 
     file_mgmt = utils.get_file_management()

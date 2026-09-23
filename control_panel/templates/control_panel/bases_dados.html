@@ -54,8 +54,8 @@
                 <div class="bd-manage-actions">
                     <form class="bd-upload-form" method="post" action="{% url 'control_panel:base_upload' base.modelo %}" enctype="multipart/form-data">
                         {% csrf_token %}
-                        <input type="file" name="arquivo" accept=".zip" required>
-                        <button type="submit" class="btn-refresh">Enviar SHP (.zip)</button>
+                        <input type="file" name="arquivo" accept=".zip,.gpkg" required>
+                        <button type="submit" class="btn-refresh">Enviar SHP (.zip) ou GPKG</button>
                     </form>
 
                     <form method="post" action="{% url 'control_panel:base_processar' base.modelo %}">

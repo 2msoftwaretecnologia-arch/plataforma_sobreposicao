@@ -19,10 +19,13 @@ class SicarImporter(BulkShapefileImporter):
 
     @staticmethod
     def format_date(date_str):
-        try:
-            return datetime.strptime(date_str, "%d/%m/%Y").date()
-        except (ValueError, TypeError):
-            return None
+        # O SHP do SICAR traz "dd/mm/aaaa"; o GeoPackage traz "aaaa-mm-dd".
+        for fmt in ("%d/%m/%Y", "%Y-%m-%d"):
+            try:
+                return datetime.strptime(date_str, fmt).date()
+            except (ValueError, TypeError):
+                continue
+        return None
 
     def format_fields(self, row):
         return {

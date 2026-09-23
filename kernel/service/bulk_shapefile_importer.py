@@ -96,6 +96,11 @@ class BulkShapefileImporter:
         user = self._get_user()
         path = self._get_archive_path()
         df = self.read_dataframe(path)
+        # A geometria é gravada assumindo SIRGAS 2000 (4674); arquivos em
+        # outro CRS (ex.: GeoPackage do SICAR em 4326) precisam ser
+        # reprojetados antes, senão a área calculada fica errada.
+        if df.crs is not None and df.crs.to_epsg() != SRID:
+            df = df.to_crs(epsg=SRID)
 
         instances = []
         seen_keys = set()

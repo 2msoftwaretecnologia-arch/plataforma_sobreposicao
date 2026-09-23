@@ -135,12 +135,25 @@ DATABASES = {
 # Cache
 # https://docs.djangoproject.com/en/5.2/topics/cache/
 
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        'LOCATION': config('REDIS_URL', default='redis://127.0.0.1:6379/1'),
+# Sem REDIS_URL (ambiente local sem Redis) cai para cache em memória: o
+# `admin_interface` lê o tema do cache em toda página do /admin e, com o
+# Redis fora do ar, o login do admin dava 500. Em produção o
+# docker-compose sempre define REDIS_URL.
+REDIS_URL = config('REDIS_URL', default='')
+
+if REDIS_URL:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': REDIS_URL,
+        }
     }
-}
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        }
+    }
 
 
 # Password validation
