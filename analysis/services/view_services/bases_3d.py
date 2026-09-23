@@ -35,9 +35,10 @@ MAX_PROPS = 2
 BASES_3D = ('SicarRecord',)
 
 # Nível máximo de tile gerado. Acima disso o mapa amplia os tiles do nível
-# 12 (4096 unidades por ~10 km, ~2,4 m de precisão) em vez de pedir novos:
-# trocar de nível no meio do tour fazia as linhas pontilhadas "pularem".
-MAX_TILE_ZOOM = 12
+# 11 (4096 unidades por ~20 km, ~4,8 m de precisão — menos de um pixel no
+# zoom do tour) em vez de pedir novos: trocar de nível enquanto a câmera
+# desce sobre uma cidade fazia as linhas pontilhadas "pularem".
+MAX_TILE_ZOOM = 11
 
 # Tiles prontos ficam em cache: gerar um tile custa ~0,5–1 s no PostGIS e,
 # enquanto ele não chega, o mapa mostra a versão de outro nível (piscando).

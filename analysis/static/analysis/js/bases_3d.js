@@ -473,26 +473,29 @@
 
     // ----- Voo contínuo -----
 
-    // Mais alto que no voo entre imóveis: as cidades ficam a dezenas de km.
-    // O zoom oscila só dentro do mesmo nível (11,0–11,9) para não trocar os
-    // tiles de nível no meio do voo.
-    var CITY_ZOOM = 11.45;
-    var ZOOM_SWING = 0.45;
-    var GROUND_SPEED = 3500;      // m/s no chão (média)
-    var MIN_SEGMENT_MS = 7000;
-    var MAX_SEGMENT_MS = 20000;
-    var ARRIVAL_SLOWDOWN = 0.7;   // desacelera ao passar sobre cada cidade
+    // Alto entre as cidades (dezenas de km) e perto sobre cada uma. Os tiles
+    // do SICAR e do relevo param no nível 11, então descer até o 13 só
+    // amplia o que já está carregado, sem trocar de nível (sem piscar).
+    var TRAVEL_ZOOM = 11.0;
+    var CITY_ZOOM = 13.0;
+    var GROUND_SPEED = 3500;      // m/s no chão, só na parte de deslocamento
+    var MIN_TRAVEL_MS = 7000;
+    var MAX_TRAVEL_MS = 20000;
+    var LINGER_MS = 7000;         // tempo a mais em cada trecho, gasto rondando as cidades
+    var ARRIVAL_SLOWDOWN = 0.92;  // quase para sobre cada cidade (0 = velocidade constante)
+    var ORBIT_DEG = 50;           // quanto a câmera gira em volta de cada cidade
     var LOOK_AHEAD = 0.3;
     var RAMP_MS = 2000;           // aceleração suave ao (re)começar
 
     function segmentMs(k) {
         var ms = distMeters(point(k), point(k + 1)) / GROUND_SPEED * 1000;
-        return Math.max(MIN_SEGMENT_MS, Math.min(MAX_SEGMENT_MS, ms));
+        return Math.max(MIN_TRAVEL_MS, Math.min(MAX_TRAVEL_MS, ms)) + LINGER_MS;
     }
 
     // Tempo do trecho (u) -> posição na curva (t). A velocidade fica
-    // 1 - A·cos(2πu): devagar sobre as cidades, mais rápida entre elas, sem
-    // nunca parar.
+    // 1 - A·cos(2πu): quase parada sobre as cidades (dá tempo de os imóveis
+    // carregarem), mais rápida entre elas, sem nunca parar de vez. Com
+    // A = 0,92 cerca de 40% do trecho é gasto a poucos km das cidades.
     function warp(u) {
         return u - ARRIVAL_SLOWDOWN * Math.sin(2 * Math.PI * u) / (2 * Math.PI);
     }
@@ -504,7 +507,16 @@
     // arco usam os mesmos valores para o voo contínuo emendar sem tranco.
     function wanderAt(c) { return 22 * Math.sin(c / 9100) + 9 * Math.sin(c / 3700 + 1.3); }
     function pitchAt(c) { return TOUR_PITCH + 6 * Math.sin(c / 13300 + 0.7); }
-    function zoomAt(u) { return CITY_ZOOM + ZOOM_SWING * Math.cos(2 * Math.PI * u); }
+    // Proximidade da cidade mais perto no trecho: 1 sobre ela, 0 no meio.
+    function nearness(u) { return (1 + Math.cos(2 * Math.PI * u)) / 2; }
+    function zoomAt(u) { return TRAVEL_ZOOM + (CITY_ZOOM - TRAVEL_ZOOM) * nearness(u); }
+
+    // Giro em volta da cidade: vai de -ORBIT/2 a +ORBIT/2 enquanto a câmera
+    // passa por ela e volta a zero no meio do trecho (sem salto em u = 0,5).
+    function orbitAt(u) {
+        var phase = u < 0.5 ? u : u - 1;  // 0 sobre a cidade, ±0,5 no meio
+        return ORBIT_DEG / 2 * Math.tanh(phase / 0.12) * (1 - Math.pow(2 * phase, 8));
+    }
 
     // Mostra só os perímetros dos CARs do município `code` (null = todos).
     // A propriedade `mun` vem nos tiles (ver TILE_EXTRA_SQL no servidor).
@@ -556,7 +568,9 @@
             var here = pathAt(k, t);
             var ta = t + LOOK_AHEAD;
             var ahead = ta <= 1 ? pathAt(k, ta) : pathAt(k + 1, ta - 1);
-            var target = distMeters(here, ahead) > 1 ? headingDeg(here, ahead) + wanderAt(clock) : camBearing;
+            var target = distMeters(here, ahead) > 1
+                ? headingDeg(here, ahead) + wanderAt(clock) + orbitAt(u)
+                : camBearing;
             camBearing += angleDiff(camBearing, target) * (1 - Math.exp(-dt / 1200));
 
             map.jumpTo({ center: here, bearing: camBearing, pitch: pitchAt(clock), zoom: zoomAt(u) });
