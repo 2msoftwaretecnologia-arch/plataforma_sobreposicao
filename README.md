@@ -69,6 +69,26 @@ Dentro da rede Docker os serviços continuam se falando pelas portas padrão (`a
 
 ## Como rodar localmente
 
+### Windows nesta máquina
+
+O ambiente configurado é `.venv` (Python com as bibliotecas GIS). Para iniciar:
+
+```powershell
+.\runserver.cmd
+```
+
+Esse comando usa `.venv\Scripts\python.exe` e, quando a porta local `5433`
+está fechada, abre um túnel SSH para o PostGIS em `root@82.25.66.238`.
+É necessário acesso ao servidor com a chave SSH já configurada. O banco utilizado
+é o banco existente no servidor. Acesse `http://127.0.0.1:8000/` e use `Ctrl+C`
+para encerrar o servidor e o túnel criado pelo comando.
+
+Para escolher outra porta: `.\runserver.cmd -Address 127.0.0.1:8001`.
+Com o túnel já aberto, também é possível executar diretamente
+`.\.venv\Scripts\python.exe manage.py runserver`.
+
+### Instalação em um novo ambiente
+
 ```bash
 python -m venv venv
 venv\Scripts\activate
