@@ -75,23 +75,21 @@
     }
     applyMode();
 
+    // Número colado de PDF/site costuma trazer espaços (inclusive
+    // invisíveis) e traços tipográficos; com eles o `pattern` do campo
+    // falha e o navegador bloqueia o envio sem avisar direito.
+    function cleanCarValue(value) {
+        return value
+            .replace(/[\s\u200B-\u200D\uFEFF.]/g, '')
+            .replace(/[\u2010-\u2015\u2212]/g, '-')
+            .toUpperCase();
+    }
+
     if (carInput) {
         function validateAndCleanCarInput(e) {
-            let value = carInput.value;
-            if (value.includes('.')) {
-                // Remove pontos
-                const newValue = value.replace(/\./g, '');
-                carInput.value = newValue;
-                
-                // Opcional: Notificar o usuário que os pontos foram removidos, 
-                // mas não bloquear ou mostrar erro vermelho permanente se agora está válido.
-                // Por enquanto, vamos limpar o erro se o valor resultante for válido (não vazio).
-                if (newValue.trim() !== '') {
-                    clientError.style.display = 'none';
-                }
-            } else {
-                clientError.style.display = 'none';
-            }
+            const cleaned = cleanCarValue(carInput.value);
+            if (cleaned !== carInput.value) carInput.value = cleaned;
+            clientError.style.display = 'none';
         }
 
         carInput.addEventListener('input', validateAndCleanCarInput);
@@ -227,9 +225,9 @@
     form.addEventListener('submit', function (e) {
         const mode = getSelectedMode();
 
-        // Garante que o input do CAR esteja limpo de pontos antes de validar
-        if (mode === 'car' && carInput && carInput.value.includes('.')) {
-            carInput.value = carInput.value.replace(/\./g, '');
+        // Garante que o input do CAR esteja limpo antes de validar
+        if (mode === 'car' && carInput) {
+            carInput.value = cleanCarValue(carInput.value);
         }
 
         const carValue = carInput.value.trim();

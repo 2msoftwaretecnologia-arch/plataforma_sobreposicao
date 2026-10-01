@@ -89,12 +89,12 @@ class OverlapService:
         """
         Calcula intersecções entre o alvo e uma camada.
         1) Usa `usable_geometry` com Intersection (PostGIS)
-        2) Fallback para `geometry` em texto quando necessário
+        2) Fallback para `geometry` em texto só nos registros sem `usable_geometry`
         """
-        results = self._compute_with_usable_geometry(layer_model)
-        if results:
-            return results
-        return self._compute_with_fallback_geometry(layer_model)
+        return (
+            self._compute_with_usable_geometry(layer_model)
+            + self._compute_with_fallback_geometry(layer_model)
+        )
 
     def _build_result_row(self, obj, inter, layer_model, fallback_geom=None):
         """
@@ -148,11 +148,22 @@ class OverlapService:
 
     def _compute_with_fallback_geometry(self, layer_model):
         """
-        Caminho de fallback: quando não há `usable_geometry`, utiliza `geometry`
-        em texto, normaliza SRID e calcula intersecção no app.
+        Caminho de fallback: para os registros sem `usable_geometry`, utiliza
+        `geometry` em texto, normaliza SRID e calcula intersecção no app.
+
+        Antes rodava sobre a camada inteira sempre que o caminho principal não
+        achava nada (o caso comum): com os 91 mil embargos do IBAMA isso
+        convertia todos os polígonos no Python a cada análise (minutos).
+        Registros sem geometria no arquivo de origem são gravados como "None".
         """
         results = []
-        for obj in layer_model.objects.exclude(geometry__isnull=True):
+        qs = (
+            layer_model.objects
+            .filter(usable_geometry__isnull=True)
+            .exclude(geometry__isnull=True)
+            .exclude(geometry__in=('', 'None'))
+        )
+        for obj in qs:
             try:
                 geom = GEOSGeometry(getattr(obj, "geometry"), srid=4674)
             except Exception:
