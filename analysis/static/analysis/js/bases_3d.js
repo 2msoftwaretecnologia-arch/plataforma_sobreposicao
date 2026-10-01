@@ -165,8 +165,9 @@
         }
     });
 
-    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
-    map.addControl(new maplibregl.FullscreenControl(), 'top-right');
+    // Embaixo à direita: o canto de cima é do formulário de análise.
+    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
+    map.addControl(new maplibregl.FullscreenControl(), 'bottom-right');
     map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-right');
 
     // =====================================================================
@@ -770,6 +771,19 @@
         WATER_LAYERS.forEach(function (id) {
             if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', e.target.checked ? 'visible' : 'none');
         });
+    });
+
+    // Formulário de análise no canto: recolhe/expande. No celular começa
+    // recolhido para não cobrir o mapa.
+    var dock = document.getElementById('entry_dock');
+    var dockToggle = document.getElementById('entry_dock_toggle');
+    function setDockOpen(open) {
+        dock.dataset.open = String(open);
+        dockToggle.setAttribute('aria-expanded', String(open));
+    }
+    setDockOpen(!window.matchMedia('(max-width: 640px)').matches);
+    dockToggle.addEventListener('click', function () {
+        setDockOpen(dock.dataset.open !== 'true');
     });
 
     terrainToggle.addEventListener('change', function () {

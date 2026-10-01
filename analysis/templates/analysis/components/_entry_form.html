@@ -1,0 +1,101 @@
+{% comment %}
+Formulário de entrada da análise (ZIP, CAR, demonstrativo, recibo). Usado na
+tela de análise e no canto do mapa 3D; o comportamento vem de upload.js.
+{% endcomment %}
+<form method="post" action="{% url 'upload_zip_car' %}" enctype="multipart/form-data" id="upload_form">
+    {% csrf_token %}
+    <div class="form-group">
+        <label class="field-label">Modo de análise</label>
+        <div class="mode-switch" role="radiogroup" aria-label="Modo de análise">
+            <input class="mode-input" id="mode_zip" type="radio" name="mode" value="zip" />
+            <label class="mode-pill" for="mode_zip">
+                <svg class="ico"><use href="#i-folder"/></svg>
+                ZIP
+            </label>
+            <input class="mode-input" id="mode_car" type="radio" name="mode" value="car" />
+            <label class="mode-pill" for="mode_car">
+                <svg class="ico"><use href="#i-pin"/></svg>
+                CAR
+            </label>
+            <input class="mode-input" id="mode_demo" type="radio" name="mode" value="demostrativo" />
+            <label class="mode-pill" for="mode_demo">
+                <svg class="ico"><use href="#i-doc"/></svg>
+                Demonstrativo
+            </label>
+            <input class="mode-input" id="mode_recibo" type="radio" name="mode" value="recibo" />
+            <label class="mode-pill" for="mode_recibo">
+                <svg class="ico"><use href="#i-check"/></svg>
+                Recibo
+            </label>
+        </div>
+    </div>
+
+    <div class="form-group" id="group_zip">
+        <label class="drop-zone" for="zip_file">
+            <input type="file" id="zip_file" name="zip_file" accept=".zip,application/zip" />
+            <span class="drop-icon"><svg class="ico"><use href="#i-upload"/></svg></span>
+            <strong>Arquivo ZIP do Shapefile</strong>
+            <p id="zip_label_text">Selecionar arquivo ZIP</p>
+        </label>
+        <div class="note-box zip-warning-message">
+            <svg class="ico"><use href="#i-alert"/></svg>
+            <p>O arquivo ZIP deve conter os arquivos do Shapefile: <strong>.shp, .shx, .dbf</strong>, etc.</p>
+        </div>
+    </div>
+
+    <div class="form-group" id="group_demo" style="display:none;">
+        <label class="drop-zone drag-zone" for="demo_file">
+            <span class="drop-icon"><svg class="ico"><use href="#i-upload"/></svg></span>
+            <strong>Demonstrativo do CAR (PDF)</strong>
+            <p id="demo_label_text">Arraste e solte seu arquivo aqui ou clique para selecionar!</p>
+        </label>
+        <input type="file" id="demo_file" name="demo_file" class="demo-input-file" accept=".pdf,application/pdf" />
+        <div class="note-box demo-warning-message">
+            <svg class="ico"><use href="#i-alert"/></svg>
+            <p>Aceitamos apenas arquivos emitidos pelo sistema <strong>Federal</strong>.</p>
+        </div>
+    </div>
+
+    <div class="form-group" id="group_recibo" style="display:none;">
+        <label class="drop-zone drag-zone" for="recibo_file">
+            <span class="drop-icon"><svg class="ico"><use href="#i-upload"/></svg></span>
+            <strong>Recibo do CAR (PDF)</strong>
+            <p id="recibo_label_text">Arraste e solte seu arquivo aqui ou clique para selecionar!</p>
+        </label>
+        <input type="file" id="recibo_file" name="recibo_file" class="demo-input-file" accept=".pdf,application/pdf" />
+        <div class="note-box recibo-warning-message">
+            <svg class="ico"><use href="#i-alert"/></svg>
+            <p>Aceitamos apenas arquivos emitidos pelo sistema <strong>Federal</strong>.</p>
+        </div>
+    </div>
+
+    <div class="form-group" id="group_car">
+        <label class="field-label" for="car_input">Número do CAR</label>
+        <input type="text" class="text-input" id="car_input" name="car_input"
+            placeholder="UF-0000000-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+            pattern="[A-Za-z]{2}-[0-9]{7}-[0-9A-Fa-f]{32}"
+            title="Formato: UF-0000000-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX (sem pontos)"
+            value="{% if car_input %}{{ car_input }}{% endif %}">
+        <div class="note-box car-warning-message">
+            <svg class="ico"><use href="#i-alert"/></svg>
+            <p>Utilize o CAR do <strong>Recibo Federal</strong>, no formato <strong>UF-0000000-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX</strong>. Digite apenas números e letras, <strong>sem pontos</strong>.</p>
+        </div>
+    </div>
+
+    <button class="btn btn-gold btn-lg btn-submit" type="submit">
+        Analisar propriedade
+        <svg class="ico" style="width:20px;height:20px"><use href="#i-arrow"/></svg>
+    </button>
+
+    <a class="termos-uso" href="{% url 'termos_de_uso' %}">Termos de Uso</a>
+</form>
+
+<div id="client_error" class="status-error" style="display:none;">❌ Por favor, envie um ZIP ou
+    informe o número do CAR.</div>
+
+{% if sucesso %}
+<div class="status-success">✅ {{ mensagem }}</div>
+{% endif %}
+{% if erro %}
+<div class="status-error">❌ {{ erro }}</div>
+{% endif %}
