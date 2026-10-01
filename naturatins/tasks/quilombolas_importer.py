@@ -13,7 +13,11 @@ class QuilombolasImporter(BulkShapefileImporter):
         return "Nenhum arquivo de quilombolas foi configurado."
 
     def read_dataframe(self, path):
-        return gpd.read_file(path, encoding="utf-8")
+        # Há versões do arquivo em UTF-8 e outras em Latin-1 sem .cpg.
+        try:
+            return gpd.read_file(path, encoding="utf-8")
+        except UnicodeDecodeError:
+            return gpd.read_file(path, encoding="latin1")
 
     def format_fields(self, row):
         return {
