@@ -82,7 +82,8 @@ class FinalResultBuilder:
         """
         Aplica regras de agrupamento específicas por camada.
 
-        - Para "PhytoecologyArea": agrupa por nome somando a área.
+        - Para "PhytoecologyArea": agrupa por nome e tipo somando a área (o
+          mesmo nome pode ter percentuais de Reserva Legal diferentes).
         - Para demais camadas: retorna os registros como estão.
         """
         if layer_name != "PhytoecologyArea" or not records:
@@ -90,9 +91,10 @@ class FinalResultBuilder:
 
         grouped = {}
         for r in records:
-            key = r.get("nome")
-            if key is None:
+            nome, tipo = r.get("nome"), r.get("tipo")
+            if nome is None:
                 continue
+            key = (nome, tipo)
             acc = grouped.get(key)
             if acc is None:
                 # Inicializa com a geometria atual
@@ -104,9 +106,10 @@ class FinalResultBuilder:
                         pass
 
                 grouped[key] = {
-                    "nome": key,
+                    "nome": nome,
+                    "tipo": tipo,
                     "area": r.get("area", 0) or 0,
-                    "item_info": key,
+                    "item_info": f"{nome} ({tipo})" if tipo else nome,
                     "preserved_area": r.get("preserved_area", 0),
                     "_geom_obj": geom # Armazena objeto temporário para união
                 }

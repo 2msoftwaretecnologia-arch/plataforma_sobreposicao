@@ -16,6 +16,16 @@ class PhytoecologyAreaImporter(BulkShapefileImporter):
         return gpd.read_file(path, encoding="utf-8")
 
     def format_fields(self, row):
+        # Regiões fitoecológicas do IBGE (TO): `NM_UVEG` é a vegetação; onde
+        # ela não existe mais vem o uso antrópico (`NM_UANTR`, ex.:
+        # pastagem) e, nos corpos d'água, nenhum dos dois. `AnáliseCA` é a
+        # classe da Reserva Legal (Cerrado 35%, Floresta 80%...).
+        phyto_type = _text(row.get("AnáliseCA"))
         return {
-            "phyto_name": row.get("AnáliseCA"),
+            "phyto_name": _text(row.get("NM_UVEG")) or _text(row.get("NM_UANTR")) or phyto_type,
+            "phyto_type": phyto_type,
         }
+
+
+def _text(value):
+    return value.strip() if isinstance(value, str) else ""

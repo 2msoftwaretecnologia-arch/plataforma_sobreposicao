@@ -49,12 +49,12 @@ class ZoningAreaAdmin(LeafletGeoAdmin):
 admin.site.register(ZoningArea, ZoningAreaAdmin)
 
 class PhytoecologyAreaAdmin(LeafletGeoAdmin):   
-    list_display = ('phyto_name', 'hash_id', 'area_ha')
-    search_fields = ('phyto_name',)
+    list_display = ('phyto_name', 'phyto_type', 'hash_id', 'area_ha')
+    search_fields = ('phyto_name', 'phyto_type')
     
     fieldsets = (
         (None, {
-            'fields': ('phyto_name', 'hash_id', 'geometry')
+            'fields': ('phyto_name', 'phyto_type', 'hash_id', 'geometry')
         }),
         (None, {
             'fields': ('usable_geometry', 'area_m2', 'area_ha')

@@ -41,6 +41,7 @@ BASES_CONFIG = [
         "cor": "#6A1B9A",
         "colunas_extraidas": [
             {"campo": "phyto_name", "coluna_bd": "nome_fitoecologia", "rotulo": "Nome da Fitoecologia", "saida": "nome"},
+            {"campo": "phyto_type", "coluna_bd": "tipo_fitoecologia", "rotulo": "Tipo (Reserva Legal)", "saida": "tipo"},
         ],
         "campos_calculados": [
             "Área de interseção (ha)",

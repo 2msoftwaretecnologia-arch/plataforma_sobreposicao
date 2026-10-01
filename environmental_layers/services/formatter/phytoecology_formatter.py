@@ -4,13 +4,14 @@ from environmental_layers.constants import PHYTOECOLOGY_PERCENTAGE
 class PhytoecologyFormatter(BaseFormatter):
     def format(self, model_obj, intersec):
         preserved_area = intersec.get("intersection_area_ha", 0) * (
-            PHYTOECOLOGY_PERCENTAGE.get(model_obj.phyto_name, 0) / 100
+            PHYTOECOLOGY_PERCENTAGE.get(model_obj.phyto_type, 0) / 100
         )
 
         return {
             "area": intersec["intersection_area_ha"],
             "nome": model_obj.phyto_name,
-            "item_info": "Regioões FitoEcologicas: {}".format(model_obj.phyto_name),
+            "tipo": model_obj.phyto_type,
+            "item_info": "Regiões Fitoecológicas: {} ({})".format(model_obj.phyto_name, model_obj.phyto_type),
             "polygon_wkt": intersec["intersection_geom"].wkt,
             "polygon_geojson": intersec["intersection_geom"].geojson,
             "preserved_area": preserved_area

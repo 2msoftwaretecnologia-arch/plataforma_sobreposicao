@@ -34,11 +34,20 @@ class ZoningArea(GeoBaseModel):
 
 class PhytoecologyArea(GeoBaseModel):
     phyto_name = models.CharField(
-        max_length=70, 
-        verbose_name="Nome da Fitoecologia", 
+        max_length=150,
+        verbose_name="Nome da Fitoecologia",
         db_column='nome_fitoecologia'
     )
-    
+    # Classe usada no cálculo da Reserva Legal ("Cerrado (35%)", "Floresta
+    # (80%)"...), chave de PHYTOECOLOGY_PERCENTAGE.
+    phyto_type = models.CharField(
+        max_length=50,
+        verbose_name="Tipo da Fitoecologia",
+        db_column='tipo_fitoecologia',
+        blank=True,
+        default='',
+    )
+
     hash_id = models.CharField(
         max_length=64, 
         verbose_name="Hash ID", 

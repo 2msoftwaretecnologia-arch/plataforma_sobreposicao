@@ -3,6 +3,7 @@
         <tr>
             <th>Área (ha)</th>
             <th>Nome</th>
+            <th>Tipo</th>
             <th>Área à Preservar (ha)</th>
         </tr>
     </thead>
@@ -11,11 +12,12 @@
         <tr>
             <td>{{ item.area|floatformat:4 }}</td>
             <td>{{ item.nome|default:"-" }}</td>
+            <td>{{ item.tipo|default:"-" }}</td>
             <td>{{ item.preserved_area|floatformat:4|default:"-" }}</td>
         </tr>
         {% empty %}
         <tr>
-            <td colspan="3">Nenhum registro encontrado.</td>
+            <td colspan="4">Nenhum registro encontrado.</td>
         </tr>
         {% endfor %}
     </tbody>
