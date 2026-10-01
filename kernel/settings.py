@@ -90,7 +90,7 @@ MIDDLEWARE = [
 
 LOGIN_URL = 'authentication:login'
 LOGIN_REDIRECT_URL = 'upload_zip_car'
-LOGOUT_REDIRECT_URL = 'landing_page'
+LOGOUT_REDIRECT_URL = 'authentication:login'
 
 ROOT_URLCONF = 'kernel.urls'
 

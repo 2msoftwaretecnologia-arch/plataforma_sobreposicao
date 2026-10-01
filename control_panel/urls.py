@@ -19,7 +19,7 @@ def _staff_only(view):
             login_url = f"{reverse('authentication:login')}?next={request.path}"
             return redirect(login_url)
         if not (request.user.is_active and request.user.is_staff):
-            return redirect('landing_page')
+            return redirect('upload_zip_car')
         return view(request, *args, **kwargs)
     return wrapped
 

@@ -62,7 +62,7 @@ class OnboardingView(View):
             profile = form.save(commit=False)
             profile.onboarding_completo = True
             profile.save()
-            return redirect(_safe_next_url(request) or 'landing_page')
+            return redirect(_safe_next_url(request) or 'upload_zip_car')
 
         return self._render(request, form)
 

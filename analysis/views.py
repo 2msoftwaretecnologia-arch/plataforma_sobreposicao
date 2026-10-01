@@ -559,19 +559,6 @@ def termos(request):
     return render(request, 'analysis/termos_de_uso.html')
 
 
-class Lading_PageView(View):
-    def get(self, request):
-        return render(request, 'analysis/lading_page.html')
-        
-
-
-class Bases3DView(View):
-    """Endereço antigo do mapa 3D, que agora é a própria tela de análise."""
-
-    def get(self, request):
-        return redirect('upload_zip_car')
-
-
 class BaseTileView(View):
     """Vector tile (MVT) de uma base, recortado pelo Tocantins."""
 

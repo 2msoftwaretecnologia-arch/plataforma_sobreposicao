@@ -36,7 +36,6 @@
 
     <div class="panel">
         <nav class="panel-nav" aria-label="Navegação">
-            <a href="{% url 'landing_page' %}">Início</a>
             <a href="{% url 'historico' %}">Meu histórico</a>
             <form method="post" action="{% url 'authentication:logout' %}">
                 {% csrf_token %}
