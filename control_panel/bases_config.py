@@ -69,6 +69,8 @@ BASES_CONFIG = [
         "nome_base": "Base de Dados de Indígenas",
         "tabela": "tb_area_terra_indigena",
         "arquivo_upload": "indigenous_zip_file",
+        # Sem shapefile: o importador baixa o GeoPackage da FUNAI publicado pela ANA.
+        "fonte_api": "FUNAI (via catálogo SNIRH/ANA) — Terras Indígenas do Tocantins",
         "cor": "#8E24AA",
         "colunas_extraidas": [
             {"campo": "indigenous_name", "coluna_bd": "NOME_AREA", "rotulo": "Nome da Área", "saida": "nome_area"},
