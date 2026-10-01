@@ -1,78 +1,7 @@
-/* Tela de upload — estende o design system da landing page (landing_page.css) */
-
-/* ===== Topbar ===== */
-.btn-outline-green {
-  border: 1.5px solid rgba(43, 90, 56, 0.35);
-  color: var(--green-800);
-  background: transparent;
-}
-
-.btn-outline-green:hover {
-  border-color: var(--green-600);
-  color: var(--green-600);
-  transform: translateY(-2px);
-}
-
-/* ===== Entrada de dados (coluna única centralizada) ===== */
-.entry-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  width: min(620px, 100%);
-  margin: 0 auto;
-  padding: 56px 0 72px;
-}
-
-/* ===== Atalho para a base SICAR em 3D ===== */
-.sicar3d-card {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 18px 22px;
-  border-radius: var(--radius-lg);
-  border: 1px solid rgba(219, 166, 63, 0.35);
-  background: rgba(251, 248, 240, 0.06);
-  color: var(--cream-50);
-  text-decoration: none;
-  transition: background .2s ease, border-color .2s ease, transform .2s ease;
-}
-
-.sicar3d-card:hover {
-  background: rgba(251, 248, 240, 0.12);
-  border-color: var(--gold-400);
-  transform: translateY(-2px);
-}
-
-.sicar3d-icon {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
-  background: linear-gradient(180deg, var(--gold-400), var(--gold-500));
-  color: var(--green-950);
-}
-
-.sicar3d-icon .ico { width: 24px; height: 24px; }
-
-.sicar3d-text { display: flex; flex-direction: column; gap: 3px; flex: 1; }
-
-.sicar3d-text strong {
-  font-family: var(--serif);
-  font-size: 19px;
-  font-weight: 600;
-}
-
-.sicar3d-text span { font-size: 13.5px; color: rgba(251, 248, 240, 0.75); line-height: 1.5; }
-
-.sicar3d-arrow { width: 20px; height: 20px; color: var(--gold-400); flex-shrink: 0; }
+/* Formulário de análise (components/_entry_form.html) — estende o design
+   system da landing page; a versão do canto do mapa 3D está em bases_3d.css. */
 
 /* ===== Cartão do formulário ===== */
-.form-card {
-  transform: none;
-}
-
 .form-body {
   padding: 26px 24px 28px;
 }
@@ -347,8 +276,7 @@
   .mode-pill,
   .mode-pill .ico,
   .drop-zone,
-  .drop-icon,
-  .sicar3d-card {
+  .drop-icon {
     transition: none;
   }
 
@@ -366,9 +294,5 @@
 
   .form-body {
     padding: 20px 16px 22px;
-  }
-
-  .entry-grid {
-    padding: 32px 0 48px;
   }
 }

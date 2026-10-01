@@ -5,7 +5,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SICAR em 3D | TerraView Tocantins</title>
+    <title>Analisar propriedade | TerraView Tocantins</title>
+    <link rel="icon" type="image/svg+xml" href="{% static 'analysis/images/icon_page.svg' %}">
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -34,7 +35,14 @@
     <div id="map" aria-label="Mapa 3D dos imóveis do SICAR no Tocantins"></div>
 
     <div class="panel">
-        <a href="{% url 'upload_zip_car' %}" class="panel-back">&larr; Voltar à análise</a>
+        <nav class="panel-nav" aria-label="Navegação">
+            <a href="{% url 'landing_page' %}">Início</a>
+            <a href="{% url 'historico' %}">Meu histórico</a>
+            <form method="post" action="{% url 'authentication:logout' %}">
+                {% csrf_token %}
+                <button type="submit">Sair</button>
+            </form>
+        </nav>
         <h1>SICAR em 3D</h1>
         <p class="panel-text">Perímetro dos imóveis do CAR da cidade em que o tour está, sobre o relevo do Tocantins. Clique num imóvel para ver os detalhes.</p>
 

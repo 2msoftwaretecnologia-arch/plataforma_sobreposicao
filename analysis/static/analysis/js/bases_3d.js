@@ -781,7 +781,9 @@
         dock.dataset.open = String(open);
         dockToggle.setAttribute('aria-expanded', String(open));
     }
-    setDockOpen(!window.matchMedia('(max-width: 640px)').matches);
+    // Sempre aberto quando a análise voltou com um aviso (ex.: CAR inválido).
+    var hasMessage = dock.querySelector('.status-error:not([style*="none"]), .status-success');
+    setDockOpen(!!hasMessage || !window.matchMedia('(max-width: 640px)').matches);
     dockToggle.addEventListener('click', function () {
         setDockOpen(dock.dataset.open !== 'true');
     });

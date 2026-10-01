@@ -1,6 +1,6 @@
 {% comment %}
-Formulário de entrada da análise (ZIP, CAR, demonstrativo, recibo). Usado na
-tela de análise e no canto do mapa 3D; o comportamento vem de upload.js.
+Formulário de entrada da análise (ZIP, CAR, demonstrativo, recibo), no canto
+do mapa 3D da página inicial; o comportamento vem de upload.js.
 {% endcomment %}
 <form method="post" action="{% url 'upload_zip_car' %}" enctype="multipart/form-data" id="upload_form">
     {% csrf_token %}

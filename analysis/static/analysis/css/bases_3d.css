@@ -28,16 +28,32 @@ html, body.bases3d-page {
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
 }
 
-.panel-back {
-  display: inline-block;
-  margin-bottom: 10px;
+.panel-nav {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(251, 248, 240, 0.12);
+}
+
+.panel-nav form { margin-left: auto; }
+
+.panel-nav a,
+.panel-nav button {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
   font-size: 13px;
   font-weight: 600;
   color: var(--gold-400);
   text-decoration: none;
+  cursor: pointer;
 }
 
-.panel-back:hover { text-decoration: underline; }
+.panel-nav a:hover,
+.panel-nav button:hover { text-decoration: underline; }
 
 .panel h1 {
   font-family: var(--serif);
@@ -441,7 +457,7 @@ html, body.bases3d-page {
 }
 
 .entry-dock .note-box .ico { stroke: var(--gold-400); }
-.entry-dock .note-box p { font-size: 12px; line-height: 1.45; }
+.entry-dock .note-box p { font-size: 12px; line-height: 1.45; min-width: 0; overflow-wrap: anywhere; }
 .entry-dock .note-box strong { color: var(--cream-50); }
 
 .entry-dock .btn-submit { padding: 12px 20px; font-size: 15px; }
@@ -449,7 +465,7 @@ html, body.bases3d-page {
 .entry-dock .termos-uso:hover { color: var(--gold-400); }
 
 .entry-dock .status-error,
-.entry-dock .status-success { margin-top: 10px; padding: 10px 12px; font-size: 13px; }
+.entry-dock .status-success { margin-top: 10px; padding: 10px 12px; font-size: 13px; overflow-wrap: anywhere; }
 .entry-dock .status-error { background: rgba(255, 107, 61, 0.14); color: #ffb79c; }
 .entry-dock .status-success { background: rgba(95, 224, 138, 0.14); color: #a8efbf; }
 

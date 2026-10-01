@@ -338,12 +338,31 @@ class DownloadPropertyKmlView(View):
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
 
+def _bases_3d_config(request):
+    """Configuração do mapa 3D (camadas, tiles e cidades do tour)."""
+    # MapLibre exige URL absoluta; os placeholders {z}/{x}/{y} e {base}
+    # não passam pelo `reverse`, então trocamos um tile fictício por eles.
+    sample = request.build_absolute_uri(reverse('base_tiles', args=('BASE', 0, 0, 0)))
+    return {
+        'tilesUrl': sample.replace('/BASE/0/0/0.pbf', '/{base}/{z}/{x}/{y}.pbf'),
+        'maxTileZoom': MAX_TILE_ZOOM,
+        'bases': bases_summary(),
+        'cities': cities_summary(),
+    }
+
+
 class UploadZipCarView(View):
-    template_upload = 'analysis/upload.html'
+    """Página inicial depois do login: mapa 3D do SICAR com o tour de cidade
+    em cidade e o formulário de análise no canto."""
+    template_upload = 'analysis/bases_3d.html'
     template_index = 'analysis/results.html'
-    
+
     def get(self, request):
-        return render(request, self.template_upload)
+        return self._render_form(request, {})
+
+    def _render_form(self, request, context):
+        context['bases_3d_config'] = _bases_3d_config(request)
+        return render(request, self.template_upload, context)
 
     def post(self, request):
         zip_file = request.FILES.get('zip_file')
@@ -386,7 +405,7 @@ class UploadZipCarView(View):
             except ValidationError as e:
                 context['erro'] = e.message
                 context['car_input'] = car_input
-                return render(request, self.template_upload, context)
+                return self._render_form(request, context)
 
             context['car_input'] = car_input
             return self._handle_only_car(request, car_input, context)
@@ -396,7 +415,7 @@ class UploadZipCarView(View):
         # --------------------------------------
         if not zip_file:
             context['erro'] = 'Por favor, envie um arquivo ZIP ou informe o número do CAR.'
-            return render(request, self.template_upload, context)
+            return self._render_form(request, context)
 
         # --------------------------------------
         # 3) Caso ZIP enviado
@@ -406,23 +425,23 @@ class UploadZipCarView(View):
 
             if zip_dataframe is None or zip_dataframe.empty:
                 context['erro'] = 'O arquivo ZIP não contém dados geográficos válidos.'
-                return render(request, self.template_upload, context)
+                return self._render_form(request, context)
 
             coordenadas_input = extract_geometry(zip_dataframe)
 
             if not coordenadas_input or not str(coordenadas_input).strip():
                 context['erro'] = 'Não foi possível extrair coordenadas do shapefile enviado.'
-                return render(request, self.template_upload, context)
+                return self._render_form(request, context)
 
             return self._process_coordinates(request, coordenadas_input, car_input)
 
         except zipfile.BadZipFile:
             context['erro'] = 'Arquivo ZIP inválido ou corrompido.'
-            return render(request, self.template_upload, context)
+            return self._render_form(request, context)
 
         except Exception as e:
             context['erro'] = f'Erro ao processar o arquivo: {str(e)}'
-            return render(request, self.template_upload, context)
+            return self._render_form(request, context)
 
     # =====================================================================
     # Métodos auxiliares
@@ -453,7 +472,7 @@ class UploadZipCarView(View):
         """Processa upload de documentos (Recibo ou Demonstrativo)."""
         if not file_obj:
             context['erro'] = missing_msg
-            return render(request, self.template_upload, context)
+            return self._render_form(request, context)
 
         try:
             parser = DocumentsParserFactory.create_parser(doc_type)
@@ -483,7 +502,7 @@ class UploadZipCarView(View):
 
         except Exception as e:
             context['erro'] = f'{error_prefix}: {str(e)}'
-            return render(request, self.template_upload, context)
+            return self._render_form(request, context)
 
     def _handle_only_car(self, request, car_input, context):
         """Processa requisição apenas com o CAR (sem ZIP)."""
@@ -503,7 +522,7 @@ class UploadZipCarView(View):
 
         except Exception as e:
             context['erro'] = f'Erro ao analisar pelo CAR: {str(e)}'
-            return render(request, self.template_upload, context)
+            return self._render_form(request, context)
 
     def _process_coordinates(self, request, coordenadas_input, car_input):
         """Processa os dados extraídos do shapefile."""
@@ -547,22 +566,10 @@ class Lading_PageView(View):
 
 
 class Bases3DView(View):
-    """Mapa 3D (MapLibre) das bases no Tocantins, com tour animado voando de
-    cidade em cidade. Os dados vêm de `BaseTileView`."""
-    template_name = 'analysis/bases_3d.html'
+    """Endereço antigo do mapa 3D, que agora é a própria tela de análise."""
 
     def get(self, request):
-        # MapLibre exige URL absoluta; os placeholders {z}/{x}/{y} e {base}
-        # não passam pelo `reverse`, então trocamos um tile fictício por eles.
-        sample = request.build_absolute_uri(reverse('base_tiles', args=('BASE', 0, 0, 0)))
-        return render(request, self.template_name, {
-            'bases_3d_config': {
-                'tilesUrl': sample.replace('/BASE/0/0/0.pbf', '/{base}/{z}/{x}/{y}.pbf'),
-                'maxTileZoom': MAX_TILE_ZOOM,
-                'bases': bases_summary(),
-                'cities': cities_summary(),
-            },
-        })
+        return redirect('upload_zip_car')
 
 
 class BaseTileView(View):
