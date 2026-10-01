@@ -24,6 +24,8 @@ BASES_CONFIG = [
         "nome_base": "Base de Dados de Zoneamento",
         "tabela": "tb_area_zoneamento",
         "arquivo_upload": "zoning_zip_file",
+        # Sem shapefile: o importador busca direto do Geoportal da SEPLAN-TO.
+        "fonte_api": "API do Geoportal SEPLAN-TO — Zoneamento Ecológico-Econômico do Tocantins",
         "cor": "#F57C00",
         "colunas_extraidas": [
             {"campo": "zone_name", "coluna_bd": "nome_zona", "rotulo": "Nome da Zona", "saida": "zona"},

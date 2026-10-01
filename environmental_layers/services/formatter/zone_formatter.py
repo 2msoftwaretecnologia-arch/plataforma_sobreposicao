@@ -7,7 +7,7 @@ class ZoningFormatter(BaseFormatter):
             "area": intersec["intersection_area_ha"],
             "zona": model_obj.zone_name,
             "sigla": model_obj.zone_acronym,
-            "item_info": f"Zonemaento: {model_obj.zone_name} ({model_obj.zone_acronym})",
+            "item_info": f"Zoneamento: {model_obj.zone_name} ({model_obj.zone_acronym})",
             "polygon_wkt": intersec["intersection_geom"].wkt,
             "polygon_geojson": intersec["intersection_geom"].geojson,
         }
