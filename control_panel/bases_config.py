@@ -224,6 +224,8 @@ BASES_CONFIG = [
         "nome_base": "Base de Dados Prodes",
         "tabela": "tb_prodes",
         "arquivo_upload": "prodes_zip_file",
+        # Sem shapefile: o importador busca direto da API do INPE (TerraBrasilis).
+        "fonte_api": "API do INPE (TerraBrasilis) — PRODES Cerrado e Amazônia Legal, Tocantins",
         "cor": "#D84315",
         "colunas_extraidas": [
             {"campo": "identification", "coluna_bd": "main_class", "rotulo": "Identificação", "saida": "identificacao"},

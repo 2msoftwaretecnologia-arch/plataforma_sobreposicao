@@ -39,12 +39,18 @@
             <div class="bd-meta">
                 <span><strong>Modelo:</strong> {{ base.modelo }}</span>
                 <span><strong>Tabela no banco:</strong> {{ base.tabela }}</span>
+                {% if base.fonte_api %}
+                <span><strong>Fonte:</strong> {{ base.fonte_api }}</span>
+                {% else %}
                 <span><strong>Upload do SHP:</strong> {{ base.arquivo_upload }}</span>
+                {% endif %}
             </div>
 
             <div class="bd-manage">
                 <div class="bd-manage-status">
-                    {% if base.arquivo_nome %}
+                    {% if base.fonte_api %}
+                    <span>Os dados vêm direto da API, sem arquivo. Processar busca a versão mais recente publicada.</span>
+                    {% elif base.arquivo_nome %}
                     <span>Arquivo atual: <code>{{ base.arquivo_nome }}</code>{% if base.arquivo_tamanho %} ({{ base.arquivo_tamanho }}){% endif %}</span>
                     {% else %}
                     <span class="empty-state">Nenhum arquivo enviado ainda.</span>
@@ -52,15 +58,17 @@
                 </div>
 
                 <div class="bd-manage-actions">
+                    {% if not base.fonte_api %}
                     <form class="bd-upload-form" method="post" action="{% url 'control_panel:base_upload' base.modelo %}" enctype="multipart/form-data">
                         {% csrf_token %}
                         <input type="file" name="arquivo" accept=".zip,.gpkg" required>
                         <button type="submit" class="btn-refresh">Enviar SHP (.zip) ou GPKG</button>
                     </form>
+                    {% endif %}
 
                     <form method="post" action="{% url 'control_panel:base_processar' base.modelo %}">
                         {% csrf_token %}
-                        <button type="submit" class="btn-processar" {% if not base.arquivo_nome %}disabled title="Envie um arquivo antes de processar"{% endif %}>
+                        <button type="submit" class="btn-processar" {% if not base.arquivo_nome and not base.fonte_api %}disabled title="Envie um arquivo antes de processar"{% endif %}>
                             Processar / Reimportar
                         </button>
                     </form>
@@ -71,7 +79,7 @@
                         <button type="submit" class="btn-excluir">Excluir camada</button>
                     </form>
                 </div>
-                <p class="bd-manage-hint">Processar substitui todos os registros atuais desta base pelos dados do arquivo enviado. Para bases grandes isso pode levar alguns minutos — aguarde a página recarregar.</p>
+                <p class="bd-manage-hint">Processar substitui todos os registros atuais desta base pelos dados {% if base.fonte_api %}da API{% else %}do arquivo enviado{% endif %}. Para bases grandes isso pode levar alguns minutos — aguarde a página recarregar.</p>
             </div>
 
             {% if base.colunas_extraidas %}

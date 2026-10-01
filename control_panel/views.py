@@ -210,6 +210,9 @@ def bases_dados_view(request):
         if base['total_registros'] > 0:
             base['status_code'] = 'ok'
             base['status_label'] = f"{base['total_registros']} registros importados"
+        elif base.get('fonte_api'):
+            base['status_code'] = 'pendente'
+            base['status_label'] = "Sem dados — clique em Processar para buscar na API"
         elif base['arquivo_nome']:
             base['status_code'] = 'pendente'
             base['status_label'] = "Arquivo enviado, aguardando processamento"

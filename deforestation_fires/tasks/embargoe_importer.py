@@ -6,6 +6,8 @@ class EmbargoesImporter(BulkShapefileImporter):
     model = Embargoes
     archive_field = "adm_embargos_ibama_a_zip_file"
     source = "Base Embargos IBAMA"
+    # O arquivo do IBAMA é do Brasil inteiro (~91 mil); só ~2 mil são do TO.
+    only_tocantins = True
 
     def missing_archive_message(self):
         return "Nenhum arquivo de Embargoes foi configurado."

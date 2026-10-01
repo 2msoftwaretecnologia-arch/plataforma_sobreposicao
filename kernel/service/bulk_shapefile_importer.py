@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import geopandas as gpd
 from django.contrib.auth.models import User
 from django.contrib.gis.geos import GEOSGeometry
@@ -9,6 +11,9 @@ from kernel.utils import model_count_cache_key, reset_db
 
 SRID = 4674
 UTM_SRID = 31982
+
+# Contorno do Tocantins (IBGE, SIRGAS 2000) — a plataforma só analisa imóveis do estado.
+TOCANTINS_GEOJSON = Path(__file__).resolve().parents[2] / 'analysis' / 'static' / 'analysis' / 'data' / 'tocantins.geojson'
 
 
 class BulkShapefileImporter:
@@ -32,6 +37,9 @@ class BulkShapefileImporter:
     archive_field = None
     source = None
     batch_size = 2000
+    # Bases nacionais (ex.: embargos do IBAMA): guarda só as feições que
+    # tocam o Tocantins e descarta as sem geometria.
+    only_tocantins = False
 
     def __init__(self, user=None):
         self.user = user
@@ -93,15 +101,21 @@ class BulkShapefileImporter:
             raise ValueError(self.missing_archive_message())
         return file_field.path
 
+    def load_dataframe(self):
+        """Origem dos dados: por padrão o arquivo enviado no painel. Bases
+        que vêm de uma API (ex.: PRODES do INPE) sobrescrevem este método."""
+        return self.read_dataframe(self._get_archive_path())
+
     def execute(self):
         user = self._get_user()
-        path = self._get_archive_path()
-        df = self.read_dataframe(path)
+        df = self.load_dataframe()
         # A geometria é gravada assumindo SIRGAS 2000 (4674); arquivos em
         # outro CRS (ex.: GeoPackage do SICAR em 4326) precisam ser
         # reprojetados antes, senão a área calculada fica errada.
         if df.crs is not None and df.crs.to_epsg() != SRID:
             df = df.to_crs(epsg=SRID)
+        if self.only_tocantins:
+            df = self._clip_to_tocantins(df)
 
         # Cada instância carrega a geometria duas vezes (WKT em `geometry` e
         # GEOS em `usable_geometry`); para bases pesadas como a hidrografia
@@ -140,6 +154,11 @@ class BulkShapefileImporter:
         # transação ainda não tinha sido confirmada.
         cache.delete(model_count_cache_key(self.model))
         return total
+
+    def _clip_to_tocantins(self, df):
+        tocantins = gpd.read_file(TOCANTINS_GEOJSON).to_crs(epsg=SRID).geometry.union_all()
+        has_geom = df.geometry.notna() & ~df.geometry.is_empty
+        return df[has_geom & df.geometry.intersects(tocantins)]
 
     def _iter_unique_rows(self, df):
         seen_keys = set()
