@@ -58,6 +58,9 @@
         .loc-points-table td, .loc-cars-table td { vertical-align:top; }
         .loc-num { text-align:right; white-space:nowrap; }
         .loc-mais { margin-top:12px; text-align:center; }
+        .loc-lote { display:flex; flex-wrap:wrap; gap:14px; align-items:center; justify-content:space-between; background:#1f3d2b; color:#fff; border-radius:12px; padding:16px 18px; margin-bottom:16px; }
+        .loc-lote p { margin:4px 0 0; color:#d5e3d4; font-size:.9rem; }
+        .loc-lote strong { font-size:1.05rem; }
         .loc-ficha-popup .leaflet-popup-content { margin:14px 16px; width:330px !important; }
         .loc-ficha { font:13px/1.45 Inter, sans-serif; color:#1f2937; }
         .loc-ficha h3 { margin:0 0 2px; font:700 .72rem Inter, sans-serif; letter-spacing:.06em; text-transform:uppercase; color:#8a6d3b; }
@@ -100,6 +103,7 @@
                     </div>
                 </a>
                 <div class="nav-actions">
+                    <a href="{% url 'lotes_cruzamento' %}" class="btn btn-outline-green">Meus lotes</a>
                     <a href="{% url 'historico' %}" class="btn btn-outline-green">Meu histórico</a>
                     <a href="{% url 'upload_zip_car' %}" class="btn btn-outline-green">Nova análise</a>
                     <form method="post" action="{% url 'authentication:logout' %}" class="nav-logout-form">
@@ -177,6 +181,18 @@
                 {% if divergent %}<div class="loc-stat loc-stat--warn"><strong>{{ divergent }}</strong><span>posição corrigida pelo Plus Code</span></div>{% endif %}
                 {% if skipped %}<div class="loc-stat loc-stat--warn"><strong>{{ skipped|length }}</strong><span>ignorados (sem posição)</span></div>{% endif %}
             </div>
+            {% if cars %}
+            <form method="post" action="{% url 'lote_cruzamento_novo' %}" class="loc-lote" style="margin-top:16px" id="loc_lote_form">
+                {% csrf_token %}
+                <input type="hidden" name="cars" id="loc_lote_cars">
+                <input type="hidden" name="titulo" value="{{ arquivos|join:', ' }}">
+                <div>
+                    <strong>Cruzar todos os {{ cars|length }} CARs com as bases de dados</strong>
+                    <p>Cada CAR inteiro é cruzado com todas as bases (embargos, PRODES, MapBiomas, UCs, terras indígenas...) e sai um relatório por CAR. Leva cerca de {{ lote_minutos }} min, em segundo plano — dá para fechar a página.</p>
+                </div>
+                <button type="submit" class="btn btn-gold">Cruzar todos os CARs</button>
+            </form>
+            {% endif %}
             <ul class="loc-files">
                 {% for a in arquivos %}<li class="badge">{{ a }}</li>{% endfor %}
             </ul>
@@ -670,6 +686,20 @@
                     });
                 }
             });
+
+            // ----- Cruzamento em lote: envia os CARs com as localizações de cada um -----
+            const loteForm = document.getElementById('loc_lote_form');
+            if (loteForm) {
+                loteForm.addEventListener('submit', function () {
+                    document.getElementById('loc_lote_cars').value = JSON.stringify(carsData.map((c) => ({
+                        car: c.car,
+                        mun: c.mun,
+                        pontos: c.pontos.map((i) => ({ i: i, n: byIndex[i].n, lat: byIndex[i].lat, lon: byIndex[i].lon })),
+                    })));
+                    const loader = document.getElementById('page-loader');
+                    if (loader) loader.classList.add('visible');
+                });
+            }
 
             // ----- CSVs -----
             const csvCell = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';

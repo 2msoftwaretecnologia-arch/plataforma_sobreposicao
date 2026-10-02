@@ -50,3 +50,83 @@ class SearchHistory(models.Model):
     def __str__(self):
         alvo = self.car_input or self.municipio or 'busca'
         return f"{alvo} — {self.created_at:%d/%m/%Y %H:%M}"
+
+
+class CrossBatch(models.Model):
+    """Lote de cruzamento: vários CARs (os encontrados na tela de Localizações)
+    cruzados com todas as bases em segundo plano. Cada CAR é um
+    `CrossBatchItem`; o progresso fica salvo para a página poder ser fechada e
+    o lote retomado se o processo cair (ver `cross_batch_service`)."""
+
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Na fila'
+        RUNNING = 'running', 'Processando'
+        DONE = 'done', 'Concluído'
+        ERROR = 'error', 'Erro'
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='cross_batches',
+    )
+    title = models.CharField(max_length=255, blank=True, default='')
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    total = models.PositiveIntegerField(default=0)
+    processed = models.PositiveIntegerField(default=0)
+    error = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    # Atualizado a cada CAR processado; sem atualização por muito tempo com o
+    # lote "processando" quer dizer que o processo caiu.
+    heartbeat_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'tb_lote_cruzamento'
+        verbose_name = "Lote de cruzamento"
+        verbose_name_plural = "Lotes de cruzamento"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.title or 'Lote'} — {self.created_at:%d/%m/%Y %H:%M}"
+
+    @property
+    def percent(self) -> int:
+        return int(self.processed * 100 / self.total) if self.total else 0
+
+
+class CrossBatchItem(models.Model):
+    """Um CAR de um lote e o resumo do cruzamento dele com as bases."""
+
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Na fila'
+        DONE = 'done', 'Concluído'
+        ERROR = 'error', 'Erro'
+
+    batch = models.ForeignKey(CrossBatch, on_delete=models.CASCADE, related_name='items')
+    car_number = models.CharField(max_length=43)
+    municipio = models.CharField(max_length=150, blank=True, default='')
+    car_status = models.CharField(max_length=50, blank=True, default='')
+    area_ha = models.FloatField(null=True, blank=True)
+    # Localizações do arquivo que caíram neste CAR: [{i, n, lat, lon}].
+    points = models.JSONField(default=list, blank=True)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING, db_index=True)
+    # Resumo do resultado do `SearchAll` (sem as geometrias, que chegam a
+    # vários MB por CAR) — ver `cross_batch_service.summarize_result`.
+    summary = models.JSONField(default=dict, blank=True)
+    critical_count = models.PositiveIntegerField(default=0)
+    warning_count = models.PositiveIntegerField(default=0)
+    overlap_count = models.PositiveIntegerField(default=0)
+    error = models.TextField(blank=True, default='')
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'tb_lote_cruzamento_car'
+        verbose_name = "CAR do lote de cruzamento"
+        verbose_name_plural = "CARs do lote de cruzamento"
+        ordering = ['id']
+        constraints = [
+            models.UniqueConstraint(fields=['batch', 'car_number'], name='uniq_lote_cruzamento_car'),
+        ]
+
+    def __str__(self):
+        return self.car_number

@@ -23,10 +23,13 @@ class SearchAll:
         self.builder = FinalResultBuilder()
         self.formatters = FormatterRegister()
 
-    def execute(self, geometry_or_car):
+    def execute(self, geometry_or_car, save_debug_files=True):
         """
         Executa o fluxo completo de análise de sobreposição
         e retorna um dicionário pronto para uso na UI.
+
+        `save_debug_files=False` desliga a gravação dos JSONs de depuração —
+        usado pelo cruzamento em lote, que roda vários CARs em paralelo.
         """
 
         performance = {}
@@ -56,7 +59,7 @@ class SearchAll:
         # 5) Persistir log de performance para depuração (só em DEBUG: em
         # produção isso é I/O síncrono por busca, com nome de arquivo fixo
         # que corrompe sob buscas concorrentes de usuários diferentes).
-        if settings.DEBUG:
+        if settings.DEBUG and save_debug_files:
             self._save_performance_log(performance)
             if final_output:
                 with open("final_output.json", "w") as f:

@@ -1,0 +1,134 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if um_car %}{{ cars.0.item.car_number }}{% else %}Relatório do lote{% endif %} | TerraView Tocantins</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+        @page { size:A4; margin:14mm 12mm; }
+        * { box-sizing:border-box; }
+        body { margin:0; font:12px/1.45 Inter, sans-serif; color:#1f2937; background:#f3f1ea; }
+        .folha { background:#fff; max-width:210mm; margin:12px auto; padding:14mm 12mm; box-shadow:0 1px 6px rgba(0,0,0,.12); }
+        .quebra { page-break-after:always; break-after:page; }
+        h1, h2 { font-family:Fraunces, serif; color:#1f3d2b; margin:0; }
+        h1 { font-size:22px; }
+        h2 { font-size:15px; font-family:ui-monospace, monospace; word-break:break-all; }
+        .topo { display:flex; justify-content:space-between; gap:12px; border-bottom:2px solid #1f3d2b; padding-bottom:6px; margin-bottom:10px; font-size:10px; color:#6b7280; }
+        .eyebrow { font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:#8a6d3b; font-weight:700; }
+        .grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:6px 12px; margin:10px 0 12px; }
+        .grid dt { color:#6b7280; font-size:10px; }
+        .grid dd { margin:0; font-weight:600; }
+        .sev { display:inline-block; padding:1px 7px; border-radius:999px; font-size:10px; font-weight:700; }
+        .sev--critical { background:#fee4e2; color:#b42318; }
+        .sev--warning { background:#fef0c7; color:#b54708; }
+        .sev--info { background:#e0ecff; color:#1849a9; }
+        .sev--ok { background:#dcfae6; color:#067647; }
+        .base { border:1px solid #e5e1d4; border-left:4px solid #1849a9; border-radius:6px; padding:6px 9px; margin-top:7px; break-inside:avoid; }
+        .base--critical { border-left-color:#b42318; }
+        .base--warning { border-left-color:#b54708; }
+        .base h3 { margin:0; font-size:12px; display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+        .base h3 small { font-weight:500; color:#4b5563; }
+        table { width:100%; border-collapse:collapse; margin-top:4px; }
+        td { padding:2px 4px; border-top:1px solid #f0ece0; vertical-align:top; font-size:11px; }
+        td.num { text-align:right; white-space:nowrap; }
+        tr.neutro td { color:#9ca3af; }
+        .sem { margin-top:8px; color:#6b7280; font-size:10.5px; }
+        .pontos { margin-top:8px; font-size:10.5px; color:#4b5563; }
+        .capa-stats { display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; margin:16px 0; }
+        .capa-stats div { border:1px solid #e5e1d4; border-radius:8px; padding:10px; }
+        .capa-stats strong { display:block; font-size:22px; color:#1f3d2b; }
+        .indice td { font-size:10.5px; }
+        .barra { position:sticky; top:0; background:#1f3d2b; color:#fff; padding:10px; text-align:center; z-index:2; }
+        .barra button { font:600 13px Inter, sans-serif; padding:7px 16px; border-radius:8px; border:none; background:#e2b74a; color:#1f2937; cursor:pointer; }
+        @media print {
+            body { background:#fff; }
+            .folha { box-shadow:none; margin:0; max-width:none; padding:0; }
+            .barra { display:none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="barra">
+        <button type="button" onclick="window.print()">Imprimir / salvar em PDF</button>
+        <span style="margin-left:10px;font-size:12px">{{ totais.cars }} CAR{{ totais.cars|pluralize:"s" }}{% if nivel == 'alertas' %} com alerta{% elif nivel == 'critical' %} com alerta crítico{% endif %} · um por página</span>
+    </div>
+
+    {% if not um_car %}
+    <!-- ===== Capa ===== -->
+    <div class="folha quebra">
+        <div class="topo"><span>TerraView Tocantins · Cruzamento em lote</span><span>Gerado em {% now "d/m/Y H:i" %}</span></div>
+        <p class="eyebrow">Relatório de sobreposições</p>
+        <h1>{{ totais.cars }} imóveis do CAR cruzados com as bases de dados</h1>
+        <p style="color:#4b5563">{{ batch.title|default:"Localizações" }} · lote criado em {{ batch.created_at|date:"d/m/Y H:i" }}{% if nivel == 'alertas' %} · só CARs com alerta{% endif %}</p>
+        <div class="capa-stats">
+            <div><strong>{{ totais.cars }}</strong>CARs neste relatório</div>
+            <div><strong style="color:#b42318">{{ totais.criticos }}</strong>com alerta crítico</div>
+            <div><strong style="color:#b54708">{{ totais.atencao }}</strong>com atenção (sem crítico)</div>
+        </div>
+        <p style="font-size:10.5px;color:#6b7280">
+            <span class="sev sev--critical">Crítico</span> embargo do IBAMA, desmatamento PRODES ou MapBiomas ·
+            <span class="sev sev--warning">Atenção</span> UC, APA, terra indígena, quilombola, assentamento, vereda, IPUCA ou hidrografia declarada ·
+            <span class="sev sev--info">Informativa</span> demais bases. Áreas "sem unidade" das camadas de UC/APA não são restrição.
+        </p>
+        <table class="indice">
+            <tr><td><strong>CAR</strong></td><td><strong>Município</strong></td><td class="num"><strong>Área (ha)</strong></td><td><strong>Alertas</strong></td></tr>
+            {% for c in cars %}
+            <tr>
+                <td style="font-family:ui-monospace,monospace">{{ c.item.car_number }}</td>
+                <td>{{ c.item.municipio|default:"—" }}</td>
+                <td class="num">{{ c.area_car|floatformat:2 }}</td>
+                <td>{% if c.item.critical_count %}<span class="sev sev--critical">{{ c.item.critical_count }} crítica{{ c.item.critical_count|pluralize }}</span> {% endif %}{% if c.item.warning_count %}<span class="sev sev--warning">{{ c.item.warning_count }} atenção</span>{% endif %}{% if not c.item.critical_count and not c.item.warning_count %}<span class="sev sev--ok">sem alertas</span>{% endif %}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+    {% endif %}
+
+    <!-- ===== Um CAR por página ===== -->
+    {% for c in cars %}
+    <div class="folha{% if not forloop.last %} quebra{% endif %}">
+        <div class="topo"><span>TerraView Tocantins · Relatório de sobreposições do CAR</span><span>{% if not um_car %}{{ forloop.counter }} / {{ cars|length }}{% else %}{% now "d/m/Y H:i" %}{% endif %}</span></div>
+        <p class="eyebrow">Imóvel do CAR</p>
+        <h2>{{ c.item.car_number }}</h2>
+        <div style="margin-top:4px">
+            {% if c.item.critical_count %}<span class="sev sev--critical">{{ c.item.critical_count }} base{{ c.item.critical_count|pluralize }} crítica{{ c.item.critical_count|pluralize }}</span>{% endif %}
+            {% if c.item.warning_count %}<span class="sev sev--warning">{{ c.item.warning_count }} de atenção</span>{% endif %}
+            {% if not c.item.critical_count and not c.item.warning_count %}<span class="sev sev--ok">sem alertas</span>{% endif %}
+        </div>
+        <dl class="grid">
+            <div><dt>Município</dt><dd>{% if c.item.municipio %}{{ c.item.municipio }} - TO{% else %}—{% endif %}</dd></div>
+            <div><dt>Situação</dt><dd>{{ c.status_label }}</dd></div>
+            <div><dt>Área do CAR</dt><dd>{{ c.area_car|floatformat:2 }} ha</dd></div>
+            <div><dt>Localizações no CAR</dt><dd>{{ c.item.points|length }}</dd></div>
+        </dl>
+
+        {% for b in c.bases %}
+        <div class="base base--{{ b.sev }}">
+            <h3>{{ b.nome_curto }} <span class="sev sev--{{ b.sev }}">{{ b.sev_label }}</span>
+                {% if b.count %}<small>{{ b.count }} sobreposiç{{ b.count|pluralize:"ão,ões" }} · {{ b.total_area|floatformat:2 }} ha{% if b.pct is not None %} ({{ b.pct }}% do CAR){% endif %}</small>{% endif %}
+            </h3>
+            <table>
+                {% for x in b.items %}
+                <tr{% if x.neutral %} class="neutro"{% endif %}><td>{{ x.info }}{% if x.neutral %} <em>(fora de unidade)</em>{% endif %}</td><td class="num">{% if x.area is not None %}{{ x.area|floatformat:2 }} ha{% else %}—{% endif %}</td></tr>
+                {% endfor %}
+            </table>
+            {% if b.truncated %}<div style="font-size:10px;color:#6b7280">+ {{ b.truncated }} itens não listados</div>{% endif %}
+        </div>
+        {% empty %}
+        <p>Nenhuma sobreposição encontrada nas bases consultadas.</p>
+        {% endfor %}
+
+        {% if c.sem %}<div class="sem"><strong>Sem sobreposição:</strong> {{ c.sem|join:" · " }}</div>{% endif %}
+        {% if c.item.points %}
+        <div class="pontos"><strong>Localizações neste CAR:</strong>
+            {% for p in c.item.points|slice:":40" %}#{{ p.i }}{% if not forloop.last %}, {% endif %}{% endfor %}{% if c.item.points|length > 40 %} e mais {{ c.item.points|length|add:"-40" }}{% endif %}
+        </div>
+        {% endif %}
+    </div>
+    {% empty %}
+    <div class="folha"><p>Nenhum CAR concluído para imprimir ainda.</p></div>
+    {% endfor %}
+</body>
+</html>

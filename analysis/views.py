@@ -1,6 +1,7 @@
 # Standard library
 import io
 import json
+import re
 import os
 import tempfile
 import zipfile
@@ -10,7 +11,7 @@ from dataclasses import asdict
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db.models import Q
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views import View
@@ -19,7 +20,7 @@ import geopandas as gpd
 from shapely import wkt as shapely_wkt
 
 # Local apps – analysis
-from analysis.models import SearchHistory
+from analysis.models import CrossBatch, CrossBatchItem, SearchHistory
 from analysis.services.analyze_coordinates.search_all import SearchAll
 from analysis.services.analyze_coordinates.search_for_car import SearchForCar
 from analysis.services.view_services.result_map_formatter import (
@@ -34,6 +35,7 @@ from analysis.services.view_services.bases_3d import (
     render_tile,
 )
 from analysis.services.view_services.zip_upload_service import ZipUploadService
+from analysis.services.view_services import cross_batch_service
 from analysis.services.view_services.kmz_points_service import (
     KmzPointsError,
     car_details,
@@ -647,6 +649,7 @@ class LocalizacoesKmzView(View):
             'without_car_in_to': len(points) - with_car - (outside_to or 0),
             'from_plus_code': sum(1 for p in points if p.from_plus_code),
             'divergent': sum(1 for p in points if p.is_divergent),
+            'lote_minutos': cross_batch_service.estimate_minutes(len(cars)),
             # Dados compactos para o mapa e para as tabelas, que são montadas no
             # navegador (com vários arquivos são milhares de localizações).
             'map_points': [
@@ -689,6 +692,177 @@ class LocalizacoesKmzView(View):
             ],
         }
         return render(request, self.template_name, context)
+
+
+# =====================================================================
+# Cruzamento em lote dos CARs encontrados em Localizações
+# =====================================================================
+
+def _get_batch_for(request, pk):
+    """O lote, se for do usuário logado (equipe vê todos)."""
+    qs = CrossBatch.objects.all() if request.user.is_staff else CrossBatch.objects.filter(user=request.user)
+    return get_object_or_404(qs, pk=pk)
+
+
+def _batch_item_row(item) -> dict:
+    """Linha compacta de um CAR do lote para o relatório (JSON no navegador)."""
+    return {
+        'id': item.pk,
+        'car': item.car_number,
+        'mun': item.municipio,
+        'st': item.car_status,
+        'area': round(item.area_ha, 2) if item.area_ha is not None else None,
+        'pontos': item.points,
+        'status': item.status,
+        'err': item.error,
+        'crit': item.critical_count,
+        'warn': item.warning_count,
+        'ov': item.overlap_count,
+        'fim': item.finished_at.isoformat() if item.finished_at else None,
+        's': item.summary,
+    }
+
+
+def _batch_progress(batch) -> dict:
+    return {
+        'status': batch.status,
+        'status_label': batch.get_status_display(),
+        'processed': batch.processed,
+        'total': batch.total,
+        'percent': batch.percent,
+        'error': batch.error,
+    }
+
+
+class LoteCruzamentoCreateView(View):
+    """Cria o lote com os CARs enviados pela tela de Localizações e dispara o
+    processamento em segundo plano."""
+
+    def post(self, request):
+        try:
+            cars = json.loads(request.POST.get('cars') or '[]')
+        except ValueError:
+            cars = []
+        if not isinstance(cars, list) or not cars:
+            return redirect('localizacoes_kmz')
+        batch = cross_batch_service.create_batch(request.user, request.POST.get('titulo', '').strip(), cars)
+        if not batch.total:
+            batch.delete()
+            return redirect('localizacoes_kmz')
+        cross_batch_service.start_batch(batch)
+        return redirect('lote_cruzamento', pk=batch.pk)
+
+
+class LotesCruzamentoListView(View):
+    template_name = 'analysis/lotes_cruzamento.html'
+
+    def get(self, request):
+        batches = CrossBatch.objects.filter(user=request.user)
+        page_obj = Paginator(batches, 15).get_page(request.GET.get('page'))
+        return render(request, self.template_name, {'page_obj': page_obj})
+
+
+class LoteCruzamentoDetailView(View):
+    template_name = 'analysis/lote_cruzamento.html'
+
+    def get(self, request, pk):
+        batch = _get_batch_for(request, pk)
+        cross_batch_service.resume_if_stale(batch)
+        batch.refresh_from_db()
+        return render(request, self.template_name, {
+            'batch': batch,
+            'progress': _batch_progress(batch),
+            'items': [_batch_item_row(item) for item in batch.items.all()],
+        })
+
+
+class LoteCruzamentoStatusView(View):
+    """Progresso do lote + CARs concluídos depois de `desde` (ISO), para a
+    página do relatório ir se atualizando sem recarregar."""
+
+    def get(self, request, pk):
+        batch = _get_batch_for(request, pk)
+        cross_batch_service.resume_if_stale(batch)
+        batch.refresh_from_db()
+        items = batch.items.exclude(status=CrossBatchItem.Status.PENDING)
+        desde = request.GET.get('desde')
+        if desde:
+            try:
+                from django.utils.dateparse import parse_datetime
+                desde_dt = parse_datetime(desde)
+                if desde_dt:
+                    items = items.filter(finished_at__gt=desde_dt)
+            except ValueError:
+                pass
+        return JsonResponse({
+            'progress': _batch_progress(batch),
+            'items': [_batch_item_row(item) for item in items],
+        })
+
+
+class LoteCruzamentoPrintView(View):
+    """Relatório para imprimir/salvar em PDF: um CAR por página."""
+    template_name = 'analysis/lote_cruzamento_print.html'
+
+    def get(self, request, pk):
+        batch = _get_batch_for(request, pk)
+        items = batch.items.filter(status=CrossBatchItem.Status.DONE)
+        car = request.GET.get('car', '').strip()
+        nivel = request.GET.get('nivel', '').strip()
+        if car:
+            items = items.filter(car_number__iexact=car)
+        if nivel == 'critical':
+            items = items.filter(critical_count__gt=0)
+        elif nivel == 'alertas':
+            items = items.filter(Q(critical_count__gt=0) | Q(warning_count__gt=0))
+        if not items.exists() and car:
+            raise Http404('CAR não encontrado neste lote.')
+        cars = [self._print_car(item) for item in items.order_by('-critical_count', '-warning_count', 'car_number')]
+        return render(request, self.template_name, {
+            'batch': batch,
+            'cars': cars,
+            'nivel': nivel,
+            'um_car': bool(car),
+            'totais': {
+                'cars': len(cars),
+                'criticos': sum(1 for c in cars if c['item'].critical_count),
+                'atencao': sum(1 for c in cars if not c['item'].critical_count and c['item'].warning_count),
+            },
+        })
+
+    _SEV_ORDER = {'critical': 0, 'warning': 1, 'info': 2}
+    _SEV_LABEL = {'critical': 'Crítico', 'warning': 'Atenção', 'info': 'Informativa'}
+
+    def _print_car(self, item) -> dict:
+        summary = item.summary or {}
+        area_car = summary.get('tamanho_area') or item.area_ha or 0
+        bases = sorted(summary.get('bases') or [],
+                       key=lambda b: (self._SEV_ORDER.get(b.get('severity'), 3), -(b.get('total_area') or 0)))
+        com = []
+        for b in bases:
+            if not (b.get('count') or b.get('neutral_count')):
+                continue
+            sev = b['severity'] if b.get('count') else 'info'
+            com.append({
+                **b,
+                'nome_curto': _base_name_short(b.get('nome', '')),
+                'sev': sev,
+                'sev_label': self._SEV_LABEL[sev] if b.get('count') else 'Sem restrição',
+                'pct': round(b['total_area'] * 100 / area_car, 1) if b.get('count') and area_car else None,
+            })
+        return {
+            'item': item,
+            'area_car': area_car,
+            'status_label': {'AT': 'Ativo', 'PE': 'Pendente', 'SU': 'Suspenso', 'CA': 'Cancelado'}.get(
+                (item.car_status or '').upper(), item.car_status or '—'),
+            'bases': com,
+            'sem': [_base_name_short(b.get('nome', '')) for b in bases if not (b.get('count') or b.get('neutral_count'))],
+        }
+
+
+def _base_name_short(nome: str) -> str:
+    """'Base de Dados de Unidades de Conservação' -> 'Unidades de Conservação'."""
+    return re.sub(r'^Base de( Dados)?( de)?\s*', '', nome or '', flags=re.I) or nome
 
 
 def termos(request):

@@ -5,7 +5,7 @@ from .search_all import SearchAll
 
 class SearchForCar:
     
-    def execute(self, car: str) -> dict:
+    def execute(self, car: str, save_debug_files: bool = True) -> dict:
         car_norm = (car or "").strip()
         qs = get_sicar_record(car_number__iexact=car_norm)
         if not qs.exists():
@@ -20,4 +20,4 @@ class SearchForCar:
             except Exception:
                 return {}
             obj.usable_geometry = geom
-        return SearchAll().execute(obj)
+        return SearchAll().execute(obj, save_debug_files=save_debug_files)
