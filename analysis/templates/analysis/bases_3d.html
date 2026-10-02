@@ -36,6 +36,7 @@
 
     <div class="panel">
         <nav class="panel-nav" aria-label="Navegação">
+            <a href="{% url 'localizacoes_kmz' %}">Localizações (KMZ)</a>
             <a href="{% url 'historico' %}">Meu histórico</a>
             <form method="post" action="{% url 'authentication:logout' %}">
                 {% csrf_token %}

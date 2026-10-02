@@ -7,6 +7,7 @@ urlpatterns = [
     path('', login_required(views.UploadZipCarView.as_view()), name='upload_zip_car'),
     path('report/print/', login_required(views.ReportPrintView.as_view()), name='report_print'),
     path('results/', login_required(views.ResultsPageView.as_view()), name='results'),
+    path('localizacoes/', login_required(views.LocalizacoesKmzView.as_view()), name='localizacoes_kmz'),
     path('historico/', login_required(views.HistoricoView.as_view()), name='historico'),
     path('historico/<int:pk>/', login_required(views.HistoricoDetalheView.as_view()), name='historico_detalhe'),
     path('download/property-kml/', login_required(views.DownloadPropertyKmlView.as_view()), name='download_property_kml'),

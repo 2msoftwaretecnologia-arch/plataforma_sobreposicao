@@ -32,6 +32,13 @@ from analysis.services.view_services.bases_3d import (
     render_tile,
 )
 from analysis.services.view_services.zip_upload_service import ZipUploadService
+from analysis.services.view_services.kmz_points_service import (
+    KmzPointsError,
+    car_perimeters,
+    locate_cars,
+    parse_location_points,
+    summarize_cars,
+)
 from analysis.validators import validate_car_number
 
 # Local apps – car_system / kernel
@@ -554,6 +561,90 @@ class UploadZipCarView(View):
             _save_search_history(request, data, SearchHistory.SearchType.SHAPEFILE)
             request.session['last_analysis'] = data
             return redirect('results')
+
+class LocalizacoesKmzView(View):
+    """Recebe um ou mais KMZ/KML de localizações (um Placemark por ponto) e
+    mostra em qual imóvel do SICAR cai o ponto central de cada uma. O
+    cruzamento do CAR inteiro com as demais bases é feito sob demanda, pelo
+    fluxo de busca por CAR que já existe (`UploadZipCarView`, modo `car`)."""
+    template_name = 'analysis/localizacoes.html'
+
+    def get(self, request):
+        return render(request, self.template_name, {})
+
+    def post(self, request):
+        files = request.FILES.getlist('kmz_files')
+        if not files:
+            return render(request, self.template_name, {'erro': 'Envie ao menos um arquivo KMZ ou KML.'})
+        invalid = [f.name for f in files if not f.name.lower().endswith(('.kmz', '.kml'))]
+        if invalid:
+            return render(request, self.template_name, {
+                'erro': f'Só são aceitos arquivos .kmz ou .kml: {", ".join(invalid)}.'
+            })
+
+        points, skipped = [], []
+        try:
+            for f in files:
+                file_points, file_skipped = parse_location_points(f, first_index=len(points) + 1, source=f.name)
+                points += file_points
+                skipped += [f'{name} ({f.name})' for name in file_skipped]
+            locate_cars(points)
+        except KmzPointsError as e:
+            return render(request, self.template_name, {'erro': str(e)})
+        except Exception as e:
+            return render(request, self.template_name, {'erro': f'Erro ao processar os arquivos: {e}'})
+
+        cars = summarize_cars(points)
+        try:
+            perimeters = car_perimeters([c['car_number'] for c in cars])
+        except Exception:
+            # Sem o perímetro a tela continua útil (pontos e tabelas).
+            perimeters = {}
+
+        sources = [f.name for f in files]
+        car_position = {c['car_number']: i for i, c in enumerate(cars)}
+        with_car = sum(1 for p in points if p.cars)
+        context = {
+            'arquivos': sources,
+            'points': points,
+            'cars': cars,
+            'skipped': skipped,
+            'total_points': len(points),
+            'distinct_positions': len({(round(p.lon, 5), round(p.lat, 5)) for p in points}),
+            'with_car': with_car,
+            'without_car': len(points) - with_car,
+            'from_plus_code': sum(1 for p in points if p.from_plus_code),
+            'divergent': sum(1 for p in points if p.is_divergent),
+            # Dados compactos para o mapa e para as tabelas, que são montadas no
+            # navegador (com vários arquivos são milhares de localizações).
+            'map_points': [
+                {
+                    'i': p.index,
+                    'n': p.name,
+                    'f': sources.index(p.source),
+                    'lat': round(p.lat, 6),
+                    'lon': round(p.lon, 6),
+                    'plus': p.from_plus_code,
+                    'div': round(p.divergence_m) if p.is_divergent else None,
+                    # Posições dos CARs em `map_cars`.
+                    'cars': [car_position[c['car_number']] for c in p.cars],
+                }
+                for p in points
+            ],
+            'map_sources': sources,
+            'map_cars': [
+                {
+                    'car': c['car_number'],
+                    'status': c['status'],
+                    'area_ha': round(c['area_ha'], 2) if c['area_ha'] is not None else None,
+                    'pontos': [p.index for p in c['points']],
+                    'geom': perimeters.get(c['car_number']),
+                }
+                for c in cars
+            ],
+        }
+        return render(request, self.template_name, context)
+
 
 def termos(request):
     return render(request, 'analysis/termos_de_uso.html')
