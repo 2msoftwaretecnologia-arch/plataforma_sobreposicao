@@ -60,10 +60,23 @@
            o botão e a contagem de pontos, que quebravam letra por letra. */
         .loc-cars-table th:last-child, .loc-cars-table td:last-child { white-space:nowrap; width:1%; }
         .loc-cars-table .ghost-button, .loc-nowrap { white-space:nowrap; }
-        .loc-cars-table td:nth-last-child(2) { min-width:110px; }
+        .loc-cars-table td:nth-last-child(2) { min-width:170px; }
         .loc-cars-table .loc-car { min-width:180px; display:inline-block; }
+        /* Tabela de localizações: '#' estreito, coordenada numa linha e espaço
+           para o número do CAR (43 caracteres) não quebrar em várias linhas. */
+        .loc-points-table th:first-child, .loc-points-table td:first-child { width:1%; white-space:nowrap; padding-right:4px; }
+        .loc-points-table th:nth-child(3), .loc-points-table td:nth-child(3) { width:1%; white-space:nowrap; }
+        .loc-points-table th:last-child, .loc-points-table td:last-child { width:34%; }
+        .loc-points-table td:last-child .loc-car { font-size:.76rem; word-break:break-all; text-align:left; }
+        .loc-num-badge { display:inline-block; min-width:34px; padding:2px 7px; border-radius:999px; border:1px solid #d6d0bf;
+                         background:#f8f5ec; color:#2f6b3f; font:600 .78rem Inter, sans-serif; text-align:center; cursor:pointer; }
+        .loc-num-badge:hover { background:#2f6b3f; color:#fff; border-color:#2f6b3f; }
         .loc-num { text-align:right; white-space:nowrap; }
         .loc-mais { margin-top:12px; text-align:center; }
+        /* As tabelas rolam dentro da própria caixa: com centenas de linhas a
+           página passava de 60 mil px e a barra de rolagem ficava minúscula. */
+        .loc-tabela-box { max-height:560px; overflow:auto; border:1px solid #eee7d6; border-radius:10px; }
+        .loc-tabela-box thead th { position:sticky; top:0; z-index:1; background:#fff; box-shadow:0 1px 0 #eee7d6; }
         .loc-base-bar { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin:0 0 16px; }
         .loc-base-bar__lbl { font-weight:700; color:#1f3d2b; }
         .loc-base-switch { display:inline-flex; flex-wrap:wrap; background:#f3efe4; border-radius:12px; padding:4px; gap:4px; }
@@ -272,7 +285,7 @@
                     <span class="badge badge-strong" id="loc_cars_contagem"></span>
                 </div>
                 <p class="loc-hint" style="margin-top:0" id="prop_hint"></p>
-                <div class="table-scroll">
+                <div class="table-scroll loc-tabela-box">
                     <table class="data-table loc-cars-table" id="loc_cars">
                         <thead></thead>
                         <tbody></tbody>
@@ -322,7 +335,7 @@
                 {% endif %}
                 <span class="badge" id="loc_contagem"></span>
             </div>
-            <div class="table-scroll">
+            <div class="table-scroll loc-tabela-box">
                 <table class="data-table loc-points-table" id="loc_points">
                     <thead>
                         <tr>
@@ -643,11 +656,15 @@
             }
 
             // ----- Tabelas (montadas aqui, em páginas de 200 linhas) -----
-            const PAGE = 200;
+            const PAGE = 60;
             const flag = (cls, txt) => '<span class="loc-flag loc-flag--' + cls + '">' + escape(txt) + '</span>';
             const coord = (v) => Number(v).toFixed(6);  // sempre com ponto: vai para o link do Google Maps
             function pagedTable(tbody, moreBtn, renderRow) {
                 let items = [], shown = 0, render = renderRow;
+                const box = tbody.closest('.loc-tabela-box');
+                if (box) box.addEventListener('scroll', function () {
+                    if (shown < items.length && box.scrollTop + box.clientHeight > box.scrollHeight - 300) more();
+                });
                 function more() {
                     const next = items.slice(shown, shown + PAGE);
                     tbody.insertAdjacentHTML('beforeend', next.map(render).join(''));
@@ -659,12 +676,13 @@
                 return function setItems(list, newRender) {
                     if (newRender) render = newRender;
                     items = list; shown = 0; tbody.innerHTML = ''; more();
+                    if (box) box.scrollTop = 0;
                 };
             }
             const pontosCurtos = (pontos) => {
                 const n = pontos.length;
                 return '<strong>' + fmt(n) + '</strong> ' + (n === 1 ? 'ponto' : 'pontos') + '<br>' +
-                    pontos.slice(0, 6).map((i) => '<button type="button" class="loc-zoom" data-zoom="' + i + '" title="' + escape(byIndex[i].n) + '">#' + i + '</button>').join(', ') + (n > 6 ? ' …' : '');
+                    pontos.slice(0, 3).map((i) => '<button type="button" class="loc-zoom" data-zoom="' + i + '" title="' + escape(byIndex[i].n) + '">#' + i + '</button>').join(', ') + (n > 3 ? ' …' : '');
             };
 
             // ----- Tabela de imóveis (CARs ou parcelas) -----
@@ -709,14 +727,14 @@
             const setPointRows = pagedTable(document.querySelector('#loc_points tbody'), document.getElementById('loc_mais'), function (p) {
                 const links = linksBase(p, base);
                 return '<tr>' +
-                    '<td><button type="button" class="loc-zoom" data-zoom="' + p.i + '">' + p.i + '</button></td>' +
+                    '<td><button type="button" class="loc-num-badge" data-zoom="' + p.i + '" title="Ver no mapa">' + p.i + '</button></td>' +
                     '<td>' + escape(p.n) + '<br>' +
                     (sources.length > 1 ? '<small style="color:#6b7280">' + escape(sources[p.f]) + '</small><br>' : '') +
                     (p.mun ? '<small style="color:#6b7280">' + escape(p.mun) + ' - TO</small><br>' : '') +
                     (p.fora ? flag('fora', 'fora do Tocantins') : '') +
                     (p.plus ? flag('plus', 'recuperado do Plus Code') : '') +
                     (p.div != null ? flag('div', 'posição corrigida pelo Plus Code (o ponto do arquivo estava a ' + (p.div >= 1000 ? fmt(p.div / 1000, 1) + ' km' : fmt(p.div) + ' m') + ')') : '') + '</td>' +
-                    '<td><a href="https://www.google.com/maps?q=' + coord(p.lat) + ',' + coord(p.lon) + '" target="_blank" rel="noopener">' + coord(p.lat) + ', ' + coord(p.lon) + '</a></td>' +
+                    '<td><a href="https://www.google.com/maps?q=' + coord(p.lat) + ',' + coord(p.lon) + '" target="_blank" rel="noopener" title="Abrir no Google Maps">' + coord(p.lat) + ', ' + coord(p.lon) + '</a></td>' +
                     '<td>' + (links || (p.fora ? '<span style="color:#6b7280">—</span>' : flag('none', 'sem ' + B().noun))) + '</td>' +
                     '</tr>';
             });
