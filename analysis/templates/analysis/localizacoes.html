@@ -56,6 +56,21 @@
         .loc-points-table td, .loc-cars-table td { vertical-align:top; }
         .loc-num { text-align:right; white-space:nowrap; }
         .loc-mais { margin-top:12px; text-align:center; }
+        .loc-ficha-popup .leaflet-popup-content { margin:14px 16px; width:330px !important; }
+        .loc-ficha { font:13px/1.45 Inter, sans-serif; color:#1f2937; }
+        .loc-ficha h3 { margin:0 0 2px; font:700 .72rem Inter, sans-serif; letter-spacing:.06em; text-transform:uppercase; color:#8a6d3b; }
+        .loc-ficha .car { font-family:ui-monospace, monospace; font-size:.85rem; font-weight:700; word-break:break-all; color:#1f3d2b; }
+        .loc-ficha .copy { margin-left:6px; padding:1px 7px; border:1px solid #d6d0bf; border-radius:6px; background:#fff; cursor:pointer; font-size:.72rem; }
+        .loc-ficha dl { display:grid; grid-template-columns:auto 1fr; gap:3px 12px; margin:10px 0; }
+        .loc-ficha dt { color:#6b7280; }
+        .loc-ficha dd { margin:0; font-weight:600; }
+        .loc-ficha .status { display:inline-block; padding:1px 8px; border-radius:999px; font-size:.78rem; background:color-mix(in srgb, var(--c) 25%, #fff); border:1px solid var(--c); }
+        .loc-ficha .secao { margin-top:10px; padding-top:8px; border-top:1px solid #eee7d6; }
+        .loc-ficha ul { margin:4px 0 0; padding-left:16px; }
+        .loc-ficha .pontos { max-height:84px; overflow:auto; }
+        .loc-ficha .acoes { display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
+        .loc-ficha .acoes button, .loc-ficha .acoes a { padding:5px 10px; border-radius:8px; border:1px solid #2f6b3f; background:#fff; color:#2f6b3f; font:600 .8rem Inter, sans-serif; cursor:pointer; text-decoration:none; }
+        .loc-ficha .acoes .principal { background:#2f6b3f; color:#fff; }
     </style>
 </head>
 <body>
@@ -204,15 +219,16 @@
             </div>
             {% if cars %}
             <div class="loc-filtros">
-                <input type="text" id="loc_cars_busca" placeholder="Número do CAR...">
+                <input type="text" id="loc_cars_busca" placeholder="Número do CAR ou município...">
                 <span class="badge badge-strong" id="loc_cars_contagem"></span>
             </div>
-            <p class="loc-hint" style="margin-top:0">Clique no CAR para vê-lo no mapa. "Cruzar com as bases" abre em outra aba a análise completa do CAR inteiro (a mesma da busca por número do CAR).</p>
+            <p class="loc-hint" style="margin-top:0">Clique no perímetro do CAR no mapa (ou no número dele aqui) para abrir a ficha com as informações do imóvel. Pontos fora de CAR (vermelhos) também abrem uma ficha ao clicar. "Cruzar com as bases" abre em outra aba a análise completa do CAR inteiro (a mesma da busca por número do CAR).</p>
             <div class="table-scroll">
                 <table class="data-table loc-cars-table" id="loc_cars">
                     <thead>
                         <tr>
                             <th>CAR</th>
+                            <th>Município</th>
                             <th>Situação</th>
                             <th class="loc-num">Área do CAR (ha)</th>
                             <th>Pontos dentro</th>
@@ -319,7 +335,10 @@
             const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19, attribution: '&copy; OpenStreetMap'
             });
-            map.createPane('cars').style.zIndex = 390;  // abaixo dos pontos
+            // Perímetros e pontos no MESMO canvas: com um canvas por camada, o de
+            // cima (pontos) engolia o clique no mapa todo e o polígono nunca recebia.
+            // A ordem de desenho é a de inclusão: perímetros primeiro, pontos por cima.
+            const renderer = L.canvas({ padding: 0.5 });
 
             // ----- Tela cheia (API nativa do navegador) -----
             const mapEl = document.getElementById('loc_map');
@@ -362,34 +381,105 @@
             const STATUS_COLOR = { AT: '#5fe08a', PE: '#ffd23f', SU: '#ff6b3d', CA: '#d9d3c7' };
             const STATUS_LABEL = { AT: 'Ativo', PE: 'Pendente', SU: 'Suspenso', CA: 'Cancelado' };
             const statusLabel = (st) => STATUS_LABEL[String(st || '').toUpperCase()] || st || '—';
+            // Ficha do CAR: abre ao clicar no perímetro ou no número na tabela.
+            function fichaCar(c) {
+                const st = String(c.status || '').toUpperCase();
+                const n = c.pontos.length;
+                const pontos = c.pontos.slice(0, 40).map((i) =>
+                    '<button type="button" class="loc-zoom" data-zoom="' + i + '" title="' + escape(byIndex[i].n) + '">#' + i + '</button>').join(', ') +
+                    (n > 40 ? ' <span style="color:#6b7280">+ ' + fmt(n - 40) + ' (lista completa no CSV)</span>' : '');
+                const hidro = c.hidro.length
+                    ? '<ul>' + c.hidro.map((h) => '<li>' + escape(h.tema) + (h.n > 1 ? ' (' + h.n + ')' : '') +
+                        (h.ha != null ? ' — ' + fmt(h.ha, 2) + ' ha' : '') + '</li>').join('') + '</ul>'
+                    : '<div style="color:#6b7280">Nenhuma declarada.</div>';
+                const centro = c.geom ? carLayers[c.car].getBounds().getCenter() : null;
+                return '<div class="loc-ficha">' +
+                    '<h3>Imóvel do CAR</h3>' +
+                    '<div><span class="car">' + escape(c.car) + '</span><button type="button" class="copy" data-copy="' + escape(c.car) + '">copiar</button></div>' +
+                    '<dl>' +
+                    '<dt>Município</dt><dd>' + escape(c.mun || '—') + (c.mun ? ' - TO' : '') + '</dd>' +
+                    '<dt>Situação</dt><dd><span class="status" style="--c:' + (STATUS_COLOR[st] || '#4dabf7') + '">' + escape(statusLabel(c.status)) + '</span></dd>' +
+                    '<dt>Área</dt><dd>' + (c.area_ha != null ? fmt(c.area_ha, 2) + ' ha' : '—') + '</dd>' +
+                    '<dt>Atualizado em</dt><dd>' + escape(c.upd || '—') + '</dd>' +
+                    '</dl>' +
+                    '<div class="secao"><strong>Hidrografia declarada</strong>' + hidro + '</div>' +
+                    '<div class="secao"><strong>' + fmt(n) + (n === 1 ? ' ponto caiu' : ' pontos caíram') + ' neste CAR</strong>' +
+                    '<div class="pontos">' + pontos + '</div></div>' +
+                    '<div class="acoes">' +
+                    '<button type="button" class="principal" data-cross="' + escape(c.car) + '">Cruzar com as bases</button>' +
+                    (c.geom ? '<button type="button" data-fit-car="' + escape(c.car) + '">Enquadrar no mapa</button>' : '') +
+                    (centro ? '<a href="https://www.google.com/maps?q=' + centro.lat.toFixed(6) + ',' + centro.lng.toFixed(6) + '" target="_blank" rel="noopener">Google Maps</a>' : '') +
+                    '</div></div>';
+            }
+            const FICHA_OPTS = { className: 'loc-ficha-popup', maxWidth: 360, autoPanPadding: [30, 30] };
+
+            const byIndex = {};
+            data.forEach((p) => { byIndex[p.i] = p; });
             const carsLayer = L.layerGroup().addTo(map);
             const carLayers = {};
             carsData.forEach(function (c) {
                 if (!c.geom) return;
                 const color = STATUS_COLOR[String(c.status || '').toUpperCase()] || '#4dabf7';
-                const layer = L.geoJSON(c.geom, { pane: 'cars', style: { color: color, weight: 2, fillColor: color, fillOpacity: .12 } });
-                layer.bindPopup(
-                    '<strong style="font-family:monospace">' + escape(c.car) + '</strong><br>' +
-                    'Situação: ' + escape(statusLabel(c.status)) + '<br>' +
-                    (c.area_ha != null ? 'Área do CAR: ' + fmt(c.area_ha, 2) + ' ha<br>' : '') +
-                    'Pontos dentro: ' + c.pontos.length
-                );
+                const layer = L.geoJSON(c.geom, { renderer: renderer, style: { color: color, weight: 2, fillColor: color, fillOpacity: .12 } });
                 layer.on('mouseover', () => layer.setStyle({ weight: 4, fillOpacity: .3 }));
                 layer.on('mouseout', () => layer.setStyle({ weight: 2, fillOpacity: .12 }));
                 carLayers[c.car] = layer;
                 layer.addTo(carsLayer);
             });
+            // O popup é montado depois que todas as camadas existem (a ficha usa o centro do perímetro).
+            carsData.forEach(function (c) {
+                const layer = carLayers[c.car];
+                if (layer) layer.bindPopup(() => fichaCar(c), FICHA_OPTS);
+            });
+            const carByNumber = {};
+            carsData.forEach((c) => { carByNumber[c.car] = c; });
+
+            function abrirFicha(numero, enquadrar) {
+                const c = carByNumber[numero];
+                if (!c) return;
+                const layer = carLayers[numero];
+                focusMap();
+                if (layer) {
+                    if (enquadrar) map.fitBounds(layer.getBounds(), { padding: [30, 30] });
+                    layer.openPopup(layer.getBounds().getCenter());
+                } else {
+                    // Sem perímetro: abre a ficha sobre o primeiro ponto do CAR.
+                    const p = byIndex[c.pontos[0]];
+                    if (enquadrar) map.setView([p.lat, p.lon], 15);
+                    L.popup(FICHA_OPTS).setLatLng([p.lat, p.lon]).setContent(fichaCar(c)).openOn(map);
+                }
+            }
 
             // ----- Localizações (pontos centrais) -----
             const markers = {};
+            function fichaPonto(p) {
+                const cars = p.cars.length
+                    ? '<div class="secao"><strong>Dentro do CAR</strong><div>' + p.cars.map((k) =>
+                        '<button type="button" class="loc-zoom loc-car" data-ficha="' + escape(carsData[k].car) + '">' + escape(carsData[k].car) + '</button>').join('<br>') + '</div></div>'
+                    : '<div class="secao"><strong>Fora de qualquer CAR</strong><div style="color:#6b7280">Nenhum imóvel do SICAR (Tocantins) contém este ponto.</div></div>';
+                const lat = Number(p.lat).toFixed(6), lon = Number(p.lon).toFixed(6);
+                return '<div class="loc-ficha">' +
+                    '<h3>Localização #' + p.i + '</h3>' +
+                    '<div style="font-weight:600">' + escape(p.n) + '</div>' +
+                    '<dl>' +
+                    (sources.length > 1 ? '<dt>Arquivo</dt><dd>' + escape(sources[p.f]) + '</dd>' : '') +
+                    '<dt>Coordenadas</dt><dd>' + lat + ', ' + lon + '<button type="button" class="copy" data-copy="' + lat + ', ' + lon + '">copiar</button></dd>' +
+                    (p.plus ? '<dt>Posição</dt><dd>recuperada pelo Plus Code do nome</dd>' : '') +
+                    (p.div != null ? '<dt>Posição</dt><dd>corrigida pelo Plus Code (o ponto do arquivo estava a ' + (p.div >= 1000 ? fmt(p.div / 1000, 1) + ' km' : fmt(p.div) + ' m') + ')</dd>' : '') +
+                    '</dl>' + cars +
+                    '<div class="acoes"><a class="principal" href="https://www.google.com/maps?q=' + lat + ',' + lon + '" target="_blank" rel="noopener">Abrir no Google Maps</a></div>' +
+                    '</div>';
+            }
+
             const pointsLayer = L.featureGroup(data.map(function (p) {
+                const dentro = p.cars.length > 0;
                 const marker = L.circleMarker([p.lat, p.lon], {
-                    radius: 5, weight: 1, color: '#fff', fillOpacity: .9,
-                    fillColor: p.cars.length ? '#2f9e44' : '#e03131'
+                    renderer: renderer, radius: 5, weight: 1, color: '#fff', fillOpacity: .9,
+                    fillColor: dentro ? '#2f9e44' : '#e03131',
+                    // Dentro de CAR o clique passa para o polígono embaixo (ficha do CAR).
+                    interactive: !dentro
                 });
-                marker.bindPopup('<strong>#' + p.i + '</strong> ' + escape(p.n) +
-                    (sources.length > 1 ? '<br><small>' + escape(sources[p.f]) + '</small>' : '') + '<br>' +
-                    (p.cars.length ? p.cars.map((k) => escape(carsData[k].car)).join('<br>') : '<em>sem CAR</em>'));
+                marker.bindPopup(() => fichaPonto(p), FICHA_OPTS);
                 markers[p.i] = marker;
                 return marker;
             })).addTo(map);
@@ -430,8 +520,6 @@
 
             // ----- Tabelas (montadas aqui, em páginas de 200 linhas) -----
             const PAGE = 200;
-            const byIndex = {};
-            data.forEach((p) => { byIndex[p.i] = p; });
             const flag = (cls, txt) => '<span class="loc-flag loc-flag--' + cls + '">' + escape(txt) + '</span>';
             const coord = (v) => Number(v).toFixed(6);  // sempre com ponto: vai para o link do Google Maps
 
@@ -460,7 +548,8 @@
                     const pts = c.pontos.slice(0, 6).map((i) =>
                         '<button type="button" class="loc-zoom" data-zoom="' + i + '" title="' + escape(byIndex[i].n) + '">#' + i + '</button>').join(', ');
                     return '<tr>' +
-                        '<td>' + (c.geom ? '<button type="button" class="loc-zoom loc-car" data-zoom-car="' + escape(c.car) + '" title="Ver perímetro no mapa">' + escape(c.car) + '</button>' : '<span class="loc-car">' + escape(c.car) + '</span>') + '</td>' +
+                        '<td><button type="button" class="loc-zoom loc-car" data-ficha="' + escape(c.car) + '" title="Abrir a ficha do CAR">' + escape(c.car) + '</button></td>' +
+                        '<td>' + escape(c.mun || '—') + '</td>' +
                         '<td>' + escape(statusLabel(c.status)) + '</td>' +
                         '<td class="loc-num">' + (c.area_ha != null ? fmt(c.area_ha, 2) : '—') + '</td>' +
                         '<td><strong>' + fmt(n) + '</strong> ' + (n === 1 ? 'ponto' : 'pontos') + '<br>' + pts + (n > 6 ? ' …' : '') + '</td>' +
@@ -469,7 +558,7 @@
                 });
                 const aplicarCars = function () {
                     const q = carsBusca.value.trim().toUpperCase();
-                    const linhas = q ? carsData.filter((c) => c.car.toUpperCase().includes(q)) : carsData;
+                    const linhas = q ? carsData.filter((c) => c.car.toUpperCase().includes(q) || (c.mun || '').toUpperCase().includes(q)) : carsData;
                     setCarRows(linhas);
                     carsContagem.textContent = fmt(linhas.length) + ' de ' + fmt(carsData.length);
                 };
@@ -484,7 +573,7 @@
             const contagem = document.getElementById('loc_contagem');
 
             const setPointRows = pagedTable(document.querySelector('#loc_points tbody'), document.getElementById('loc_mais'), function (p) {
-                const cars = p.cars.map((k) => '<div class="loc-car">' + escape(carsData[k].car) + '</div>').join('');
+                const cars = p.cars.map((k) => '<div><button type="button" class="loc-zoom loc-car" data-ficha="' + escape(carsData[k].car) + '" title="Abrir a ficha do CAR">' + escape(carsData[k].car) + '</button></div>').join('');
                 return '<tr>' +
                     '<td><button type="button" class="loc-zoom" data-zoom="' + p.i + '">' + p.i + '</button></td>' +
                     '<td>' + escape(p.n) + '<br>' +
@@ -519,29 +608,50 @@
 
             // ----- Cliques nas tabelas (delegados: as linhas são recriadas) -----
             const crossForm = document.getElementById('loc_cross_form');
-            document.addEventListener('click', function (e) {
+            function tratarClique(e) {
                 const zoom = e.target.closest('[data-zoom]');
                 if (zoom) {
                     const marker = markers[zoom.dataset.zoom];
                     if (!marker) return;
                     focusMap();
-                    map.setView(marker.getLatLng(), 15);
+                    map.setView(marker.getLatLng(), 16);
                     marker.openPopup();
                     return;
                 }
-                const zoomCar = e.target.closest('[data-zoom-car]');
-                if (zoomCar) {
-                    const layer = carLayers[zoomCar.dataset.zoomCar];
-                    if (!layer) return;
-                    focusMap();
-                    map.fitBounds(layer.getBounds(), { padding: [30, 30] });
-                    layer.openPopup(layer.getBounds().getCenter());
+                const ficha = e.target.closest('[data-ficha]');
+                if (ficha) {
+                    abrirFicha(ficha.dataset.ficha, true);
+                    return;
+                }
+                const fit = e.target.closest('[data-fit-car]');
+                if (fit) {
+                    const layer = carLayers[fit.dataset.fitCar];
+                    if (layer) map.fitBounds(layer.getBounds(), { padding: [30, 30] });
+                    return;
+                }
+                const copy = e.target.closest('[data-copy]');
+                if (copy) {
+                    const done = () => { copy.textContent = 'copiado!'; setTimeout(() => { copy.textContent = 'copiar'; }, 1500); };
+                    if (navigator.clipboard) navigator.clipboard.writeText(copy.dataset.copy).then(done, () => {});
                     return;
                 }
                 const cross = e.target.closest('[data-cross]');
                 if (cross && crossForm) {
                     document.getElementById('loc_cross_car').value = cross.dataset.cross;
                     crossForm.submit();
+                }
+            }
+            document.addEventListener('click', tratarClique);
+            // Os balões do Leaflet param a propagação do clique, então os botões
+            // de dentro deles (ficha do CAR, CARs do ponto) precisam do tratador direto.
+            map.on('popupopen', function (e) {
+                const el = e.popup.getElement();
+                if (el && !el.dataset.cliques) {
+                    el.dataset.cliques = '1';
+                    el.addEventListener('click', function (ev) {
+                        tratarClique(ev);
+                        ev.stopPropagation();  // não tratar de novo no document
+                    });
                 }
             });
 
@@ -570,9 +680,9 @@
 
             // Um CAR por linha (cada imóvel uma vez).
             document.getElementById('loc_cars_csv').addEventListener('click', function () {
-                const lines = [['car', 'situacao', 'area_car_ha', 'pontos_dentro', 'localizacoes'].join(';')];
+                const lines = [['car', 'municipio', 'situacao', 'area_car_ha', 'atualizado_em', 'pontos_dentro', 'localizacoes'].join(';')];
                 carsData.forEach(function (c) {
-                    lines.push([c.car, statusLabel(c.status), num(c.area_ha, 2), c.pontos.length, csvCell(c.pontos.join(', '))].join(';'));
+                    lines.push([c.car, csvCell(c.mun), statusLabel(c.status), num(c.area_ha, 2), c.upd, c.pontos.length, csvCell(c.pontos.join(', '))].join(';'));
                 });
                 baixarCsv('cars_encontrados.csv', lines);
             });

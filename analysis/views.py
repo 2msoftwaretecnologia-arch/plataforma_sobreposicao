@@ -1,5 +1,6 @@
 # Standard library
 import io
+import json
 import os
 import tempfile
 import zipfile
@@ -27,6 +28,7 @@ from analysis.services.view_services.result_map_formatter import (
 )
 from analysis.services.view_services.bases_3d import (
     MAX_TILE_ZOOM,
+    MUNICIPIOS_JSON,
     bases_summary,
     cities_summary,
     render_tile,
@@ -34,6 +36,7 @@ from analysis.services.view_services.bases_3d import (
 from analysis.services.view_services.zip_upload_service import ZipUploadService
 from analysis.services.view_services.kmz_points_service import (
     KmzPointsError,
+    car_details,
     car_perimeters,
     locate_cars,
     parse_location_points,
@@ -562,6 +565,18 @@ class UploadZipCarView(View):
             request.session['last_analysis'] = data
             return redirect('results')
 
+def _municipios_por_codigo() -> dict:
+    """Nome dos municípios do Tocantins pelo código IBGE."""
+    try:
+        return {m['codigo']: m['nome'] for m in json.loads(MUNICIPIOS_JSON.read_text(encoding='utf-8'))}
+    except (OSError, ValueError):
+        return {}
+
+
+def _data_br(value) -> str:
+    return value.strftime('%d/%m/%Y') if value else ''
+
+
 class LocalizacoesKmzView(View):
     """Recebe um ou mais KMZ/KML de localizações (um Placemark por ponto) e
     mostra em qual imóvel do SICAR cai o ponto central de cada uma. O
@@ -595,11 +610,17 @@ class LocalizacoesKmzView(View):
             return render(request, self.template_name, {'erro': f'Erro ao processar os arquivos: {e}'})
 
         cars = summarize_cars(points)
+        car_numbers = [c['car_number'] for c in cars]
         try:
-            perimeters = car_perimeters([c['car_number'] for c in cars])
+            perimeters = car_perimeters(car_numbers)
         except Exception:
             # Sem o perímetro a tela continua útil (pontos e tabelas).
             perimeters = {}
+        try:
+            details = car_details(car_numbers)
+        except Exception:
+            details = {}
+        municipios = _municipios_por_codigo()
 
         sources = [f.name for f in files]
         car_position = {c['car_number']: i for i, c in enumerate(cars)}
@@ -639,6 +660,17 @@ class LocalizacoesKmzView(View):
                     'area_ha': round(c['area_ha'], 2) if c['area_ha'] is not None else None,
                     'pontos': [p.index for p in c['points']],
                     'geom': perimeters.get(c['car_number']),
+                    # O código IBGE do município está no número do CAR (UF-<7 dígitos>-<hash>).
+                    'mun': municipios.get(c['car_number'][3:10], ''),
+                    'upd': _data_br(details.get(c['car_number'], {}).get('last_update')),
+                    'hidro': [
+                        {
+                            'tema': h['theme'],
+                            'n': h['count'],
+                            'ha': round(h['area_ha'], 2) if h['area_ha'] is not None else None,
+                        }
+                        for h in details.get(c['car_number'], {}).get('hydrography', [])
+                    ],
                 }
                 for c in cars
             ],

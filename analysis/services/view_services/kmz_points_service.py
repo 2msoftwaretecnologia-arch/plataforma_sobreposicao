@@ -349,3 +349,30 @@ def car_perimeters(car_numbers: list) -> dict:
     with connection.cursor() as cursor:
         cursor.execute(sql, [list(car_numbers)])
         return {car: json.loads(geojson) for car, geojson in cursor.fetchall() if geojson}
+
+
+def car_details(car_numbers: list) -> dict:
+    """Dados extras de cada CAR para a ficha da tela: data da última
+    atualização no SICAR e a hidrografia declarada (por tipo, com área)."""
+    if not car_numbers:
+        return {}
+    car_numbers = list(car_numbers)
+    details = {car: {'last_update': None, 'hydrography': []} for car in car_numbers}
+    with connection.cursor() as cursor:
+        cursor.execute(
+            'SELECT numero_car, ultima_atualizacao FROM tb_registro_sicar WHERE numero_car = ANY(%s)',
+            [car_numbers],
+        )
+        for car, last_update in cursor.fetchall():
+            details[car]['last_update'] = last_update
+        cursor.execute("""
+            SELECT cod_imovel, nom_tema, COUNT(*), SUM(area_ha)
+            FROM tb_hidrografia_declarada
+            WHERE cod_imovel = ANY(%s)
+            GROUP BY 1, 2
+            ORDER BY 1, 4 DESC NULLS LAST
+        """, [car_numbers])
+        for car, theme, count, area_ha in cursor.fetchall():
+            if car in details:
+                details[car]['hydrography'].append({'theme': theme, 'count': count, 'area_ha': area_ha})
+    return details
