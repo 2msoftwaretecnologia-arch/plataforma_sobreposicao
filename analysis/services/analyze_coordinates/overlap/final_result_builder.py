@@ -196,6 +196,7 @@ class FinalResultBuilder:
             "Embargoes": "Base de Embargos do IBAMA",
             "Ipuca": "Base de Dados IPUCA",
             "Prodes": "Base de Dados Prodes",
+            "Highways": "Base de Dados de Rodovias",
         }
         return mapping.get(layer.__name__, layer.__name__)
 
@@ -218,5 +219,6 @@ class FinalResultBuilder:
             "Embargoes": "#FF5722",
             "Ipuca": "#673AB7",
             "Prodes": "#D84315",
+            "Highways": "#9E9E9E",
         }
         return mapping.get(layer.__name__, "#9E9E9E")

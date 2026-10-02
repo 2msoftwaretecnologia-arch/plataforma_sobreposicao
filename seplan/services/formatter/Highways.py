@@ -7,6 +7,7 @@ class HighwaysFormatter(BaseFormatter):
             "area": intersec["intersection_area_ha"],
             "NOME_2011": model_obj.NOME_2011,
             "CLAS_2011": model_obj.CLAS_2011,
+            "item_info": "Rodovia (faixa de domínio): {} — {}".format(model_obj.NOME_2011, model_obj.CLAS_2011),
             "polygon_wkt": intersec["intersection_geom"].wkt,
             "polygon_geojson": intersec["intersection_geom"].geojson,
         }
