@@ -51,6 +51,8 @@ class LocationPoint:
     # Code, que é o endereço original (ver `parse_location_points`).
     divergence_m: float = None
     cars: list = field(default_factory=list)
+    # Parcelas do SIGEF que contêm o ponto central (ver `locate_sigef`).
+    parcels: list = field(default_factory=list)
 
     @property
     def is_divergent(self) -> bool:
@@ -408,3 +410,65 @@ def locate_municipalities(points: list) -> list:
         for idx, name in cursor.fetchall():
             by_index[idx].municipality = name
     return points
+
+
+# ---------------------------------------------------------------------------
+# SIGEF: a mesma ideia do SICAR, com parcelas no lugar de CARs
+# ---------------------------------------------------------------------------
+
+def locate_sigef(points: list) -> list:
+    """Preenche `point.parcels` com as parcelas do SIGEF que contêm o ponto
+    central. Uma consulta só, pelo índice espacial de `tb_area_sigef`."""
+    if not points:
+        return points
+    sql = """
+        SELECT p.idx, s.codigo_imo, s.propriedade_co, s.nome_area, s.status, s.area_ha
+        FROM unnest(%s::int[], %s::float8[], %s::float8[]) AS p(idx, lon, lat)
+        JOIN tb_area_sigef s
+          ON ST_Intersects(s.geometria_util, ST_SetSRID(ST_MakePoint(p.lon, p.lat), 4674))
+        ORDER BY p.idx, s.area_ha DESC NULLS LAST
+    """
+    by_index = {p.index: p for p in points}
+    with connection.cursor() as cursor:
+        cursor.execute(sql, [
+            [p.index for p in points],
+            [p.lon for p in points],
+            [p.lat for p in points],
+        ])
+        for idx, code, property_code, name, status, area_ha in cursor.fetchall():
+            by_index[idx].parcels.append({
+                'code': code,
+                'property_code': property_code or '',
+                'name': (name or '').strip(' -'),
+                'status': status or '',
+                'area_ha': area_ha,
+            })
+    return points
+
+
+def summarize_parcels(points: list) -> list:
+    """Parcelas distintas encontradas (cada uma conta uma vez), com os pontos
+    que caíram em cada uma e o município mais comum entre esses pontos."""
+    parcels = {}
+    for p in points:
+        for parcel in p.parcels:
+            entry = parcels.setdefault(parcel['code'], {**parcel, 'points': []})
+            entry['points'].append(p)
+    for entry in parcels.values():
+        names = [p.municipality for p in entry['points'] if p.municipality]
+        entry['municipality'] = max(set(names), key=names.count) if names else ''
+    return sorted(parcels.values(), key=lambda c: (-len(c['points']), c['code']))
+
+
+def sigef_perimeters(codes: list) -> dict:
+    """GeoJSON do perímetro de cada parcela (simplificado como o do SICAR)."""
+    if not codes:
+        return {}
+    sql = """
+        SELECT codigo_imo, ST_AsGeoJSON(ST_SimplifyPreserveTopology(geometria_util, 0.00002), 6)
+        FROM tb_area_sigef
+        WHERE codigo_imo = ANY(%s) AND geometria_util IS NOT NULL
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(sql, [list(codes)])
+        return {code: json.loads(geojson) for code, geojson in cursor.fetchall() if geojson}

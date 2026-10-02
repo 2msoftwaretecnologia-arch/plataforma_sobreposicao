@@ -70,6 +70,12 @@ class OverlapService:
             return (inter_area_m2 / self.target_area_m2) * 100
         return 0
 
+    def _is_target_itself(self, obj):
+        """O próprio registro analisado (ex.: a parcela do SIGEF cruzada com a
+        camada do SIGEF) não é sobreposição."""
+        record = getattr(self.target, "self_record", None)
+        return record is not None and type(obj) is type(record) and obj.pk == record.pk
+
     def _should_discard(self, layer_model, inter_area_ha, percent_overlap_layer):
         """
         Aplica regras de descarte:
@@ -101,6 +107,8 @@ class OverlapService:
         Constrói o dicionário de saída para uma intersecção válida.
         Inclui métricas de área e percentuais de cobertura.
         """
+        if self._is_target_itself(obj):
+            return None
         inter_utm = inter.transform(UTM_SRID, clone=True)
         inter_area_m2 = inter_utm.area
         inter_area_ha = inter_area_m2 / 10000

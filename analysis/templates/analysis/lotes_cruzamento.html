@@ -30,6 +30,9 @@
         .lote-bar { height:8px; border-radius:999px; background:#eee7d6; overflow:hidden; }
         .lote-bar span { display:block; height:100%; background:linear-gradient(90deg,#2f6b3f,#5fa463); }
         .lote-abrir { white-space:nowrap; }
+        .lote-base { display:inline-block; padding:2px 10px; border-radius:999px; font-size:.75rem; font-weight:700; }
+        .lote-base--car { background:#e3f0e3; color:#1f3d2b; }
+        .lote-base--sigef { background:#e0ecff; color:#1849a9; }
     </style>
 </head>
 <body>
@@ -68,7 +71,7 @@
                 <div class="reveal">
                     <div class="hero-badge"><svg class="ico"><use href="#i-layers"/></svg> Cruzamento em lote</div>
                     <h1>Meus <em>lotes</em> de cruzamento.</h1>
-                    <p class="hero-text">Cada lote cruza todos os CARs encontrados na tela de Localizações com as demais bases de dados.</p>
+                    <p class="hero-text">Cada lote cruza todos os CARs (SICAR) ou todas as parcelas (SIGEF) encontrados na tela de Localizações com as demais bases de dados.</p>
                 </div>
             </div>
         </div>
@@ -89,7 +92,8 @@
                         </div>
                         <div class="lote-meta">
                             <span class="lote-status lote-status--{{ lote.status }}">{{ lote.get_status_display }}</span>
-                            <span><strong>{{ lote.total }}</strong> CAR{{ lote.total|pluralize:"s" }}</span>
+                            <span class="lote-base lote-base--{{ lote.labels.kind }}">{{ lote.labels.base }}</span>
+                            <span><strong>{{ lote.total }}</strong> {% if lote.total == 1 %}{{ lote.labels.noun }}{% else %}{{ lote.labels.noun_pl }}{% endif %}</span>
                             <span>Criado em {{ lote.created_at|date:"d/m/Y \à\s H:i" }}</span>
                         </div>
                     </div>

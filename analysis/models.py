@@ -17,6 +17,7 @@ class SearchHistory(models.Model):
         COORDENADAS = 'coordenadas', 'Coordenadas'
         DEMONSTRATIVO = 'demonstrativo', 'PDF — Demonstrativo'
         RECIBO = 'recibo', 'PDF — Recibo'
+        SIGEF = 'sigef', 'Parcela do SIGEF'
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True,
@@ -64,10 +65,17 @@ class CrossBatch(models.Model):
         DONE = 'done', 'Concluído'
         ERROR = 'error', 'Erro'
 
+    class Kind(models.TextChoices):
+        CAR = 'car', 'CARs do SICAR'
+        SIGEF = 'sigef', 'Parcelas do SIGEF'
+
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True,
         on_delete=models.SET_NULL, related_name='cross_batches',
     )
+    # Do que o lote é feito: CARs (item.car_number = número do CAR) ou
+    # parcelas do SIGEF (item.car_number = código da parcela).
+    kind = models.CharField(max_length=10, choices=Kind.choices, default=Kind.CAR)
     title = models.CharField(max_length=255, blank=True, default='')
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     total = models.PositiveIntegerField(default=0)
@@ -95,7 +103,8 @@ class CrossBatch(models.Model):
 
 
 class CrossBatchItem(models.Model):
-    """Um CAR de um lote e o resumo do cruzamento dele com as bases."""
+    """Um CAR (ou parcela do SIGEF) de um lote e o resumo do cruzamento dele
+    com as bases. Para parcelas, `car_number` guarda o código da parcela."""
 
     class Status(models.TextChoices):
         PENDING = 'pending', 'Na fila'
@@ -109,6 +118,8 @@ class CrossBatchItem(models.Model):
     area_ha = models.FloatField(null=True, blank=True)
     # Localizações do arquivo que caíram neste CAR: [{i, n, lat, lon}].
     points = models.JSONField(default=list, blank=True)
+    # Dados que só existem no SIGEF: {'name': nome da área, 'property_code': código do imóvel}.
+    extra = models.JSONField(default=dict, blank=True)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING, db_index=True)
     # Resumo do resultado do `SearchAll` (sem as geometrias, que chegam a
     # vários MB por CAR) — ver `cross_batch_service.summarize_result`.

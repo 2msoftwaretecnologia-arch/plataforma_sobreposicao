@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% if um_car %}{{ cars.0.item.car_number }}{% else %}Relatório do lote{% endif %} | TerraView Tocantins</title>
+    <title>{% if um_car %}{{ cars.0.item.extra.name|default:cars.0.item.car_number }}{% else %}Relatório do lote{% endif %} | TerraView Tocantins</title>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <style>
         @page { size:A4; margin:14mm 12mm; }
@@ -52,7 +52,7 @@
 <body>
     <div class="barra">
         <button type="button" onclick="window.print()">Imprimir / salvar em PDF</button>
-        <span style="margin-left:10px;font-size:12px">{{ totais.cars }} CAR{{ totais.cars|pluralize:"s" }}{% if nivel == 'alertas' %} com alerta{% elif nivel == 'critical' %} com alerta crítico{% endif %} · um por página</span>
+        <span style="margin-left:10px;font-size:12px">{{ totais.cars }} {% if totais.cars == 1 %}{{ labels.noun }}{% else %}{{ labels.noun_pl }}{% endif %}{% if nivel == 'alertas' %} com alerta{% elif nivel == 'critical' %} com alerta crítico{% endif %} · um por página</span>
     </div>
 
     {% if not um_car %}
@@ -60,10 +60,10 @@
     <div class="folha quebra">
         <div class="topo"><span>TerraView Tocantins · Cruzamento em lote</span><span>Gerado em {% now "d/m/Y H:i" %}</span></div>
         <p class="eyebrow">Relatório de sobreposições</p>
-        <h1>{{ totais.cars }} imóveis do CAR cruzados com as bases de dados</h1>
-        <p style="color:#4b5563">{{ batch.title|default:"Localizações" }} · lote criado em {{ batch.created_at|date:"d/m/Y H:i" }}{% if nivel == 'alertas' %} · só CARs com alerta{% endif %}</p>
+        <h1>{% if labels.kind == 'sigef' %}{{ totais.cars }} parcelas do SIGEF cruzadas{% else %}{{ totais.cars }} imóveis do CAR cruzados{% endif %} com as bases de dados</h1>
+        <p style="color:#4b5563">{{ batch.title|default:"Localizações" }} · lote criado em {{ batch.created_at|date:"d/m/Y H:i" }}{% if nivel == 'alertas' %} · só {{ labels.noun_pl }} com alerta{% endif %}</p>
         <div class="capa-stats">
-            <div><strong>{{ totais.cars }}</strong>CARs neste relatório</div>
+            <div><strong>{{ totais.cars }}</strong>{{ labels.noun_pl|capfirst }} neste relatório</div>
             <div><strong style="color:#b42318">{{ totais.criticos }}</strong>com alerta crítico</div>
             <div><strong style="color:#b54708">{{ totais.atencao }}</strong>com atenção (sem crítico)</div>
         </div>
@@ -73,10 +73,10 @@
             <span class="sev sev--info">Informativa</span> demais bases. Áreas "sem unidade" das camadas de UC/APA não são restrição.
         </p>
         <table class="indice">
-            <tr><td><strong>CAR</strong></td><td><strong>Município</strong></td><td class="num"><strong>Área (ha)</strong></td><td><strong>Alertas</strong></td></tr>
+            <tr><td><strong>{% if labels.kind == 'sigef' %}Parcela{% else %}CAR{% endif %}</strong></td><td><strong>Município</strong></td><td class="num"><strong>Área (ha)</strong></td><td><strong>Alertas</strong></td></tr>
             {% for c in cars %}
             <tr>
-                <td style="font-family:ui-monospace,monospace">{{ c.item.car_number }}</td>
+                <td>{% if labels.kind == 'sigef' %}<strong>{{ c.item.extra.name|default:"Parcela" }}</strong><br>{% endif %}<span style="font-family:ui-monospace,monospace">{{ c.item.car_number }}</span></td>
                 <td>{{ c.item.municipio|default:"—" }}</td>
                 <td class="num">{{ c.area_car|floatformat:2 }}</td>
                 <td>{% if c.item.critical_count %}<span class="sev sev--critical">{{ c.item.critical_count }} crítica{{ c.item.critical_count|pluralize }}</span> {% endif %}{% if c.item.warning_count %}<span class="sev sev--warning">{{ c.item.warning_count }} atenção</span>{% endif %}{% if not c.item.critical_count and not c.item.warning_count %}<span class="sev sev--ok">sem alertas</span>{% endif %}</td>
@@ -89,8 +89,9 @@
     <!-- ===== Um CAR por página ===== -->
     {% for c in cars %}
     <div class="folha{% if not forloop.last %} quebra{% endif %}">
-        <div class="topo"><span>TerraView Tocantins · Relatório de sobreposições do CAR</span><span>{% if not um_car %}{{ forloop.counter }} / {{ cars|length }}{% else %}{% now "d/m/Y H:i" %}{% endif %}</span></div>
-        <p class="eyebrow">Imóvel do CAR</p>
+        <div class="topo"><span>TerraView Tocantins · Relatório de sobreposições d{{ labels.o }} {{ labels.noun }}</span><span>{% if not um_car %}{{ forloop.counter }} / {{ cars|length }}{% else %}{% now "d/m/Y H:i" %}{% endif %}</span></div>
+        <p class="eyebrow">{{ labels.item_title }}</p>
+        {% if labels.kind == 'sigef' %}<h1 style="font-size:17px">{{ c.item.extra.name|default:"Parcela" }}</h1>{% endif %}
         <h2>{{ c.item.car_number }}</h2>
         <div style="margin-top:4px">
             {% if c.item.critical_count %}<span class="sev sev--critical">{{ c.item.critical_count }} base{{ c.item.critical_count|pluralize }} crítica{{ c.item.critical_count|pluralize }}</span>{% endif %}
@@ -100,14 +101,15 @@
         <dl class="grid">
             <div><dt>Município</dt><dd>{% if c.item.municipio %}{{ c.item.municipio }} - TO{% else %}—{% endif %}</dd></div>
             <div><dt>Situação</dt><dd>{{ c.status_label }}</dd></div>
-            <div><dt>Área do CAR</dt><dd>{{ c.area_car|floatformat:2 }} ha</dd></div>
-            <div><dt>Localizações no CAR</dt><dd>{{ c.item.points|length }}</dd></div>
+            {% if labels.kind == 'sigef' %}<div><dt>Cód. imóvel (SIGEF)</dt><dd>{{ c.item.extra.property_code|default:"—" }}</dd></div>{% endif %}
+            <div><dt>Área</dt><dd>{{ c.area_car|floatformat:2 }} ha</dd></div>
+            <div><dt>Localizações n{% if labels.kind == 'sigef' %}a parcela{% else %}o CAR{% endif %}</dt><dd>{{ c.item.points|length }}</dd></div>
         </dl>
 
         {% for b in c.bases %}
         <div class="base base--{{ b.sev }}">
             <h3>{{ b.nome_curto }} <span class="sev sev--{{ b.sev }}">{{ b.sev_label }}</span>
-                {% if b.count %}<small>{{ b.count }} sobreposiç{{ b.count|pluralize:"ão,ões" }} · {{ b.total_area|floatformat:2 }} ha{% if b.pct is not None %} ({{ b.pct }}% do CAR){% endif %}</small>{% endif %}
+                {% if b.count %}<small>{{ b.count }} sobreposiç{{ b.count|pluralize:"ão,ões" }} · {{ b.total_area|floatformat:2 }} ha{% if b.pct is not None %} ({{ b.pct }}% d{{ labels.o }} {{ labels.noun }}){% endif %}</small>{% endif %}
             </h3>
             <table>
                 {% for x in b.items %}
@@ -122,13 +124,13 @@
 
         {% if c.sem %}<div class="sem"><strong>Sem sobreposição:</strong> {{ c.sem|join:" · " }}</div>{% endif %}
         {% if c.item.points %}
-        <div class="pontos"><strong>Localizações neste CAR:</strong>
+        <div class="pontos"><strong>Localizações n{% if labels.kind == 'sigef' %}esta parcela{% else %}este CAR{% endif %}:</strong>
             {% for p in c.item.points|slice:":40" %}#{{ p.i }}{% if not forloop.last %}, {% endif %}{% endfor %}{% if c.item.points|length > 40 %} e mais {{ c.item.points|length|add:"-40" }}{% endif %}
         </div>
         {% endif %}
     </div>
     {% empty %}
-    <div class="folha"><p>Nenhum CAR concluído para imprimir ainda.</p></div>
+    <div class="folha"><p>Nenhum{% if labels.kind == 'sigef' %}a{% endif %} {{ labels.noun }} concluíd{{ labels.o }} para imprimir ainda.</p></div>
     {% endfor %}
 </body>
 </html>

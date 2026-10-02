@@ -140,7 +140,7 @@
             </div>
             <p style="margin:0;color:#6b7280;">
                 Tipo: {{ historico.get_search_type_display }}
-                {% if historico.car_input %} • CAR: {{ historico.car_input }}{% endif %}
+                {% if historico.car_input %} • {% if historico.search_type == 'sigef' %}Parcela do SIGEF{% else %}CAR{% endif %}: {{ historico.car_input }}{% endif %}
             </p>
             {% if historico_back_url %}
             <p style="margin-top:12px;">

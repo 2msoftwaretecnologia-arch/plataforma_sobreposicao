@@ -22,8 +22,10 @@ from django.utils import timezone
 
 from analysis.models import CrossBatch, CrossBatchItem
 from analysis.services.analyze_coordinates.search_for_car import SearchForCar
+from analysis.services.analyze_coordinates.search_for_sigef import SearchForSigef
 from analysis.templatetags.report_extras import base_severity
 from car_system.models import SicarRecord
+from gov.models import Sigef
 
 logger = logging.getLogger(__name__)
 
@@ -99,32 +101,48 @@ def summarize_result(result: dict) -> dict:
     }
 
 
-def create_batch(user, title: str, cars: list) -> CrossBatch:
-    """Cria o lote a partir dos CARs da tela de Localizações.
+def create_batch(user, title: str, cars: list, kind: str = CrossBatch.Kind.CAR) -> CrossBatch:
+    """Cria o lote a partir dos CARs (ou parcelas do SIGEF) da tela de Localizações.
 
-    `cars`: [{car, mun, pontos: [{i, n, lat, lon}]}]. Só entram números que
-    existem no SICAR; situação e área vêm do banco, não do navegador.
+    `cars`: [{car, mun, pontos: [{i, n, lat, lon}]}] — `car` é o número do CAR
+    ou o código da parcela. Só entram identificadores que existem na base;
+    situação e área vêm do banco, não do navegador.
     """
     by_number = {}
     for car in cars:
         number = str(car.get('car') or '').strip().upper()
         if number and number not in by_number:
             by_number[number] = car
-    records = {
-        r.car_number.upper(): r
-        for r in SicarRecord.objects.filter(car_number__in=list(by_number)).only('car_number', 'status', 'area_ha')
-    }
-    batch = CrossBatch.objects.create(user=user, title=title[:255], total=len(records))
+
+    if kind == CrossBatch.Kind.SIGEF:
+        rows = [
+            (r.installment_code, r.status, r.area_ha,
+             {'name': (r.name or '').strip(' -'), 'property_code': r.property_code or ''})
+            for r in Sigef.objects.filter(installment_code__in=[n.lower() for n in by_number] + list(by_number))
+            .only('installment_code', 'status', 'area_ha', 'name', 'property_code')
+        ]
+    else:
+        kind = CrossBatch.Kind.CAR
+        rows = [
+            (r.car_number, r.status, r.area_ha, {})
+            for r in SicarRecord.objects.filter(car_number__in=list(by_number)).only('car_number', 'status', 'area_ha')
+        ]
+    records = {}
+    for number, status, area_ha, extra in rows:
+        records.setdefault(number.upper(), (number, status, area_ha, extra))
+
+    batch = CrossBatch.objects.create(user=user, title=title[:255], total=len(records), kind=kind)
     CrossBatchItem.objects.bulk_create([
         CrossBatchItem(
             batch=batch,
-            car_number=record.car_number,
-            municipio=str(by_number[number].get('mun') or '')[:150],
-            car_status=record.status or '',
-            area_ha=record.area_ha,
-            points=_clean_points(by_number[number].get('pontos')),
+            car_number=number,
+            municipio=str(by_number[key].get('mun') or '')[:150],
+            car_status=status or '',
+            area_ha=area_ha,
+            points=_clean_points(by_number[key].get('pontos')),
+            extra=extra,
         )
-        for number, record in records.items()
+        for key, (number, status, area_ha, extra) in records.items()
     ])
     return batch
 
@@ -276,9 +294,14 @@ def _process_item(item_id: int):
     if item.status != CrossBatchItem.Status.PENDING:
         return
     try:
-        result = SearchForCar().execute(item.car_number, save_debug_files=False)
-        if not result:
-            raise ValueError('CAR não encontrado ou sem geometria válida no SICAR.')
+        if item.batch.kind == CrossBatch.Kind.SIGEF:
+            result = SearchForSigef().execute(item.car_number, save_debug_files=False)
+            if not result:
+                raise ValueError('Parcela não encontrada ou sem geometria válida no SIGEF.')
+        else:
+            result = SearchForCar().execute(item.car_number, save_debug_files=False)
+            if not result:
+                raise ValueError('CAR não encontrado ou sem geometria válida no SICAR.')
         summary = summarize_result(result)
         with_overlap = [b for b in summary['bases'] if b['count']]
         item.summary = summary

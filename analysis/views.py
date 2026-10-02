@@ -23,6 +23,7 @@ from shapely import wkt as shapely_wkt
 from analysis.models import CrossBatch, CrossBatchItem, SearchHistory
 from analysis.services.analyze_coordinates.search_all import SearchAll
 from analysis.services.analyze_coordinates.search_for_car import SearchForCar
+from analysis.services.analyze_coordinates.search_for_sigef import SearchForSigef
 from analysis.services.view_services.result_map_formatter import (
     format_data_map,
     planet_tiles_url,
@@ -42,8 +43,11 @@ from analysis.services.view_services.kmz_points_service import (
     car_perimeters,
     locate_cars,
     locate_municipalities,
+    locate_sigef,
     parse_location_points,
+    sigef_perimeters,
     summarize_cars,
+    summarize_parcels,
 )
 from analysis.validators import validate_car_number
 
@@ -607,6 +611,7 @@ class LocalizacoesKmzView(View):
                 points += file_points
                 skipped += [f'{name} ({f.name})' for name in file_skipped]
             locate_cars(points)
+            locate_sigef(points)
         except KmzPointsError as e:
             return render(request, self.template_name, {'erro': str(e)})
         except Exception as e:
@@ -632,6 +637,14 @@ class LocalizacoesKmzView(View):
             details = {}
         municipios = _municipios_por_codigo()
 
+        parcels = summarize_parcels(points)
+        try:
+            parcel_perimeters = sigef_perimeters([p['code'] for p in parcels])
+        except Exception:
+            parcel_perimeters = {}
+        parcel_position = {p['code']: i for i, p in enumerate(parcels)}
+        with_parcel = sum(1 for p in points if p.parcels)
+
         sources = [f.name for f in files]
         car_position = {c['car_number']: i for i, c in enumerate(cars)}
         with_car = sum(1 for p in points if p.cars)
@@ -650,6 +663,10 @@ class LocalizacoesKmzView(View):
             'from_plus_code': sum(1 for p in points if p.from_plus_code),
             'divergent': sum(1 for p in points if p.is_divergent),
             'lote_minutos': cross_batch_service.estimate_minutes(len(cars)),
+            'parcels': parcels,
+            'with_parcel': with_parcel,
+            'without_parcel_in_to': len(points) - with_parcel - (outside_to or 0),
+            'lote_minutos_sigef': cross_batch_service.estimate_minutes(len(parcels)),
             # Dados compactos para o mapa e para as tabelas, que são montadas no
             # navegador (com vários arquivos são milhares de localizações).
             'map_points': [
@@ -663,12 +680,26 @@ class LocalizacoesKmzView(View):
                     'div': round(p.divergence_m) if p.is_divergent else None,
                     'mun': p.municipality or '',
                     'fora': municipios_ok and p.municipality is None,
-                    # Posições dos CARs em `map_cars`.
+                    # Posições dos CARs em `map_cars` e das parcelas em `map_parcels`.
                     'cars': [car_position[c['car_number']] for c in p.cars],
+                    'parc': [parcel_position[c['code']] for c in p.parcels],
                 }
                 for p in points
             ],
             'map_sources': sources,
+            'map_parcels': [
+                {
+                    'code': c['code'],
+                    'imovel': c['property_code'],
+                    'nome': c['name'],
+                    'status': c['status'],
+                    'area_ha': round(c['area_ha'], 2) if c['area_ha'] is not None else None,
+                    'mun': c['municipality'],
+                    'pontos': [p.index for p in c['points']],
+                    'geom': parcel_perimeters.get(c['code']),
+                }
+                for c in parcels
+            ],
             'map_cars': [
                 {
                     'car': c['car_number'],
@@ -694,6 +725,39 @@ class LocalizacoesKmzView(View):
         return render(request, self.template_name, context)
 
 
+class AnaliseParcelaSigefView(View):
+    """Cruza uma parcela do SIGEF inteira com as bases e abre a mesma página
+    de resultados da busca por CAR (botão "Cruzar com as bases" da ficha da
+    parcela na tela de Localizações e do relatório do lote)."""
+
+    def post(self, request):
+        code = request.POST.get('parcela', '').strip()
+        data = {'car_input': code, 'sucesso': True}
+        try:
+            resultado = SearchForSigef().execute(code)
+            if not resultado:
+                raise ValueError('Parcela não encontrada no SIGEF.')
+            data.update({'resultado': resultado, 'municipio': _municipio_da_parcela(code), 'uf': 'TO'})
+        except Exception as e:
+            data.update({'sucesso': False, 'erro': f'Erro ao analisar a parcela do SIGEF: {e}'})
+        _save_search_history(request, data, SearchHistory.SearchType.SIGEF)
+        request.session['last_analysis'] = data
+        return redirect('results')
+
+
+def _municipio_da_parcela(code: str) -> str:
+    """Município do Tocantins onde fica (o interior de) uma parcela do SIGEF."""
+    from django.db import connection
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT m."NOME" FROM tb_area_sigef s
+            JOIN tb_area_municipios m ON ST_Intersects(m.geometria_util, ST_PointOnSurface(s.geometria_util))
+            WHERE s.codigo_imo = %s LIMIT 1
+        """, [code])
+        row = cursor.fetchone()
+    return row[0] if row else ''
+
+
 # =====================================================================
 # Cruzamento em lote dos CARs encontrados em Localizações
 # =====================================================================
@@ -713,6 +777,7 @@ def _batch_item_row(item) -> dict:
         'st': item.car_status,
         'area': round(item.area_ha, 2) if item.area_ha is not None else None,
         'pontos': item.points,
+        'extra': item.extra,
         'status': item.status,
         'err': item.error,
         'crit': item.critical_count,
@@ -721,6 +786,23 @@ def _batch_item_row(item) -> dict:
         'fim': item.finished_at.isoformat() if item.finished_at else None,
         's': item.summary,
     }
+
+
+# Como chamar os itens de cada tipo de lote nas telas.
+_BATCH_LABELS = {
+    CrossBatch.Kind.CAR: {
+        'kind': 'car', 'base': 'SICAR', 'noun': 'CAR', 'noun_pl': 'CARs', 'o': 'o', 'os': 'os',
+        'item_title': 'Imóvel do CAR',
+    },
+    CrossBatch.Kind.SIGEF: {
+        'kind': 'sigef', 'base': 'SIGEF', 'noun': 'parcela', 'noun_pl': 'parcelas', 'o': 'a', 'os': 'as',
+        'item_title': 'Parcela do SIGEF',
+    },
+}
+
+
+def _batch_labels(batch) -> dict:
+    return _BATCH_LABELS.get(batch.kind, _BATCH_LABELS[CrossBatch.Kind.CAR])
 
 
 def _batch_progress(batch) -> dict:
@@ -745,7 +827,8 @@ class LoteCruzamentoCreateView(View):
             cars = []
         if not isinstance(cars, list) or not cars:
             return redirect('localizacoes_kmz')
-        batch = cross_batch_service.create_batch(request.user, request.POST.get('titulo', '').strip(), cars)
+        kind = CrossBatch.Kind.SIGEF if request.POST.get('base') == 'sigef' else CrossBatch.Kind.CAR
+        batch = cross_batch_service.create_batch(request.user, request.POST.get('titulo', '').strip(), cars, kind)
         if not batch.total:
             batch.delete()
             return redirect('localizacoes_kmz')
@@ -771,6 +854,7 @@ class LotesCruzamentoListView(View):
         for lote in page_obj:
             if cross_batch_service.resume_if_stale(lote):
                 lote.refresh_from_db()
+            lote.labels = _batch_labels(lote)
             # O título é a lista de arquivos enviados ("a.kmz, b.kmz"); vira etiquetas na tela.
             lote.arquivos = [
                 {'nome': _nome_arquivo_curto(a), 'completo': a.strip()}
@@ -791,6 +875,7 @@ class LoteCruzamentoDetailView(View):
         batch.refresh_from_db()
         return render(request, self.template_name, {
             'batch': batch,
+            'labels': _batch_labels(batch),
             'progress': _batch_progress(batch),
             'items': [_batch_item_row(item) for item in batch.items.all()],
         })
@@ -840,6 +925,7 @@ class LoteCruzamentoPrintView(View):
         cars = [self._print_car(item) for item in items.order_by('-critical_count', '-warning_count', 'car_number')]
         return render(request, self.template_name, {
             'batch': batch,
+            'labels': _batch_labels(batch),
             'cars': cars,
             'nivel': nivel,
             'um_car': bool(car),
@@ -873,8 +959,10 @@ class LoteCruzamentoPrintView(View):
         return {
             'item': item,
             'area_car': area_car,
-            'status_label': {'AT': 'Ativo', 'PE': 'Pendente', 'SU': 'Suspenso', 'CA': 'Cancelado'}.get(
-                (item.car_status or '').upper(), item.car_status or '—'),
+            'status_label': {
+                'AT': 'Ativo', 'PE': 'Pendente', 'SU': 'Suspenso', 'CA': 'Cancelado',
+                'CERTIFICADA': 'Certificada', 'REGISTRADA': 'Registrada',
+            }.get((item.car_status or '').upper(), item.car_status or '—'),
             'bases': com,
             'sem': [_base_name_short(b.get('nome', '')) for b in bases if not (b.get('count') or b.get('neutral_count'))],
         }

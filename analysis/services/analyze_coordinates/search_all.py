@@ -3,6 +3,8 @@ import time
 
 from django.conf import settings
 
+from car_system.models import SicarRecord
+
 from analysis.services.analyze_coordinates.overlap.final_result_builder import FinalResultBuilder
 from analysis.services.analyze_coordinates.overlap.formatter_register import FormatterRegister
 from analysis.services.analyze_coordinates.overlap.geometry_target import GeometryTarget
@@ -73,9 +75,12 @@ class SearchAll:
         Também devolve o tipo de entrada ("CAR" ou "ExternalGeometry").
         """
         if hasattr(geometry_or_car, "usable_geometry"):
+            # Registro de uma camada (CAR do SICAR, parcela do SIGEF...).
             target = GeometryTarget(geometry_or_car.usable_geometry)
-            target.car = geometry_or_car
-            return target, "CAR"
+            target.self_record = geometry_or_car
+            is_car = isinstance(geometry_or_car, SicarRecord)
+            target.car = geometry_or_car if is_car else None
+            return target, "CAR" if is_car else type(geometry_or_car).__name__
         target = GeometryTarget(geometry_or_car)
         target.car = None
         return target, "ExternalGeometry"

@@ -56,11 +56,29 @@
         .loc-stat--fora strong { color:#9c36b5; }
         .loc-zoom { background:none; border:none; color:#2f6b3f; cursor:pointer; text-decoration:underline; padding:0; font:inherit; text-align:left; }
         .loc-points-table td, .loc-cars-table td { vertical-align:top; }
+        /* Sem isso a coluna do código (CAR/parcela) tomava a largura toda e espremia
+           o botão e a contagem de pontos, que quebravam letra por letra. */
+        .loc-cars-table th:last-child, .loc-cars-table td:last-child { white-space:nowrap; width:1%; }
+        .loc-cars-table .ghost-button, .loc-nowrap { white-space:nowrap; }
+        .loc-cars-table td:nth-last-child(2) { min-width:110px; }
+        .loc-cars-table .loc-car { min-width:180px; display:inline-block; }
         .loc-num { text-align:right; white-space:nowrap; }
         .loc-mais { margin-top:12px; text-align:center; }
+        .loc-base-bar { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin:0 0 16px; }
+        .loc-base-bar__lbl { font-weight:700; color:#1f3d2b; }
+        .loc-base-switch { display:inline-flex; flex-wrap:wrap; background:#f3efe4; border-radius:12px; padding:4px; gap:4px; }
+        .loc-base-switch button { border:none; background:none; border-radius:9px; padding:10px 22px; min-width:190px; cursor:pointer; font:inherit; text-align:left; color:#4b5563; line-height:1.2; }
+        .loc-base-switch button strong { display:block; font-size:.95rem; color:#1f3d2b; }
+        .loc-base-switch button span { font-size:.78rem; }
+        .loc-base-switch button.ativo { background:#1f3d2b; color:#d5e3d4; box-shadow:0 1px 4px rgba(0,0,0,.15); }
+        .loc-base-switch button.ativo strong { color:#fff; }
+        body[data-base="car"] [data-show="sigef"], body[data-base="sigef"] [data-show="car"] { display:none !important; }
         .loc-lote { display:flex; flex-wrap:wrap; gap:14px; align-items:center; justify-content:space-between; background:#1f3d2b; color:#fff; border-radius:12px; padding:16px 18px; margin-bottom:16px; }
         .loc-lote p { margin:4px 0 0; color:#d5e3d4; font-size:.9rem; }
         .loc-lote strong { font-size:1.05rem; }
+        .loc-lote-btns { display:flex; flex-wrap:wrap; gap:10px; }
+        .loc-lote-btns .btn { display:flex; flex-direction:column; align-items:flex-start; line-height:1.2; }
+        .loc-lote-btns .btn small { font-weight:500; font-size:.75rem; opacity:.8; margin-top:2px; }
         .loc-ficha-popup .leaflet-popup-content { margin:14px 16px; width:330px !important; }
         .loc-ficha { font:13px/1.45 Inter, sans-serif; color:#1f2937; }
         .loc-ficha h3 { margin:0 0 2px; font:700 .72rem Inter, sans-serif; letter-spacing:.06em; text-transform:uppercase; color:#8a6d3b; }
@@ -167,36 +185,41 @@
                     <h2 class="panel-title">{{ arquivos|length }} arquivo{{ arquivos|length|pluralize }}</h2>
                 </div>
             </div>
+            <div class="loc-base-bar">
+                <span class="loc-base-bar__lbl">Ver resultado por</span>
+                <div class="loc-base-switch" role="tablist" aria-label="Base de imóveis">
+                    <button type="button" role="tab" data-base-btn="car"><strong>SICAR</strong><span>{{ cars|length }} CAR{{ cars|length|pluralize:"s" }} encontrado{{ cars|length|pluralize }}</span></button>
+                    <button type="button" role="tab" data-base-btn="sigef"><strong>SIGEF</strong><span>{{ parcels|length }} parcela{{ parcels|length|pluralize }} encontrada{{ parcels|length|pluralize }}</span></button>
+                </div>
+            </div>
             <div class="loc-stats">
-                <div class="loc-stat loc-stat--main"><strong>{{ cars|length }}</strong><span>CARs encontrados (cada imóvel conta uma vez)</span></div>
+                <div class="loc-stat loc-stat--main"><strong id="st_total"></strong><span id="st_total_lbl"></span></div>
                 <div class="loc-stat"><strong>{{ total_points }}</strong><span>localizações lidas ({{ distinct_positions }} posições distintas)</span></div>
-                <div class="loc-stat"><strong>{{ with_car }}</strong><span>localizações dentro de algum CAR</span></div>
-                {% if outside_to is not None %}
-                <div class="loc-stat"><strong>{{ without_car_in_to }}</strong><span>sem CAR, dentro do Tocantins</span></div>
-                <div class="loc-stat loc-stat--fora"><strong>{{ outside_to }}</strong><span>fora do Tocantins (o SICAR do sistema não cobre)</span></div>
-                {% else %}
-                <div class="loc-stat"><strong>{{ without_car }}</strong><span>localizações sem CAR</span></div>
-                {% endif %}
+                <div class="loc-stat"><strong id="st_com"></strong><span id="st_com_lbl"></span></div>
+                <div class="loc-stat"><strong id="st_sem"></strong><span id="st_sem_lbl"></span></div>
+                {% if outside_to is not None %}<div class="loc-stat loc-stat--fora"><strong>{{ outside_to }}</strong><span>fora do Tocantins (SICAR e SIGEF do sistema não cobrem)</span></div>{% endif %}
                 {% if from_plus_code %}<div class="loc-stat"><strong>{{ from_plus_code }}</strong><span>posição recuperada pelo Plus Code</span></div>{% endif %}
                 {% if divergent %}<div class="loc-stat loc-stat--warn"><strong>{{ divergent }}</strong><span>posição corrigida pelo Plus Code</span></div>{% endif %}
                 {% if skipped %}<div class="loc-stat loc-stat--warn"><strong>{{ skipped|length }}</strong><span>ignorados (sem posição)</span></div>{% endif %}
             </div>
-            {% if cars %}
             <form method="post" action="{% url 'lote_cruzamento_novo' %}" class="loc-lote" style="margin-top:16px" id="loc_lote_form">
                 {% csrf_token %}
                 <input type="hidden" name="cars" id="loc_lote_cars">
+                <input type="hidden" name="base" id="loc_lote_base" value="car">
                 <input type="hidden" name="titulo" value="{{ arquivos|join:', ' }}">
                 <div>
-                    <strong>Cruzar todos os {{ cars|length }} CARs com as bases de dados</strong>
-                    <p>Cada CAR inteiro é cruzado com todas as bases (embargos, PRODES, MapBiomas, UCs, terras indígenas...) e sai um relatório por CAR. Leva cerca de {{ lote_minutos }} min, em segundo plano — dá para fechar a página.</p>
+                    <strong>Cruzar com as bases de dados</strong>
+                    <p>Cada imóvel inteiro é cruzado com todas as bases (embargos, PRODES, MapBiomas, UCs, terras indígenas...) e sai um relatório por imóvel, em segundo plano — dá para fechar a página.</p>
                 </div>
-                <button type="submit" class="btn btn-gold">Cruzar todos os CARs</button>
+                <div class="loc-lote-btns">
+                    {% if cars %}<button type="submit" class="btn btn-gold" data-lote-base="car">Cruzar os {{ cars|length }} CAR{{ cars|length|pluralize:"s" }} (SICAR)<small>cerca de {{ lote_minutos }} min</small></button>{% endif %}
+                    {% if parcels %}<button type="submit" class="btn btn-gold" data-lote-base="sigef">Cruzar as {{ parcels|length }} parcela{{ parcels|length|pluralize }} (SIGEF)<small>cerca de {{ lote_minutos_sigef }} min</small></button>{% endif %}
+                </div>
             </form>
-            {% endif %}
             <ul class="loc-files">
                 {% for a in arquivos %}<li class="badge">{{ a }}</li>{% endfor %}
             </ul>
-            <p class="loc-hint">O SICAR do sistema cobre só o Tocantins{% if outside_to %}: as {{ outside_to }} localizações fora do estado (pelos limites oficiais do IBGE) ficam sem CAR por isso, e não porque não exista imóvel lá{% endif %}.</p>
+            <p class="loc-hint">O SICAR e o SIGEF do sistema cobrem só o Tocantins{% if outside_to %}: as {{ outside_to }} localizações fora do estado (pelos limites oficiais do IBGE) ficam sem imóvel por isso, e não porque não exista imóvel lá{% endif %}. Use a chave <strong>SICAR | SIGEF</strong> acima para trocar entre CARs e parcelas — o mapa, as tabelas e o cruzamento em lote acompanham.</p>
             {% if divergent %}
             <p class="loc-hint">
                 <strong>Posição corrigida:</strong> o ponto do arquivo estava a mais de 200 m do Plus Code do próprio nome — o Google Earth não achou o endereço e colocou o ponto no centro da cidade ou numa cidade de mesmo nome em outro estado. Nesses casos foi usada a posição do Plus Code (o endereço original).
@@ -214,63 +237,59 @@
             <div class="panel-header">
                 <div>
                     <p class="eyebrow">Mapa</p>
-                    <h2 class="panel-title">Localizações e perímetro dos CARs</h2>
+                    <h2 class="panel-title" id="map_title"></h2>
                 </div>
             </div>
             <div id="loc_map"></div>
             <div class="loc-legend">
-                <span><i style="background:#2f9e44"></i>ponto central dentro de CAR</span>
-                <span><i style="background:#e03131"></i>sem CAR</span>
+                <span><i style="background:#2f9e44"></i><span id="lg_dentro"></span></span>
+                <span><i style="background:#e03131"></i><span id="lg_fora"></span></span>
                 {% if outside_to %}<span><i style="background:#9c36b5"></i>fora do Tocantins</span>{% endif %}
-                <span><b style="border-color:#5fe08a;background:rgba(95,224,138,.15)"></b>CAR ativo</span>
-                <span><b style="border-color:#ffd23f;background:rgba(255,210,63,.15)"></b>pendente</span>
-                <span><b style="border-color:#ff6b3d;background:rgba(255,107,61,.15)"></b>suspenso</span>
-                <span><b style="border-color:#d9d3c7;background:rgba(217,211,199,.15)"></b>cancelado</span>
+                <span data-show="car"><b style="border-color:#5fe08a;background:rgba(95,224,138,.15)"></b>CAR ativo</span>
+                <span data-show="car"><b style="border-color:#ffd23f;background:rgba(255,210,63,.15)"></b>pendente</span>
+                <span data-show="car"><b style="border-color:#ff6b3d;background:rgba(255,107,61,.15)"></b>suspenso</span>
+                <span data-show="car"><b style="border-color:#d9d3c7;background:rgba(217,211,199,.15)"></b>cancelado</span>
+                <span data-show="sigef"><b style="border-color:#63e6be;background:rgba(99,230,190,.15)"></b>parcela certificada</span>
+                <span data-show="sigef"><b style="border-color:#74c0fc;background:rgba(116,192,252,.15)"></b>parcela registrada</span>
             </div>
         </section>
 
-        <!-- ===== Imóveis ===== -->
+        <!-- ===== Imóveis (CARs ou parcelas) ===== -->
         <section class="panel reveal">
             <div class="panel-header">
                 <div>
-                    <p class="eyebrow">SICAR</p>
-                    <h2 class="panel-title">Imóveis encontrados</h2>
+                    <p class="eyebrow" id="prop_eyebrow"></p>
+                    <h2 class="panel-title" id="prop_title"></h2>
                 </div>
                 <button type="button" class="ghost-button ghost-button--small" id="loc_cars_csv">
                     <svg class="ico" style="width:16px;height:16px"><use href="#i-download"/></svg>
-                    Baixar CSV dos CARs
+                    <span id="prop_csv_lbl"></span>
                 </button>
             </div>
-            {% if cars %}
-            <div class="loc-filtros">
-                <input type="text" id="loc_cars_busca" placeholder="Número do CAR ou município...">
-                <span class="badge badge-strong" id="loc_cars_contagem"></span>
+            <div id="prop_area">
+                <div class="loc-filtros">
+                    <input type="text" id="loc_cars_busca">
+                    <span class="badge badge-strong" id="loc_cars_contagem"></span>
+                </div>
+                <p class="loc-hint" style="margin-top:0" id="prop_hint"></p>
+                <div class="table-scroll">
+                    <table class="data-table loc-cars-table" id="loc_cars">
+                        <thead></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div class="loc-mais"><button type="button" class="ghost-button ghost-button--small" id="loc_cars_mais" hidden>Mostrar mais</button></div>
             </div>
-            <p class="loc-hint" style="margin-top:0">Clique no perímetro do CAR no mapa (ou no número dele aqui) para abrir a ficha com as informações do imóvel. Pontos fora de CAR (vermelhos) também abrem uma ficha ao clicar. "Cruzar com as bases" abre em outra aba a análise completa do CAR inteiro (a mesma da busca por número do CAR).</p>
-            <div class="table-scroll">
-                <table class="data-table loc-cars-table" id="loc_cars">
-                    <thead>
-                        <tr>
-                            <th>CAR</th>
-                            <th>Município</th>
-                            <th>Situação</th>
-                            <th class="loc-num">Área do CAR (ha)</th>
-                            <th>Pontos dentro</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-            </div>
-            <div class="loc-mais"><button type="button" class="ghost-button ghost-button--small" id="loc_cars_mais" hidden>Mostrar mais</button></div>
-            <form method="post" action="{% url 'upload_zip_car' %}" target="_blank" id="loc_cross_form" hidden>
+            <p class="empty-state" id="prop_vazio" hidden></p>
+            <form method="post" action="{% url 'upload_zip_car' %}" target="_blank" id="loc_cross_form_car" hidden>
                 {% csrf_token %}
                 <input type="hidden" name="mode" value="car">
-                <input type="hidden" name="car_input" id="loc_cross_car">
+                <input type="hidden" name="car_input">
             </form>
-            {% else %}
-            <p class="empty-state">Nenhuma localização encontrou imóvel do SICAR.</p>
-            {% endif %}
+            <form method="post" action="{% url 'analisar_parcela_sigef' %}" target="_blank" id="loc_cross_form_sigef" hidden>
+                {% csrf_token %}
+                <input type="hidden" name="parcela">
+            </form>
         </section>
 
         <!-- ===== Pontos ===== -->
@@ -286,11 +305,11 @@
                 </button>
             </div>
             <div class="loc-filtros">
-                <input type="text" id="loc_busca" placeholder="Nome da localização ou CAR...">
+                <input type="text" id="loc_busca" placeholder="Nome da localização, CAR ou parcela...">
                 <select id="loc_filtro">
                     <option value="">Todas as localizações</option>
-                    <option value="com">Dentro de CAR</option>
-                    <option value="sem">Sem CAR, dentro do Tocantins</option>
+                    <option value="com" id="opt_com"></option>
+                    <option value="sem" id="opt_sem"></option>
                     {% if outside_to %}<option value="fora">Fora do Tocantins</option>{% endif %}
                     <option value="div">Posição corrigida pelo Plus Code</option>
                     <option value="plus">Recuperadas pelo Plus Code</option>
@@ -310,7 +329,7 @@
                             <th>#</th>
                             <th>Localização</th>
                             <th>Lat, Lon</th>
-                            <th>CAR</th>
+                            <th id="pts_col"></th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -342,15 +361,60 @@
     {% if points %}
     {{ map_points|json_script:"loc_map_points" }}
     {{ map_cars|json_script:"loc_map_cars" }}
+    {{ map_parcels|json_script:"loc_map_parcels" }}
     {{ map_sources|json_script:"loc_map_sources" }}
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         (function () {
             const data = JSON.parse(document.getElementById('loc_map_points').textContent);
             const carsData = JSON.parse(document.getElementById('loc_map_cars').textContent);
+            const parcelsData = JSON.parse(document.getElementById('loc_map_parcels').textContent);
             const sources = JSON.parse(document.getElementById('loc_map_sources').textContent);
-            const escape = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+            const escape = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
             const fmt = (n, d) => Number(n).toLocaleString('pt-BR', { maximumFractionDigits: d || 0 });
+            const byIndex = {};
+            data.forEach((p) => { byIndex[p.i] = p; });
+            const temForaTO = {% if outside_to is not None %}true{% else %}false{% endif %};
+
+            // ----- As duas bases: o resto da tela é o mesmo para CARs e parcelas -----
+            const BASES = {
+                car: {
+                    items: carsData,
+                    id: (c) => c.car,
+                    ptsKey: 'cars',          // campo de cada ponto com as posições em `items`
+                    noun: 'CAR', nounPl: 'CARs', o: 'o', os: 'os', um: 'um',
+                    eyebrow: 'SICAR', title: 'Imóveis encontrados (CARs)',
+                    mapTitle: 'Localizações e perímetro dos CARs',
+                    statusColor: { AT: '#5fe08a', PE: '#ffd23f', SU: '#ff6b3d', CA: '#d9d3c7' },
+                    statusLabel: { AT: 'Ativo', PE: 'Pendente', SU: 'Suspenso', CA: 'Cancelado' },
+                    totals: { com: {{ with_car|unlocalize }}, sem: {{ without_car_in_to|unlocalize }} },
+                    minutos: {{ lote_minutos|unlocalize }},
+                    busca: 'Número do CAR ou município...',
+                },
+                sigef: {
+                    items: parcelsData,
+                    id: (c) => c.code,
+                    ptsKey: 'parc',
+                    noun: 'parcela', nounPl: 'parcelas', o: 'a', os: 'as', um: 'uma',
+                    eyebrow: 'SIGEF', title: 'Parcelas encontradas (SIGEF)',
+                    mapTitle: 'Localizações e perímetro das parcelas do SIGEF',
+                    statusColor: { CERTIFICADA: '#63e6be', REGISTRADA: '#74c0fc' },
+                    statusLabel: { CERTIFICADA: 'Certificada', REGISTRADA: 'Registrada' },
+                    totals: { com: {{ with_parcel|unlocalize }}, sem: {{ without_parcel_in_to|unlocalize }} },
+                    minutos: {{ lote_minutos_sigef|unlocalize }},
+                    busca: 'Nome da área, código da parcela ou município...',
+                },
+            };
+            Object.values(BASES).forEach(function (b) {
+                b.byId = {};
+                b.items.forEach((c) => { b.byId[b.id(c)] = c; });
+                b.layers = {};
+                b.statusText = (st) => b.statusLabel[String(st || '').toUpperCase()] || st || '—';
+                b.color = (st) => b.statusColor[String(st || '').toUpperCase()] || '#4dabf7';
+            });
+            let base = 'car';
+            try { if (localStorage.getItem('loc_base') === 'sigef') base = 'sigef'; } catch (e) { /* sem storage */ }
+            const B = () => BASES[base];
 
             // ----- Mapa (canvas: centenas de polígonos sem travar) -----
             const map = L.map('loc_map', { preferCanvas: true });
@@ -401,89 +465,116 @@
                 });
             });
             const focusMap = () => { if (!isFullscreen()) mapEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); };
+            const FICHA_OPTS = { className: 'loc-ficha-popup', maxWidth: 360, autoPanPadding: [30, 30] };
 
-            // ----- Perímetro dos CARs (mesmas cores do mapa 3D da página inicial) -----
-            const STATUS_COLOR = { AT: '#5fe08a', PE: '#ffd23f', SU: '#ff6b3d', CA: '#d9d3c7' };
-            const STATUS_LABEL = { AT: 'Ativo', PE: 'Pendente', SU: 'Suspenso', CA: 'Cancelado' };
-            const statusLabel = (st) => STATUS_LABEL[String(st || '').toUpperCase()] || st || '—';
-            // Ficha do CAR: abre ao clicar no perímetro ou no número na tabela.
+            // ----- Fichas -----
+            function listaPontos(pontos, noun) {
+                const n = pontos.length;
+                return '<div class="secao"><strong>' + fmt(n) + (n === 1 ? ' ponto caiu' : ' pontos caíram') + ' n' + (noun === 'CAR' ? 'este CAR' : 'esta parcela') + '</strong>' +
+                    '<div class="pontos">' + pontos.slice(0, 40).map((i) =>
+                        '<button type="button" class="loc-zoom" data-zoom="' + i + '" title="' + escape(byIndex[i].n) + '">#' + i + '</button>').join(', ') +
+                    (n > 40 ? ' <span style="color:#6b7280">+ ' + fmt(n - 40) + ' (lista completa no CSV)</span>' : '') + '</div></div>';
+            }
+            function acoes(b, key, c) {
+                const layer = b.layers[key];
+                const centro = layer ? layer.getBounds().getCenter() : null;
+                return '<div class="acoes">' +
+                    '<button type="button" class="principal" data-cross="' + escape(key) + '" data-base="' + (b === BASES.car ? 'car' : 'sigef') + '">Cruzar com as bases</button>' +
+                    (layer ? '<button type="button" data-fit="' + escape(key) + '" data-base="' + (b === BASES.car ? 'car' : 'sigef') + '">Enquadrar no mapa</button>' : '') +
+                    (centro ? '<a href="https://www.google.com/maps?q=' + centro.lat.toFixed(6) + ',' + centro.lng.toFixed(6) + '" target="_blank" rel="noopener">Google Maps</a>' : '') +
+                    '</div>';
+            }
+            function statusChip(b, st) {
+                return '<span class="status" style="--c:' + b.color(st) + '">' + escape(b.statusText(st)) + '</span>';
+            }
             function fichaCar(c) {
-                const st = String(c.status || '').toUpperCase();
-                const n = c.pontos.length;
-                const pontos = c.pontos.slice(0, 40).map((i) =>
-                    '<button type="button" class="loc-zoom" data-zoom="' + i + '" title="' + escape(byIndex[i].n) + '">#' + i + '</button>').join(', ') +
-                    (n > 40 ? ' <span style="color:#6b7280">+ ' + fmt(n - 40) + ' (lista completa no CSV)</span>' : '');
+                const b = BASES.car;
                 const hidro = c.hidro.length
                     ? '<ul>' + c.hidro.map((h) => '<li>' + escape(h.tema) + (h.n > 1 ? ' (' + h.n + ')' : '') +
                         (h.ha != null ? ' — ' + fmt(h.ha, 2) + ' ha' : '') + '</li>').join('') + '</ul>'
                     : '<div style="color:#6b7280">Nenhuma declarada.</div>';
-                const centro = c.geom ? carLayers[c.car].getBounds().getCenter() : null;
                 return '<div class="loc-ficha">' +
                     '<h3>Imóvel do CAR</h3>' +
                     '<div><span class="car">' + escape(c.car) + '</span><button type="button" class="copy" data-copy="' + escape(c.car) + '">copiar</button></div>' +
                     '<dl>' +
                     '<dt>Município</dt><dd>' + escape(c.mun || '—') + (c.mun ? ' - TO' : '') + '</dd>' +
-                    '<dt>Situação</dt><dd><span class="status" style="--c:' + (STATUS_COLOR[st] || '#4dabf7') + '">' + escape(statusLabel(c.status)) + '</span></dd>' +
+                    '<dt>Situação</dt><dd>' + statusChip(b, c.status) + '</dd>' +
                     '<dt>Área</dt><dd>' + (c.area_ha != null ? fmt(c.area_ha, 2) + ' ha' : '—') + '</dd>' +
                     '<dt>Atualizado em</dt><dd>' + escape(c.upd || '—') + '</dd>' +
                     '</dl>' +
                     '<div class="secao"><strong>Hidrografia declarada</strong>' + hidro + '</div>' +
-                    '<div class="secao"><strong>' + fmt(n) + (n === 1 ? ' ponto caiu' : ' pontos caíram') + ' neste CAR</strong>' +
-                    '<div class="pontos">' + pontos + '</div></div>' +
-                    '<div class="acoes">' +
-                    '<button type="button" class="principal" data-cross="' + escape(c.car) + '">Cruzar com as bases</button>' +
-                    (c.geom ? '<button type="button" data-fit-car="' + escape(c.car) + '">Enquadrar no mapa</button>' : '') +
-                    (centro ? '<a href="https://www.google.com/maps?q=' + centro.lat.toFixed(6) + ',' + centro.lng.toFixed(6) + '" target="_blank" rel="noopener">Google Maps</a>' : '') +
-                    '</div></div>';
+                    listaPontos(c.pontos, 'CAR') + acoes(b, c.car, c) + '</div>';
             }
-            const FICHA_OPTS = { className: 'loc-ficha-popup', maxWidth: 360, autoPanPadding: [30, 30] };
+            function fichaParcela(c) {
+                const b = BASES.sigef;
+                return '<div class="loc-ficha">' +
+                    '<h3>Parcela do SIGEF</h3>' +
+                    (c.nome ? '<div style="font-weight:700;color:#1f3d2b">' + escape(c.nome) + '</div>' : '') +
+                    '<dl>' +
+                    '<dt>Parcela</dt><dd><span class="car" style="font-size:.78rem">' + escape(c.code) + '</span><button type="button" class="copy" data-copy="' + escape(c.code) + '">copiar</button></dd>' +
+                    '<dt>Cód. imóvel</dt><dd>' + escape(c.imovel || '—') + (c.imovel ? '<button type="button" class="copy" data-copy="' + escape(c.imovel) + '">copiar</button>' : '') + '</dd>' +
+                    '<dt>Município</dt><dd>' + escape(c.mun || '—') + (c.mun ? ' - TO' : '') + '</dd>' +
+                    '<dt>Situação</dt><dd>' + statusChip(b, c.status) + '</dd>' +
+                    '<dt>Área</dt><dd>' + (c.area_ha != null ? fmt(c.area_ha, 2) + ' ha' : '—') + '</dd>' +
+                    '</dl>' +
+                    listaPontos(c.pontos, 'parcela') + acoes(b, c.code, c) + '</div>';
+            }
+            BASES.car.ficha = fichaCar;
+            BASES.sigef.ficha = fichaParcela;
 
-            const byIndex = {};
-            data.forEach((p) => { byIndex[p.i] = p; });
-            const carsLayer = L.layerGroup().addTo(map);
-            const carLayers = {};
-            carsData.forEach(function (c) {
-                if (!c.geom) return;
-                const color = STATUS_COLOR[String(c.status || '').toUpperCase()] || '#4dabf7';
-                const layer = L.geoJSON(c.geom, { renderer: renderer, style: { color: color, weight: 2, fillColor: color, fillOpacity: .12 } });
-                layer.on('mouseover', () => layer.setStyle({ weight: 4, fillOpacity: .3 }));
-                layer.on('mouseout', () => layer.setStyle({ weight: 2, fillOpacity: .12 }));
-                carLayers[c.car] = layer;
-                layer.addTo(carsLayer);
+            // ----- Perímetros das duas bases (só a base ativa fica no mapa) -----
+            Object.values(BASES).forEach(function (b) {
+                b.group = L.layerGroup();
+                b.items.forEach(function (c) {
+                    if (!c.geom) return;
+                    const color = b.color(c.status);
+                    const layer = L.geoJSON(c.geom, { renderer: renderer, style: { color: color, weight: 2, fillColor: color, fillOpacity: .12 } });
+                    layer.on('mouseover', () => layer.setStyle({ weight: 4, fillOpacity: .3 }));
+                    layer.on('mouseout', () => layer.setStyle({ weight: 2, fillOpacity: .12 }));
+                    b.layers[b.id(c)] = layer;
+                    layer.addTo(b.group);
+                });
+                // O popup é montado depois que todas as camadas existem (a ficha usa o centro do perímetro).
+                b.items.forEach(function (c) {
+                    const layer = b.layers[b.id(c)];
+                    if (layer) layer.bindPopup(() => b.ficha(c), FICHA_OPTS);
+                });
             });
-            // O popup é montado depois que todas as camadas existem (a ficha usa o centro do perímetro).
-            carsData.forEach(function (c) {
-                const layer = carLayers[c.car];
-                if (layer) layer.bindPopup(() => fichaCar(c), FICHA_OPTS);
-            });
-            const carByNumber = {};
-            carsData.forEach((c) => { carByNumber[c.car] = c; });
 
-            function abrirFicha(numero, enquadrar) {
-                const c = carByNumber[numero];
+            function abrirFicha(baseKey, key, enquadrar) {
+                if (baseKey !== base) setBase(baseKey);
+                const b = BASES[baseKey];
+                const c = b.byId[key];
                 if (!c) return;
-                const layer = carLayers[numero];
+                const layer = b.layers[key];
                 focusMap();
                 if (layer) {
                     if (enquadrar) map.fitBounds(layer.getBounds(), { padding: [30, 30] });
                     layer.openPopup(layer.getBounds().getCenter());
                 } else {
-                    // Sem perímetro: abre a ficha sobre o primeiro ponto do CAR.
+                    // Sem perímetro: abre a ficha sobre o primeiro ponto.
                     const p = byIndex[c.pontos[0]];
                     if (enquadrar) map.setView([p.lat, p.lon], 15);
-                    L.popup(FICHA_OPTS).setLatLng([p.lat, p.lon]).setContent(fichaCar(c)).openOn(map);
+                    L.popup(FICHA_OPTS).setLatLng([p.lat, p.lon]).setContent(b.ficha(c)).openOn(map);
                 }
             }
 
             // ----- Localizações (pontos centrais) -----
             const markers = {};
+            function linksBase(p, baseKey) {
+                const b = BASES[baseKey];
+                return p[b.ptsKey].map(function (k) {
+                    const c = b.items[k];
+                    const rotulo = baseKey === 'sigef' ? (c.nome || c.code) : c.car;
+                    return '<button type="button" class="loc-zoom loc-car" data-ficha="' + escape(b.id(c)) + '" data-base="' + baseKey + '" title="Abrir a ficha">' + escape(rotulo) + '</button>';
+                }).join('<br>');
+            }
             function fichaPonto(p) {
-                const cars = p.cars.length
-                    ? '<div class="secao"><strong>Dentro do CAR</strong><div>' + p.cars.map((k) =>
-                        '<button type="button" class="loc-zoom loc-car" data-ficha="' + escape(carsData[k].car) + '">' + escape(carsData[k].car) + '</button>').join('<br>') + '</div></div>'
-                    : (p.fora
-                        ? '<div class="secao"><strong>Fora do Tocantins</strong><div style="color:#6b7280">O SICAR do sistema só cobre o Tocantins, então não há como saber o CAR deste ponto.</div></div>'
-                        : '<div class="secao"><strong>Fora de qualquer CAR</strong><div style="color:#6b7280">Nenhum imóvel do SICAR contém este ponto.</div></div>');
+                const secao = function (baseKey, titulo) {
+                    const links = linksBase(p, baseKey);
+                    return '<div class="secao"><strong>' + titulo + '</strong><div>' +
+                        (links || '<span style="color:#6b7280">' + (p.fora ? 'fora do Tocantins (a base não cobre)' : 'nenhum') + '</span>') + '</div></div>';
+                };
                 const lat = Number(p.lat).toFixed(6), lon = Number(p.lon).toFixed(6);
                 return '<div class="loc-ficha">' +
                     '<h3>Localização #' + p.i + '</h3>' +
@@ -494,115 +585,129 @@
                     '<dt>Coordenadas</dt><dd>' + lat + ', ' + lon + '<button type="button" class="copy" data-copy="' + lat + ', ' + lon + '">copiar</button></dd>' +
                     (p.plus ? '<dt>Posição</dt><dd>recuperada pelo Plus Code do nome</dd>' : '') +
                     (p.div != null ? '<dt>Posição</dt><dd>corrigida pelo Plus Code (o ponto do arquivo estava a ' + (p.div >= 1000 ? fmt(p.div / 1000, 1) + ' km' : fmt(p.div) + ' m') + ')</dd>' : '') +
-                    '</dl>' + cars +
+                    '</dl>' +
+                    secao('car', 'CAR (SICAR)') + secao('sigef', 'Parcela (SIGEF)') +
                     '<div class="acoes"><a class="principal" href="https://www.google.com/maps?q=' + lat + ',' + lon + '" target="_blank" rel="noopener">Abrir no Google Maps</a></div>' +
                     '</div>';
             }
-
             const pointsLayer = L.featureGroup(data.map(function (p) {
-                const dentro = p.cars.length > 0;
-                const marker = L.circleMarker([p.lat, p.lon], {
-                    renderer: renderer, radius: 5, weight: 1, color: '#fff', fillOpacity: .9,
-                    fillColor: dentro ? '#2f9e44' : (p.fora ? '#9c36b5' : '#e03131'),
-                    // Dentro de CAR o clique passa para o polígono embaixo (ficha do CAR).
-                    interactive: !dentro
-                });
+                const marker = L.circleMarker([p.lat, p.lon], { renderer: renderer, radius: 5, weight: 1, color: '#fff', fillOpacity: .9 });
                 marker.bindPopup(() => fichaPonto(p), FICHA_OPTS);
                 markers[p.i] = marker;
                 return marker;
-            })).addTo(map);
-            // Enquadra as localizações que acharam CAR: pontos geocodificados em
-            // outro estado (erro do próprio arquivo) afastariam demais a visão.
-            const comCarPts = data.filter((p) => p.cars.length).map((p) => [p.lat, p.lon]);
-            map.fitBounds(comCarPts.length ? L.latLngBounds(comCarPts) : pointsLayer.getBounds(), { padding: [20, 20] });
+            }));
+            function estilizarPontos() {
+                const b = B();
+                data.forEach(function (p) {
+                    const dentro = p[b.ptsKey].length > 0;
+                    const marker = markers[p.i];
+                    marker.setStyle({ fillColor: dentro ? '#2f9e44' : (p.fora ? '#9c36b5' : '#e03131') });
+                    // Dentro de um imóvel o clique passa para o polígono embaixo (ficha do imóvel).
+                    marker.options.interactive = !dentro;
+                });
+            }
 
-            L.control.layers({ 'Satélite': satelite, 'Mapa': osm }, { 'Perímetro dos CARs': carsLayer, 'Localizações': pointsLayer }).addTo(map);
+            L.control.layers({ 'Satélite': satelite, 'Mapa': osm }, { 'Localizações': pointsLayer }).addTo(map);
 
             // ----- Quadro de contagem (visível também em tela cheia) -----
+            let infoDiv = null;
             const InfoControl = L.Control.extend({
                 options: { position: 'bottomleft' },
                 onAdd: function () {
-                    const div = L.DomUtil.create('div', 'loc-map-info');
-                    const porSituacao = {};
-                    carsData.forEach(function (c) {
-                        const st = String(c.status || '').toUpperCase();
-                        porSituacao[st] = (porSituacao[st] || 0) + 1;
-                    });
-                    const total = carsData.length;
-                    const linhas = Object.keys(porSituacao)
-                        .sort((a, b) => porSituacao[b] - porSituacao[a])
-                        .map((st) => '<li><span style="--c:' + (STATUS_COLOR[st] || '#4dabf7') + '">' +
-                            escape(STATUS_LABEL[st] || st || 'Sem situação') + '</span><strong>' + fmt(porSituacao[st]) + '</strong></li>')
-                        .join('');
-                    div.innerHTML =
-                        '<div class="total">' + fmt(total) + '<small>CAR' + (total === 1 ? '' : 's') + ' encontrado' + (total === 1 ? '' : 's') + '</small></div>' +
-                        '<ul>' + linhas + '</ul><hr><ul>' +
-                        '<li><span style="--c:#2f9e44">Pontos em CAR</span><strong>' + fmt({{ with_car|unlocalize }}) + '</strong></li>' +
-                        {% if outside_to is not None %}'<li><span style="--c:#e03131">Pontos sem CAR no TO</span><strong>' + fmt({{ without_car_in_to|unlocalize }}) + '</strong></li>' +
-                        '<li><span style="--c:#9c36b5">Pontos fora do TO</span><strong>' + fmt({{ outside_to|unlocalize }}) + '</strong></li></ul>';{% else %}'<li><span style="--c:#e03131">Pontos sem CAR</span><strong>' + fmt({{ without_car|unlocalize }}) + '</strong></li></ul>';{% endif %}
-                    L.DomEvent.disableClickPropagation(div);
-                    L.DomEvent.disableScrollPropagation(div);
-                    return div;
+                    infoDiv = L.DomUtil.create('div', 'loc-map-info');
+                    L.DomEvent.disableClickPropagation(infoDiv);
+                    L.DomEvent.disableScrollPropagation(infoDiv);
+                    return infoDiv;
                 }
             });
             new InfoControl().addTo(map);
+            function renderInfo() {
+                const b = B();
+                const porSituacao = {};
+                b.items.forEach(function (c) {
+                    const st = String(c.status || '').toUpperCase();
+                    porSituacao[st] = (porSituacao[st] || 0) + 1;
+                });
+                const total = b.items.length;
+                const linhas = Object.keys(porSituacao)
+                    .sort((x, y) => porSituacao[y] - porSituacao[x])
+                    .map((st) => '<li><span style="--c:' + b.color(st) + '">' + escape(b.statusText(st)) + '</span><strong>' + fmt(porSituacao[st]) + '</strong></li>')
+                    .join('');
+                infoDiv.innerHTML =
+                    '<div class="total">' + fmt(total) + '<small>' + (total === 1 ? b.noun : b.nounPl) + ' encontrad' + b.o + (total === 1 ? '' : 's') + '</small></div>' +
+                    '<ul>' + linhas + '</ul><hr><ul>' +
+                    '<li><span style="--c:#2f9e44">Pontos em ' + b.noun + '</span><strong>' + fmt(b.totals.com) + '</strong></li>' +
+                    '<li><span style="--c:#e03131">Pontos sem ' + b.noun + (temForaTO ? ' no TO' : '') + '</span><strong>' + fmt(b.totals.sem) + '</strong></li>' +
+                    (temForaTO ? '<li><span style="--c:#9c36b5">Pontos fora do TO</span><strong>' + fmt({{ outside_to|default:0|unlocalize }}) + '</strong></li>' : '') +
+                    '</ul>';
+            }
 
             // ----- Tabelas (montadas aqui, em páginas de 200 linhas) -----
             const PAGE = 200;
             const flag = (cls, txt) => '<span class="loc-flag loc-flag--' + cls + '">' + escape(txt) + '</span>';
             const coord = (v) => Number(v).toFixed(6);  // sempre com ponto: vai para o link do Google Maps
-
             function pagedTable(tbody, moreBtn, renderRow) {
-                let items = [], shown = 0;
+                let items = [], shown = 0, render = renderRow;
                 function more() {
                     const next = items.slice(shown, shown + PAGE);
-                    tbody.insertAdjacentHTML('beforeend', next.map(renderRow).join(''));
+                    tbody.insertAdjacentHTML('beforeend', next.map(render).join(''));
                     shown += next.length;
                     moreBtn.hidden = shown >= items.length;
                     moreBtn.textContent = 'Mostrar mais (' + fmt(items.length - shown) + ' restantes)';
                 }
                 moreBtn.addEventListener('click', more);
-                return function setItems(list) {
+                return function setItems(list, newRender) {
+                    if (newRender) render = newRender;
                     items = list; shown = 0; tbody.innerHTML = ''; more();
                 };
             }
+            const pontosCurtos = (pontos) => {
+                const n = pontos.length;
+                return '<strong>' + fmt(n) + '</strong> ' + (n === 1 ? 'ponto' : 'pontos') + '<br>' +
+                    pontos.slice(0, 6).map((i) => '<button type="button" class="loc-zoom" data-zoom="' + i + '" title="' + escape(byIndex[i].n) + '">#' + i + '</button>').join(', ') + (n > 6 ? ' …' : '');
+            };
 
-            // ----- Tabela de CARs -----
-            const carsBusca = document.getElementById('loc_cars_busca');
-            const carsContagem = document.getElementById('loc_cars_contagem');
-            const carsTbody = document.querySelector('#loc_cars tbody');
-            if (carsTbody) {
-                const setCarRows = pagedTable(carsTbody, document.getElementById('loc_cars_mais'), function (c) {
-                    const n = c.pontos.length;
-                    const pts = c.pontos.slice(0, 6).map((i) =>
-                        '<button type="button" class="loc-zoom" data-zoom="' + i + '" title="' + escape(byIndex[i].n) + '">#' + i + '</button>').join(', ');
-                    return '<tr>' +
-                        '<td><button type="button" class="loc-zoom loc-car" data-ficha="' + escape(c.car) + '" title="Abrir a ficha do CAR">' + escape(c.car) + '</button></td>' +
-                        '<td>' + escape(c.mun || '—') + '</td>' +
-                        '<td>' + escape(statusLabel(c.status)) + '</td>' +
-                        '<td class="loc-num">' + (c.area_ha != null ? fmt(c.area_ha, 2) : '—') + '</td>' +
-                        '<td><strong>' + fmt(n) + '</strong> ' + (n === 1 ? 'ponto' : 'pontos') + '<br>' + pts + (n > 6 ? ' …' : '') + '</td>' +
-                        '<td><button type="button" class="ghost-button ghost-button--small" data-cross="' + escape(c.car) + '">Cruzar com as bases</button></td>' +
-                        '</tr>';
-                });
-                const aplicarCars = function () {
-                    const q = carsBusca.value.trim().toUpperCase();
-                    const linhas = q ? carsData.filter((c) => c.car.toUpperCase().includes(q) || (c.mun || '').toUpperCase().includes(q)) : carsData;
-                    setCarRows(linhas);
-                    carsContagem.textContent = fmt(linhas.length) + ' de ' + fmt(carsData.length);
-                };
-                carsBusca.addEventListener('input', aplicarCars);
-                aplicarCars();
+            // ----- Tabela de imóveis (CARs ou parcelas) -----
+            const HEADS = {
+                car: '<tr><th>CAR</th><th>Município</th><th>Situação</th><th class="loc-num">Área (ha)</th><th>Pontos dentro</th><th></th></tr>',
+                sigef: '<tr><th>Parcela</th><th>Cód. imóvel</th><th>Município</th><th>Situação</th><th class="loc-num">Área (ha)</th><th>Pontos dentro</th><th></th></tr>',
+            };
+            const ROWS = {
+                car: (c) => '<tr>' +
+                    '<td><button type="button" class="loc-zoom loc-car" data-ficha="' + escape(c.car) + '" data-base="car" title="Abrir a ficha do CAR">' + escape(c.car) + '</button></td>' +
+                    '<td>' + escape(c.mun || '—') + '</td>' +
+                    '<td class="loc-nowrap">' + escape(BASES.car.statusText(c.status)) + '</td>' +
+                    '<td class="loc-num">' + (c.area_ha != null ? fmt(c.area_ha, 2) : '—') + '</td>' +
+                    '<td>' + pontosCurtos(c.pontos) + '</td>' +
+                    '<td><button type="button" class="ghost-button ghost-button--small" data-cross="' + escape(c.car) + '" data-base="car">Cruzar com as bases</button></td></tr>',
+                sigef: (c) => '<tr>' +
+                    '<td><button type="button" class="loc-zoom" data-ficha="' + escape(c.code) + '" data-base="sigef" title="Abrir a ficha da parcela"><strong>' + escape(c.nome || 'Parcela') + '</strong></button>' +
+                    '<div class="loc-car" style="color:#6b7280;font-size:.72rem">' + escape(c.code) + '</div></td>' +
+                    '<td>' + escape(c.imovel || '—') + '</td>' +
+                    '<td>' + escape(c.mun || '—') + '</td>' +
+                    '<td class="loc-nowrap">' + escape(BASES.sigef.statusText(c.status)) + '</td>' +
+                    '<td class="loc-num">' + (c.area_ha != null ? fmt(c.area_ha, 2) : '—') + '</td>' +
+                    '<td>' + pontosCurtos(c.pontos) + '</td>' +
+                    '<td><button type="button" class="ghost-button ghost-button--small" data-cross="' + escape(c.code) + '" data-base="sigef">Cruzar com as bases</button></td></tr>',
+            };
+            const propBusca = document.getElementById('loc_cars_busca');
+            const setPropRows = pagedTable(document.querySelector('#loc_cars tbody'), document.getElementById('loc_cars_mais'), ROWS.car);
+            function aplicarProps() {
+                const b = B();
+                const q = propBusca.value.trim().toUpperCase();
+                const casa = (c) => [b.id(c), c.mun, c.nome, c.imovel].some((v) => String(v || '').toUpperCase().includes(q));
+                const linhas = q ? b.items.filter(casa) : b.items;
+                setPropRows(linhas, ROWS[base]);
+                document.getElementById('loc_cars_contagem').textContent = fmt(linhas.length) + ' de ' + fmt(b.items.length);
             }
+            propBusca.addEventListener('input', aplicarProps);
 
             // ----- Tabela de localizações -----
             const busca = document.getElementById('loc_busca');
             const filtro = document.getElementById('loc_filtro');
             const arquivo = document.getElementById('loc_arquivo');
-            const contagem = document.getElementById('loc_contagem');
-
             const setPointRows = pagedTable(document.querySelector('#loc_points tbody'), document.getElementById('loc_mais'), function (p) {
-                const cars = p.cars.map((k) => '<div><button type="button" class="loc-zoom loc-car" data-ficha="' + escape(carsData[k].car) + '" title="Abrir a ficha do CAR">' + escape(carsData[k].car) + '</button></div>').join('');
+                const links = linksBase(p, base);
                 return '<tr>' +
                     '<td><button type="button" class="loc-zoom" data-zoom="' + p.i + '">' + p.i + '</button></td>' +
                     '<td>' + escape(p.n) + '<br>' +
@@ -612,34 +717,91 @@
                     (p.plus ? flag('plus', 'recuperado do Plus Code') : '') +
                     (p.div != null ? flag('div', 'posição corrigida pelo Plus Code (o ponto do arquivo estava a ' + (p.div >= 1000 ? fmt(p.div / 1000, 1) + ' km' : fmt(p.div) + ' m') + ')') : '') + '</td>' +
                     '<td><a href="https://www.google.com/maps?q=' + coord(p.lat) + ',' + coord(p.lon) + '" target="_blank" rel="noopener">' + coord(p.lat) + ', ' + coord(p.lon) + '</a></td>' +
-                    '<td>' + (cars || (p.fora ? '<span style="color:#6b7280">—</span>' : flag('none', 'sem CAR'))) + '</td>' +
+                    '<td>' + (links || (p.fora ? '<span style="color:#6b7280">—</span>' : flag('none', 'sem ' + B().noun))) + '</td>' +
                     '</tr>';
             });
-
             function aplicar() {
+                const b = B();
                 const q = busca.value.trim().toLowerCase();
                 const f = filtro.value;
                 const a = arquivo && arquivo.value !== '' ? +arquivo.value : null;
                 const lista = data.filter(function (p) {
-                    if (f === 'com' && !p.cars.length) return false;
-                    if (f === 'sem' && (p.cars.length || p.fora)) return false;
+                    const dentro = p[b.ptsKey].length > 0;
+                    if (f === 'com' && !dentro) return false;
+                    if (f === 'sem' && (dentro || p.fora)) return false;
                     if (f === 'fora' && !p.fora) return false;
                     if (f === 'div' && p.div == null) return false;
                     if (f === 'plus' && !p.plus) return false;
                     if (a !== null && p.f !== a) return false;
-                    if (q && !(p.n.toLowerCase().includes(q) || p.cars.some((k) => carsData[k].car.toLowerCase().includes(q)))) return false;
+                    if (q && !(p.n.toLowerCase().includes(q)
+                        || p.cars.some((k) => carsData[k].car.toLowerCase().includes(q))
+                        || p.parc.some((k) => (parcelsData[k].code + ' ' + parcelsData[k].nome).toLowerCase().includes(q)))) return false;
                     return true;
                 });
                 setPointRows(lista);
-                contagem.textContent = fmt(lista.length) + ' de ' + fmt(data.length);
+                document.getElementById('loc_contagem').textContent = fmt(lista.length) + ' de ' + fmt(data.length);
             }
             busca.addEventListener('input', aplicar);
             filtro.addEventListener('change', aplicar);
             if (arquivo) arquivo.addEventListener('change', aplicar);
-            aplicar();
 
-            // ----- Cliques nas tabelas (delegados: as linhas são recriadas) -----
-            const crossForm = document.getElementById('loc_cross_form');
+            // ----- Troca de base (SICAR | SIGEF) -----
+            const setText = (id, txt) => { document.getElementById(id).textContent = txt; };
+            function setBase(novo) {
+                base = novo;
+                try { localStorage.setItem('loc_base', base); } catch (e) { /* sem storage */ }
+                const b = B();
+                document.body.dataset.base = base;
+                document.querySelectorAll('[data-base-btn]').forEach((btn) => {
+                    const on = btn.dataset.baseBtn === base;
+                    btn.classList.toggle('ativo', on);
+                    btn.setAttribute('aria-selected', on ? 'true' : 'false');
+                });
+                const n = b.items.length;
+                setText('st_total', fmt(n));
+                setText('st_total_lbl', (n === 1 ? b.noun : b.nounPl) + ' encontrad' + b.o + (n === 1 ? '' : 's') + ' no ' + b.eyebrow + ' (cada ' + (b.noun === 'CAR' ? 'imóvel' : 'parcela') + ' conta uma vez)');
+                setText('st_com', fmt(b.totals.com));
+                setText('st_com_lbl', 'localizações dentro de ' + b.um + ' ' + b.noun);
+                setText('st_sem', fmt(b.totals.sem));
+                setText('st_sem_lbl', 'sem ' + b.noun + (temForaTO ? ', dentro do Tocantins' : ''));
+                setText('map_title', b.mapTitle);
+                setText('lg_dentro', 'ponto dentro de ' + b.um + ' ' + b.noun);
+                setText('lg_fora', 'sem ' + b.noun);
+                setText('prop_eyebrow', b.eyebrow);
+                setText('prop_title', b.title);
+                setText('prop_csv_lbl', 'Baixar CSV d' + b.os + ' ' + b.nounPl);
+                setText('pts_col', b.noun === 'CAR' ? 'CAR' : 'Parcela SIGEF');
+                setText('opt_com', 'Dentro de ' + b.um + ' ' + b.noun);
+                setText('opt_sem', 'Sem ' + b.noun + (temForaTO ? ', dentro do Tocantins' : ''));
+                document.getElementById('prop_hint').textContent = 'Clique no perímetro no mapa (ou no ' + (b.noun === 'CAR' ? 'número do CAR' : 'nome da parcela') + ' aqui) para abrir a ficha. Pontos sem ' + b.noun + ' (vermelhos) também abrem uma ficha. "Cruzar com as bases" abre em outra aba a análise completa d' + b.o + ' ' + b.noun + ' inteir' + b.o + '.';
+                propBusca.placeholder = b.busca;
+                document.querySelector('#loc_cars thead').innerHTML = HEADS[base];
+                document.getElementById('prop_area').hidden = !n;
+                const vazio = document.getElementById('prop_vazio');
+                vazio.hidden = !!n;
+                vazio.textContent = 'Nenhuma localização caiu dentro de ' + b.um + ' ' + b.noun + '.';
+
+
+                // Mapa: só a base ativa; pontos de novo por cima dos perímetros.
+                map.closePopup();
+                Object.values(BASES).forEach((x) => map.removeLayer(x.group));
+                map.removeLayer(pointsLayer);
+                b.group.addTo(map);
+                pointsLayer.addTo(map);
+                estilizarPontos();
+                renderInfo();
+                aplicarProps();
+                aplicar();
+            }
+            document.querySelectorAll('[data-base-btn]').forEach((btn) =>
+                btn.addEventListener('click', () => setBase(btn.dataset.baseBtn)));
+            setBase(base);
+            // Enquadra as localizações que acharam CAR ou parcela: pontos geocodificados em
+            // outro estado (erro do próprio arquivo) afastariam demais a visão.
+            const comImovel = data.filter((p) => p.cars.length || p.parc.length).map((p) => [p.lat, p.lon]);
+            map.fitBounds(comImovel.length ? L.latLngBounds(comImovel) : pointsLayer.getBounds(), { padding: [20, 20] });
+
+            // ----- Cliques (delegados: as linhas e os balões são recriados) -----
             function tratarClique(e) {
                 const zoom = e.target.closest('[data-zoom]');
                 if (zoom) {
@@ -652,12 +814,12 @@
                 }
                 const ficha = e.target.closest('[data-ficha]');
                 if (ficha) {
-                    abrirFicha(ficha.dataset.ficha, true);
+                    abrirFicha(ficha.dataset.base || base, ficha.dataset.ficha, true);
                     return;
                 }
-                const fit = e.target.closest('[data-fit-car]');
+                const fit = e.target.closest('[data-fit]');
                 if (fit) {
-                    const layer = carLayers[fit.dataset.fitCar];
+                    const layer = BASES[fit.dataset.base].layers[fit.dataset.fit];
                     if (layer) map.fitBounds(layer.getBounds(), { padding: [30, 30] });
                     return;
                 }
@@ -668,14 +830,15 @@
                     return;
                 }
                 const cross = e.target.closest('[data-cross]');
-                if (cross && crossForm) {
-                    document.getElementById('loc_cross_car').value = cross.dataset.cross;
-                    crossForm.submit();
+                if (cross) {
+                    const form = document.getElementById('loc_cross_form_' + (cross.dataset.base === 'sigef' ? 'sigef' : 'car'));
+                    form.querySelector(cross.dataset.base === 'sigef' ? '[name="parcela"]' : '[name="car_input"]').value = cross.dataset.cross;
+                    form.submit();
                 }
             }
             document.addEventListener('click', tratarClique);
             // Os balões do Leaflet param a propagação do clique, então os botões
-            // de dentro deles (ficha do CAR, CARs do ponto) precisam do tratador direto.
+            // de dentro deles precisam do tratador direto.
             map.on('popupopen', function (e) {
                 const el = e.popup.getElement();
                 if (el && !el.dataset.cliques) {
@@ -687,50 +850,56 @@
                 }
             });
 
-            // ----- Cruzamento em lote: envia os CARs com as localizações de cada um -----
+            // ----- Cruzamento em lote: envia os imóveis da base ativa com as localizações de cada um -----
             const loteForm = document.getElementById('loc_lote_form');
-            if (loteForm) {
-                loteForm.addEventListener('submit', function () {
-                    document.getElementById('loc_lote_cars').value = JSON.stringify(carsData.map((c) => ({
-                        car: c.car,
-                        mun: c.mun,
-                        pontos: c.pontos.map((i) => ({ i: i, n: byIndex[i].n, lat: byIndex[i].lat, lon: byIndex[i].lon })),
-                    })));
-                    const loader = document.getElementById('page-loader');
-                    if (loader) loader.classList.add('visible');
-                });
-            }
+            loteForm.hidden = !carsData.length && !parcelsData.length;
+            loteForm.addEventListener('submit', function (e) {
+                // Cada botão cruza a sua base, qualquer que seja a aba aberta.
+                const qual = (e.submitter && e.submitter.dataset.loteBase) || base;
+                const b = BASES[qual];
+                document.getElementById('loc_lote_base').value = qual;
+                document.getElementById('loc_lote_cars').value = JSON.stringify(b.items.map((c) => ({
+                    car: b.id(c),
+                    mun: c.mun,
+                    pontos: c.pontos.map((i) => ({ i: i, n: byIndex[i].n, lat: byIndex[i].lat, lon: byIndex[i].lon })),
+                })));
+                const loader = document.getElementById('page-loader');
+                if (loader) loader.classList.add('visible');
+            });
 
             // ----- CSVs -----
             const csvCell = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
             const num = (v, d) => v == null ? '' : Number(v).toFixed(d).replace('.', ',');
             function baixarCsv(nome, lines) {
-                const blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+                const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
                 const a = document.createElement('a');
                 a.href = URL.createObjectURL(blob);
                 a.download = nome;
                 a.click();
                 URL.revokeObjectURL(a.href);
             }
-
-            // Uma linha por localização x CAR.
+            // Uma linha por localização, com os CARs e as parcelas dela.
             document.getElementById('loc_csv').addEventListener('click', function () {
-                const lines = [['localizacao', 'nome', 'arquivo', 'latitude', 'longitude', 'municipio', 'fora_do_tocantins', 'car'].join(';')];
+                const lines = [['localizacao', 'nome', 'arquivo', 'latitude', 'longitude', 'municipio', 'fora_do_tocantins', 'cars', 'parcelas_sigef', 'imoveis_sigef'].join(';')];
                 data.forEach(function (p) {
-                    (p.cars.length ? p.cars : [null]).forEach(function (k) {
-                        lines.push([p.i, csvCell(p.n), csvCell(sources[p.f]), num(p.lat, 6), num(p.lon, 6), csvCell(p.mun), p.fora ? 'sim' : 'nao', k == null ? '' : carsData[k].car].join(';'));
-                    });
+                    lines.push([p.i, csvCell(p.n), csvCell(sources[p.f]), num(p.lat, 6), num(p.lon, 6), csvCell(p.mun), p.fora ? 'sim' : 'nao',
+                        csvCell(p.cars.map((k) => carsData[k].car).join(' | ')),
+                        csvCell(p.parc.map((k) => parcelsData[k].code).join(' | ')),
+                        csvCell(p.parc.map((k) => parcelsData[k].imovel).join(' | '))].join(';'));
                 });
-                baixarCsv('localizacoes_car.csv', lines);
+                baixarCsv('localizacoes_car_sigef.csv', lines);
             });
-
-            // Um CAR por linha (cada imóvel uma vez).
+            // Um imóvel por linha, da base ativa.
             document.getElementById('loc_cars_csv').addEventListener('click', function () {
-                const lines = [['car', 'municipio', 'situacao', 'area_car_ha', 'atualizado_em', 'pontos_dentro', 'localizacoes'].join(';')];
-                carsData.forEach(function (c) {
-                    lines.push([c.car, csvCell(c.mun), statusLabel(c.status), num(c.area_ha, 2), c.upd, c.pontos.length, csvCell(c.pontos.join(', '))].join(';'));
-                });
-                baixarCsv('cars_encontrados.csv', lines);
+                if (base === 'sigef') {
+                    const lines = [['parcela', 'nome_area', 'codigo_imovel', 'municipio', 'situacao', 'area_ha', 'pontos_dentro', 'localizacoes'].join(';')];
+                    parcelsData.forEach((c) => lines.push([c.code, csvCell(c.nome), c.imovel, csvCell(c.mun), BASES.sigef.statusText(c.status), num(c.area_ha, 2), c.pontos.length, csvCell(c.pontos.join(', '))].join(';')));
+                    baixarCsv('parcelas_sigef_encontradas.csv', lines);
+                } else {
+                    const lines = [['car', 'municipio', 'situacao', 'area_car_ha', 'atualizado_em', 'pontos_dentro', 'localizacoes'].join(';')];
+                    carsData.forEach((c) => lines.push([c.car, csvCell(c.mun), BASES.car.statusText(c.status), num(c.area_ha, 2), c.upd, c.pontos.length, csvCell(c.pontos.join(', '))].join(';')));
+                    baixarCsv('cars_encontrados.csv', lines);
+                }
             });
         })();
     </script>

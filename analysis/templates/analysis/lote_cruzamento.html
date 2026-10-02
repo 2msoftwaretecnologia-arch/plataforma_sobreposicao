@@ -104,15 +104,15 @@
             <div class="hero-grid">
                 <div class="reveal">
                     <div class="hero-badge"><svg class="ico"><use href="#i-layers"/></svg> Cruzamento em lote</div>
-                    <h1>Relatório dos <em>{{ batch.total }} CARs</em> cruzados com as bases.</h1>
-                    <p class="hero-text">{{ batch.title|default:"Localizações" }} · criado em {{ batch.created_at|date:"d/m/Y H:i" }}</p>
+                    <h1>Relatório d{{ labels.os }} <em>{{ batch.total }} {{ labels.noun_pl }}</em> cruzad{{ labels.os }} com as bases.</h1>
+                    <p class="hero-text">{{ labels.base }} · {{ batch.title|default:"Localizações" }} · criado em {{ batch.created_at|date:"d/m/Y H:i" }}</p>
                 </div>
                 <div class="hero-actions reveal reveal-delay-1">
                     <a href="{% url 'lote_cruzamento_imprimir' batch.pk %}" target="_blank" class="btn btn-gold" id="lote_imprimir">
                         <svg class="ico" style="width:18px;height:18px"><use href="#i-doc"/></svg>
-                        Imprimir / PDF (um CAR por página)
+                        Imprimir / PDF (um{% if labels.kind == "sigef" %}a{% endif %} {{ labels.noun }} por página)
                     </a>
-                    <a href="{% url 'lote_cruzamento_imprimir' batch.pk %}?nivel=alertas" target="_blank" class="btn btn-outline-light">Só CARs com alerta</a>
+                    <a href="{% url 'lote_cruzamento_imprimir' batch.pk %}?nivel=alertas" target="_blank" class="btn btn-outline-light">Só {{ labels.noun_pl }} com alerta</a>
                     <button type="button" class="btn btn-outline-light" id="lote_csv">
                         <svg class="ico" style="width:18px;height:18px"><use href="#i-download"/></svg>
                         Baixar CSV
@@ -141,7 +141,7 @@
             <div class="panel-header">
                 <div>
                     <p class="eyebrow">Resumo</p>
-                    <h2 class="panel-title">Situação dos CARs</h2>
+                    <h2 class="panel-title">Situação d{{ labels.os }} {{ labels.noun_pl }}</h2>
                 </div>
             </div>
             <div class="lote-stats" id="lote_stats"></div>
@@ -163,27 +163,27 @@
             <div class="table-scroll">
                 <table class="data-table lote-bases" id="lote_bases">
                     <thead>
-                        <tr><th>Base</th><th>Gravidade</th><th class="loc-num">CARs com sobreposição</th><th class="loc-num">Área sobreposta somada (ha)</th></tr>
+                        <tr><th>Base</th><th>Gravidade</th><th class="loc-num">{{ labels.noun_pl|capfirst }} com sobreposição</th><th class="loc-num">Área sobreposta somada (ha)</th></tr>
                     </thead>
                     <tbody></tbody>
                 </table>
             </div>
-            <p style="margin:8px 0 0;color:#6b7280;font-size:.85rem">Clique numa base para listar só os CARs que a tocam.</p>
+            <p style="margin:8px 0 0;color:#6b7280;font-size:.85rem">Clique numa base para listar só {{ labels.os }} {{ labels.noun_pl }} que a tocam.</p>
         </section>
 
         <!-- ===== Por CAR ===== -->
         <section class="panel">
             <div class="panel-header">
                 <div>
-                    <p class="eyebrow">Relatório por CAR</p>
-                    <h2 class="panel-title">CARs do lote</h2>
+                    <p class="eyebrow">Relatório por {{ labels.noun }}</p>
+                    <h2 class="panel-title">{{ labels.noun_pl|capfirst }} do lote</h2>
                 </div>
                 <span class="badge badge-strong" id="lote_contagem"></span>
             </div>
             <div class="lote-filtros">
-                <input type="text" id="lote_busca" placeholder="Número do CAR ou município...">
+                <input type="text" id="lote_busca" placeholder="{% if labels.kind == "sigef" %}Nome da área, código da parcela ou município...{% else %}Número do CAR ou município...{% endif %}">
                 <select id="lote_filtro">
-                    <option value="">Todos os CARs</option>
+                    <option value="">Tod{{ labels.os }} {{ labels.os }} {{ labels.noun_pl }}</option>
                     <option value="critical">Com alerta crítico</option>
                     <option value="warning">Com atenção (sem crítico)</option>
                     <option value="ok">Sem alertas</option>
@@ -194,19 +194,26 @@
                 <select id="lote_ordem">
                     <option value="sev">Ordenar por gravidade</option>
                     <option value="pontos">Ordenar por nº de pontos</option>
-                    <option value="area">Ordenar por área do CAR</option>
+                    <option value="area">Ordenar por área</option>
                     <option value="mun">Ordenar por município</option>
                 </select>
             </div>
             <div class="lote-cars">
                 <div class="lote-lista" id="lote_lista"></div>
-                <div class="lote-ficha" id="lote_ficha"><div class="lote-vazio">Escolha um CAR na lista para ver o relatório dele.</div></div>
+                <div class="lote-ficha" id="lote_ficha"><div class="lote-vazio">Escolha um{% if labels.kind == "sigef" %}a{% endif %} {{ labels.noun }} na lista para ver o relatório.</div></div>
             </div>
+            {% if labels.kind == 'sigef' %}
+            <form method="post" action="{% url 'analisar_parcela_sigef' %}" target="_blank" id="lote_cross_form" hidden>
+                {% csrf_token %}
+                <input type="hidden" name="parcela" id="lote_cross_car">
+            </form>
+            {% else %}
             <form method="post" action="{% url 'upload_zip_car' %}" target="_blank" id="lote_cross_form" hidden>
                 {% csrf_token %}
                 <input type="hidden" name="mode" value="car">
                 <input type="hidden" name="car_input" id="lote_cross_car">
             </form>
+            {% endif %}
         </section>
     </div>
 
@@ -217,18 +224,24 @@
     <script src="{% static 'analysis/js/landing_page.js' %}"></script>
     {{ items|json_script:"lote_items" }}
     {{ progress|json_script:"lote_progress" }}
+    {{ labels|json_script:"lote_labels" }}
     <script>
         (function () {
             const STATUS_URL = "{% url 'lote_cruzamento_status' batch.pk %}";
             const PRINT_URL = "{% url 'lote_cruzamento_imprimir' batch.pk %}";
             const items = JSON.parse(document.getElementById('lote_items').textContent);
             let progress = JSON.parse(document.getElementById('lote_progress').textContent);
+            const LB = JSON.parse(document.getElementById('lote_labels').textContent);
+            const SIGEF = LB.kind === 'sigef';
+            const UM = SIGEF ? 'uma' : 'um', ESTE = SIGEF ? 'esta' : 'este';
             const byId = {};
             items.forEach((it) => { byId[it.id] = it; });
 
             const escape = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
             const fmt = (n, d) => Number(n).toLocaleString('pt-BR', { maximumFractionDigits: d == null ? 0 : d, minimumFractionDigits: d ? Math.min(d, 2) : 0 });
-            const STATUS_LABEL = { AT: 'Ativo', PE: 'Pendente', SU: 'Suspenso', CA: 'Cancelado' };
+            const STATUS_LABEL = { AT: 'Ativo', PE: 'Pendente', SU: 'Suspenso', CA: 'Cancelado', CERTIFICADA: 'Certificada', REGISTRADA: 'Registrada' };
+            // Como o item aparece na lista: CAR pelo número; parcela pelo nome da área.
+            const titulo = (it) => SIGEF ? ((it.extra || {}).name || 'Parcela') : it.car;
             const SEV_LABEL = { critical: 'Crítico', warning: 'Atenção', info: 'Informativa' };
             const SEV_ORDER = { critical: 0, warning: 1, info: 2 };
             const statusCar = (st) => STATUS_LABEL[String(st || '').toUpperCase()] || st || '—';
@@ -261,13 +274,13 @@
                 const done = progress.status === 'done';
                 document.getElementById('lote_progress_bar').style.width = progress.percent + '%';
                 document.getElementById('lote_progress_txt').textContent = done
-                    ? 'Concluído: ' + fmt(progress.processed) + ' de ' + fmt(progress.total) + ' CARs cruzados com as bases.'
+                    ? 'Concluído: ' + fmt(progress.processed) + ' de ' + fmt(progress.total) + ' ' + LB.noun_pl + ' cruzad' + LB.os + ' com as bases.'
                     : progress.status === 'error'
                         ? 'O lote parou com erro: ' + progress.error
-                        : progress.status_label + ': ' + fmt(progress.processed) + ' de ' + fmt(progress.total) + ' CARs (' + progress.percent + '%)';
+                        : progress.status_label + ': ' + fmt(progress.processed) + ' de ' + fmt(progress.total) + ' ' + LB.noun_pl + ' (' + progress.percent + '%)';
                 const restantes = progress.total - progress.processed;
                 document.getElementById('lote_progress_sub').textContent = done ? '' :
-                    'Faltam ' + fmt(restantes) + ' CARs (cerca de ' + Math.max(1, Math.round(restantes * 5 / 3 / 60)) + ' min). ' +
+                    'Faltam ' + fmt(restantes) + ' ' + LB.noun_pl + ' (cerca de ' + Math.max(1, Math.round(restantes * 5 / 3 / 60)) + ' min). ' +
                     'Pode fechar esta página: o cruzamento continua e o relatório fica em "Meus lotes".';
                 panel.hidden = done && !items.some((it) => it.status === 'error');
             }
@@ -283,7 +296,7 @@
                 });
                 const card = (key, cls, num, label) => '<button type="button" class="lote-stat ' + cls + (filtroCard === key ? ' ativo' : '') + '" data-card="' + key + '"><strong>' + fmt(num) + '</strong><span>' + label + '</span></button>';
                 document.getElementById('lote_stats').innerHTML =
-                    card('', '', c.feitos, 'de ' + fmt(c.total) + ' CARs analisados') +
+                    card('', '', c.feitos, 'de ' + fmt(c.total) + ' ' + LB.noun_pl + ' analisad' + LB.os) +
                     card('critical', 'lote-stat--crit', c.critical, 'com alerta crítico') +
                     card('warning', 'lote-stat--warn', c.warning, 'com atenção (sem crítico)') +
                     card('ok', 'lote-stat--ok', c.ok, 'sem alertas') +
@@ -317,7 +330,7 @@
                     '<td><span class="sev sev--' + b.severity + '">' + SEV_LABEL[b.severity] + '</span></td>' +
                     '<td class="loc-num"><strong>' + fmt(b.cars) + '</strong></td>' +
                     '<td class="loc-num">' + fmt(b.area, 2) + '</td></tr>').join('') ||
-                    '<tr><td colspan="4" style="color:#6b7280">Os resultados aparecem aqui conforme os CARs forem processados.</td></tr>';
+                    '<tr><td colspan="4" style="color:#6b7280">Os resultados aparecem aqui conforme ' + LB.os + ' ' + LB.noun_pl + ' forem processad' + LB.os + '.</td></tr>';
                 const sel = document.getElementById('lote_base');
                 const atual = sel.value;
                 sel.innerHTML = '<option value="">Qualquer base</option>' + agg.filter((b) => b.cars).map((b) =>
@@ -342,7 +355,7 @@
                 const lista = items.filter(function (it) {
                     if (f && nivel(it) !== f) return false;
                     if (filtroBase && !((it.s || {}).bases || []).some((b) => b.nome === filtroBase && b.count)) return false;
-                    if (q && !(it.car.toUpperCase().includes(q) || String(it.mun || '').toUpperCase().includes(q))) return false;
+                    if (q && ![it.car, it.mun, (it.extra || {}).name, (it.extra || {}).property_code].some((v) => String(v || '').toUpperCase().includes(q))) return false;
                     return true;
                 });
                 const NIV = { critical: 0, warning: 1, ok: 2, err: 3, pending: 4 };
@@ -359,9 +372,10 @@
                 document.getElementById('lote_contagem').textContent = fmt(lista.length) + ' de ' + fmt(items.length);
                 document.getElementById('lote_lista').innerHTML = lista.map((it) =>
                     '<button type="button" data-item="' + it.id + '"' + (selecionado === it.id ? ' class="ativo"' : '') + '>' +
+                    (SIGEF ? '<div style="font-weight:700;color:#1f3d2b;font-size:.85rem">' + escape(titulo(it)) + '</div>' : '') +
                     '<div class="car">' + escape(it.car) + '</div>' +
                     '<div class="meta">' + escape(it.mun || '—') + ' · ' + it.pontos.length + ' pt' + (it.pontos.length === 1 ? '' : 's') + ' ' + chips(it) + '</div>' +
-                    '</button>').join('') || '<div class="lote-vazio">Nenhum CAR com esses filtros.</div>';
+                    '</button>').join('') || '<div class="lote-vazio">Nenhum' + (SIGEF ? 'a' : '') + ' ' + LB.noun + ' com esses filtros.</div>';
             }
             ['lote_busca', 'lote_filtro', 'lote_ordem'].forEach((id) =>
                 document.getElementById(id).addEventListener(id === 'lote_busca' ? 'input' : 'change', function () {
@@ -383,17 +397,17 @@
             function renderFicha() {
                 const it = byId[selecionado];
                 const el = document.getElementById('lote_ficha');
-                if (!it) { el.innerHTML = '<div class="lote-vazio">Escolha um CAR na lista para ver o relatório dele.</div>'; return; }
+                if (!it) { el.innerHTML = '<div class="lote-vazio">Escolha ' + UM + ' ' + LB.noun + ' na lista para ver o relatório.</div>'; return; }
                 const s = it.s || {};
                 const bases = (s.bases || []).slice().sort((a, b) => (SEV_ORDER[a.severity] - SEV_ORDER[b.severity]) || (b.total_area - a.total_area));
                 const com = bases.filter((b) => b.count || b.neutral_count);
                 const sem = bases.filter((b) => !b.count && !b.neutral_count);
                 const areaCar = s.tamanho_area || it.area || 0;
-                const pct = (a) => areaCar ? ' (' + fmt(a * 100 / areaCar, 1) + '% do CAR)' : '';
+                const pct = (a) => areaCar ? ' (' + fmt(a * 100 / areaCar, 1) + '% d' + LB.o + ' ' + LB.noun + ')' : '';
 
                 let corpo;
-                if (it.status === 'pending') corpo = '<div class="lote-vazio">Este CAR ainda está na fila do cruzamento.</div>';
-                else if (it.status === 'error') corpo = '<p class="lote-erro">Não foi possível cruzar este CAR: ' + escape(it.err) + '</p>';
+                if (it.status === 'pending') corpo = '<div class="lote-vazio">' + (SIGEF ? 'Esta parcela ainda está' : 'Este CAR ainda está') + ' na fila do cruzamento.</div>';
+                else if (it.status === 'error') corpo = '<p class="lote-erro">Não foi possível cruzar ' + ESTE + ' ' + LB.noun + ': ' + escape(it.err) + '</p>';
                 else corpo =
                     com.map(function (b) {
                         const itens = (b.items || []).map((x) =>
@@ -414,21 +428,23 @@
                     (it.pontos.length > 60 ? ' + ' + (it.pontos.length - 60) : '');
 
                 el.innerHTML =
-                    '<p class="eyebrow" style="margin:0">Relatório do CAR</p>' +
+                    '<p class="eyebrow" style="margin:0">Relatório d' + LB.o + ' ' + LB.noun + '</p>' +
+                    (SIGEF ? '<div style="font-weight:700;font-size:1.1rem;color:#1f3d2b">' + escape(titulo(it)) + '</div>' : '') +
                     '<div><span class="car">' + escape(it.car) + '</span><button type="button" class="copy" data-copy="' + escape(it.car) + '">copiar</button></div>' +
                     '<div style="margin-top:6px">' + chips(it) + '</div>' +
                     '<dl>' +
                     '<div><dt>Município</dt><dd>' + escape(it.mun ? it.mun + ' - TO' : '—') + '</dd></div>' +
                     '<div><dt>Situação</dt><dd>' + escape(statusCar(it.st)) + '</dd></div>' +
-                    '<div><dt>Área do CAR</dt><dd>' + (areaCar ? fmt(areaCar, 2) + ' ha' : '—') + '</dd></div>' +
-                    '<div><dt>Localizações no CAR</dt><dd>' + it.pontos.length + '</dd></div>' +
+                    (SIGEF ? '<div><dt>Cód. imóvel (SIGEF)</dt><dd>' + escape((it.extra || {}).property_code || '—') + '</dd></div>' : '') +
+                    '<div><dt>Área</dt><dd>' + (areaCar ? fmt(areaCar, 2) + ' ha' : '—') + '</dd></div>' +
+                    '<div><dt>Localizações n' + (SIGEF ? 'a parcela' : 'o CAR') + '</dt><dd>' + it.pontos.length + '</dd></div>' +
                     (s.tempo ? '<div><dt>Tempo do cruzamento</dt><dd>' + escape(s.tempo) + '</dd></div>' : '') +
                     '</dl>' +
                     corpo +
                     '<div style="margin-top:14px;font-size:.85rem"><strong>Localizações:</strong> ' + pontos + '</div>' +
                     '<div class="lote-acoes">' +
                     '<button type="button" class="btn btn-gold" data-cross="' + escape(it.car) + '">Relatório completo com mapa</button>' +
-                    (it.status === 'done' ? '<a class="btn btn-outline-green" target="_blank" href="' + PRINT_URL + '?car=' + encodeURIComponent(it.car) + '">Imprimir este CAR</a>' : '') +
+                    (it.status === 'done' ? '<a class="btn btn-outline-green" target="_blank" href="' + PRINT_URL + '?car=' + encodeURIComponent(it.car) + '">Imprimir ' + ESTE + ' ' + LB.noun + '</a>' : '') +
                     '</div>';
             }
             document.getElementById('lote_ficha').addEventListener('click', function (e) {
@@ -451,19 +467,20 @@
                 const bases = basesAgg().map((b) => b.nome);
                 const num = (v) => v == null || v === '' ? '' : Number(v).toFixed(2).replace('.', ',');
                 const cell = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
-                const lines = [['car', 'municipio', 'situacao', 'area_car_ha', 'localizacoes', 'nivel', 'bases_criticas', 'bases_atencao']
+                const lines = [(SIGEF ? ['parcela', 'nome_area', 'codigo_imovel'] : ['car']).concat(['municipio', 'situacao', 'area_ha', 'localizacoes', 'nivel', 'bases_criticas', 'bases_atencao'])
                     .concat(bases.map((b) => cell(baseName(b) + ' (ha)'))).join(';')];
                 const NIVEL_TXT = { critical: 'critico', warning: 'atencao', ok: 'sem alertas', err: 'erro', pending: 'na fila' };
                 filtrados().forEach(function (it) {
                     const porBase = {};
                     ((it.s || {}).bases || []).forEach((b) => { if (b.count) porBase[b.nome] = b.total_area; });
-                    lines.push([it.car, cell(it.mun), statusCar(it.st), num(it.area), it.pontos.length, NIVEL_TXT[nivel(it)], it.crit, it.warn]
+                    lines.push((SIGEF ? [it.car, cell((it.extra || {}).name), (it.extra || {}).property_code || ''] : [it.car])
+                        .concat([cell(it.mun), statusCar(it.st), num(it.area), it.pontos.length, NIVEL_TXT[nivel(it)], it.crit, it.warn])
                         .concat(bases.map((b) => num(porBase[b]))).join(';'));
                 });
                 const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
                 const a = document.createElement('a');
                 a.href = URL.createObjectURL(blob);
-                a.download = 'lote_cruzamento_cars.csv';
+                a.download = SIGEF ? 'lote_cruzamento_parcelas_sigef.csv' : 'lote_cruzamento_cars.csv';
                 a.click();
                 URL.revokeObjectURL(a.href);
             });

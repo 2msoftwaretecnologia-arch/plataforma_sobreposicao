@@ -8,6 +8,7 @@ urlpatterns = [
     path('report/print/', login_required(views.ReportPrintView.as_view()), name='report_print'),
     path('results/', login_required(views.ResultsPageView.as_view()), name='results'),
     path('localizacoes/', login_required(views.LocalizacoesKmzView.as_view()), name='localizacoes_kmz'),
+    path('localizacoes/sigef/analisar/', login_required(views.AnaliseParcelaSigefView.as_view()), name='analisar_parcela_sigef'),
     path('localizacoes/lotes/', login_required(views.LotesCruzamentoListView.as_view()), name='lotes_cruzamento'),
     path('localizacoes/lotes/novo/', login_required(views.LoteCruzamentoCreateView.as_view()), name='lote_cruzamento_novo'),
     path('localizacoes/lotes/<int:pk>/', login_required(views.LoteCruzamentoDetailView.as_view()), name='lote_cruzamento'),
