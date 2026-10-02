@@ -11,8 +11,8 @@ do próprio processo web (ambiente local, onde não há broker). O progresso fic
 no banco, então um lote interrompido é retomado de onde parou (`resume_if_stale`).
 """
 import logging
+import queue
 import threading
-from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 
 from django.conf import settings
@@ -32,8 +32,10 @@ logger = logging.getLogger(__name__)
 WORKERS = 3
 # Itens guardados por base no resumo de cada CAR (o total sempre é guardado).
 MAX_ITEMS_PER_BASE = 100
-# Sem progresso por esse tempo com o lote "processando" = processo caiu.
-STALE_AFTER = timedelta(minutes=5)
+# Sem progresso por esse tempo com o lote "processando" = processo caiu. Com
+# 3 CARs em paralelo o progresso anda a cada poucos segundos (o CAR mais
+# demorado medido levou ~25 s), então 2 min sem nada já é parada.
+STALE_AFTER = timedelta(minutes=2)
 # Lote "na fila" há mais que isso: o Celery não pegou (broker sem worker).
 QUEUE_TIMEOUT = timedelta(minutes=1)
 # Tempo médio de um CAR, para a estimativa mostrada antes de começar.
@@ -207,12 +209,16 @@ def run_batch(batch_id: int):
             processed=batch.items.exclude(status=CrossBatchItem.Status.PENDING).count(),
         )
         pending = list(batch.items.filter(status=CrossBatchItem.Status.PENDING).values_list('pk', flat=True))
-        with ThreadPoolExecutor(max_workers=WORKERS) as pool:
-            list(pool.map(_process_item_safely, pending))
+        _run_in_daemon_threads(pending)
 
         # Contagem final pelo banco (o `processed` incremental pode ter
         # contado itens de uma execução anterior interrompida).
         processed = batch.items.exclude(status=CrossBatchItem.Status.PENDING).count()
+        if processed < batch.total:
+            # Sobrou item pendente por erro inesperado: deixa "processando"
+            # para `resume_if_stale` refazer só os que faltam.
+            CrossBatch.objects.filter(pk=batch_id).update(processed=processed)
+            return
         CrossBatch.objects.filter(pk=batch_id).update(
             status=CrossBatch.Status.DONE, processed=processed,
             finished_at=timezone.now(), heartbeat_at=timezone.now(),
@@ -222,6 +228,38 @@ def run_batch(batch_id: int):
         CrossBatch.objects.filter(pk=batch_id).update(status=CrossBatch.Status.ERROR, error=str(exc)[:2000])
     finally:
         connection.close()
+
+
+def _run_in_daemon_threads(item_ids: list):
+    """Processa os itens com `WORKERS` threads daemon.
+
+    Não usa `ThreadPoolExecutor`: as threads dele não são daemon e o Python
+    espera por elas ao sair — no `runserver` isso travava o recarregamento
+    automático e o Ctrl+C até o lote inteiro terminar (o servidor seguia
+    atendendo com o código antigo). Com daemon, se o processo sair o lote só
+    para e é retomado depois (`resume_if_stale`)."""
+    fila = queue.Queue()
+    for item_id in item_ids:
+        fila.put(item_id)
+
+    def worker():
+        while True:
+            try:
+                item_id = fila.get_nowait()
+            except queue.Empty:
+                return
+            try:
+                _process_item_safely(item_id)
+            except Exception:
+                # Erro fora do cruzamento (ex.: banco caiu): o item fica
+                # pendente e é refeito quando o lote for retomado.
+                logger.exception('Falha inesperada no item %s do lote de cruzamento.', item_id)
+
+    threads = [threading.Thread(target=worker, daemon=True) for _ in range(min(WORKERS, len(item_ids)) or 1)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
 
 
 def _process_item_safely(item_id: int):

@@ -12,8 +12,24 @@
     <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/landing_page.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/results.css' %}">
     <style>
-        .lote-bar { height:8px; border-radius:999px; background:#eee7d6; overflow:hidden; min-width:120px; }
-        .lote-bar span { display:block; height:100%; background:#2f6b3f; }
+        .lotes { display:flex; flex-direction:column; gap:12px; }
+        .lote-card { display:grid; grid-template-columns:minmax(0, 1fr) 220px auto; gap:18px; align-items:center;
+                     background:#fff; border:1px solid #e6e1d3; border-radius:14px; padding:16px 18px; }
+        .lote-card:hover { border-color:#c9d8c4; box-shadow:0 2px 10px rgba(31,61,43,.06); }
+        @media (max-width: 760px) { .lote-card { grid-template-columns:minmax(0, 1fr); gap:12px; } }
+        .lote-titulo { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+        .lote-arquivo { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+                        background:#f3efe4; color:#3f4a3c; border-radius:999px; padding:3px 10px; font-size:.8rem; font-weight:600; }
+        .lote-meta { display:flex; flex-wrap:wrap; gap:6px 16px; align-items:center; color:#6b7280; font-size:.85rem; }
+        .lote-meta strong { color:#1f3d2b; }
+        .lote-status { display:inline-block; padding:2px 10px; border-radius:999px; font-size:.75rem; font-weight:700; }
+        .lote-status--done { background:#dcfae6; color:#067647; }
+        .lote-status--running, .lote-status--pending { background:#fef0c7; color:#b54708; }
+        .lote-status--error { background:#fee4e2; color:#b42318; }
+        .lote-prog small { display:flex; justify-content:space-between; color:#6b7280; font-size:.78rem; margin-top:5px; }
+        .lote-bar { height:8px; border-radius:999px; background:#eee7d6; overflow:hidden; }
+        .lote-bar span { display:block; height:100%; background:linear-gradient(90deg,#2f6b3f,#5fa463); }
+        .lote-abrir { white-space:nowrap; }
     </style>
 </head>
 <body>
@@ -64,22 +80,26 @@
     <div class="page">
         <section class="panel reveal">
             {% if page_obj %}
-            <div class="table-scroll">
-                <table class="data-table">
-                    <thead><tr><th>Lote</th><th>Criado em</th><th>CARs</th><th>Situação</th><th>Progresso</th><th></th></tr></thead>
-                    <tbody>
-                        {% for lote in page_obj %}
-                        <tr>
-                            <td>{{ lote.title|default:"Localizações" }}</td>
-                            <td>{{ lote.created_at|date:"d/m/Y H:i" }}</td>
-                            <td>{{ lote.total }}</td>
-                            <td>{{ lote.get_status_display }}</td>
-                            <td><div class="lote-bar"><span style="width:{{ lote.percent }}%"></span></div><small>{{ lote.processed }} de {{ lote.total }}</small></td>
-                            <td><a href="{% url 'lote_cruzamento' lote.pk %}" class="historico-ver-link">Abrir relatório</a></td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+            <div class="lotes">
+                {% for lote in page_obj %}
+                <article class="lote-card">
+                    <div style="min-width:0">
+                        <div class="lote-titulo">
+                            {% for arquivo in lote.arquivos %}<span class="lote-arquivo" title="{{ arquivo.completo }}">{{ arquivo.nome }}</span>{% empty %}<span class="lote-arquivo">Localizações</span>{% endfor %}
+                        </div>
+                        <div class="lote-meta">
+                            <span class="lote-status lote-status--{{ lote.status }}">{{ lote.get_status_display }}</span>
+                            <span><strong>{{ lote.total }}</strong> CAR{{ lote.total|pluralize:"s" }}</span>
+                            <span>Criado em {{ lote.created_at|date:"d/m/Y \à\s H:i" }}</span>
+                        </div>
+                    </div>
+                    <div class="lote-prog">
+                        <div class="lote-bar"><span style="width:{{ lote.percent }}%"></span></div>
+                        <small><span>{{ lote.processed }} de {{ lote.total }}</span><span>{{ lote.percent }}%</span></small>
+                    </div>
+                    <a href="{% url 'lote_cruzamento' lote.pk %}" class="btn btn-outline-green lote-abrir">Abrir relatório</a>
+                </article>
+                {% endfor %}
             </div>
             {% if page_obj.has_other_pages %}
             <div class="historico-paginacao">
@@ -98,5 +118,11 @@
         <div class="container">TerraView Tocantins &copy; 2026 &mdash; Análise geoambiental e fundiária para imóveis rurais no Tocantins.</div>
     </footer>
     <script src="{% static 'analysis/js/landing_page.js' %}"></script>
+    {% if algum_processando %}
+    <script>
+        // Atualiza o progresso enquanto algum lote estiver processando.
+        setTimeout(function () { location.reload(); }, 10000);
+    </script>
+    {% endif %}
 </body>
 </html>

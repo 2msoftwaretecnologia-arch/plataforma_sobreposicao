@@ -753,13 +753,33 @@ class LoteCruzamentoCreateView(View):
         return redirect('lote_cruzamento', pk=batch.pk)
 
 
+def _nome_arquivo_curto(nome: str) -> str:
+    """'Trajetos_Florestal_Agosto_2022.xlsx (1).kmz' -> 'Trajetos Florestal Agosto 2022'."""
+    nome = re.sub(r'\.(kmz|kml)$', '', nome.strip(), flags=re.I)
+    nome = re.sub(r'\s*\(\d+\)$', '', nome)            # cópia baixada de novo: "(1)"
+    nome = re.sub(r'\.(xlsx?|csv)$', '', nome, flags=re.I)  # planilha de origem
+    nome = re.sub(r'\s*\(\d+\)$', '', nome)
+    return re.sub(r'[_]+', ' ', nome).strip() or nome
+
+
 class LotesCruzamentoListView(View):
     template_name = 'analysis/lotes_cruzamento.html'
 
     def get(self, request):
         batches = CrossBatch.objects.filter(user=request.user)
         page_obj = Paginator(batches, 15).get_page(request.GET.get('page'))
-        return render(request, self.template_name, {'page_obj': page_obj})
+        for lote in page_obj:
+            if cross_batch_service.resume_if_stale(lote):
+                lote.refresh_from_db()
+            # O título é a lista de arquivos enviados ("a.kmz, b.kmz"); vira etiquetas na tela.
+            lote.arquivos = [
+                {'nome': _nome_arquivo_curto(a), 'completo': a.strip()}
+                for a in (lote.title or '').split(', ') if a.strip()
+            ]
+        algum_processando = any(
+            lote.status in (CrossBatch.Status.PENDING, CrossBatch.Status.RUNNING) for lote in page_obj
+        )
+        return render(request, self.template_name, {'page_obj': page_obj, 'algum_processando': algum_processando})
 
 
 class LoteCruzamentoDetailView(View):
