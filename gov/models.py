@@ -79,7 +79,7 @@ class Ruralsettlement(GeoBaseModel):
 
 class SnicTotal(GeoBaseModel):
     property_name = models.CharField(
-        max_length=150, 
+        max_length=300, 
         verbose_name="Nome do imovel", 
         db_column='nome_imove'
     )

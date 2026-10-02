@@ -1,5 +1,8 @@
+import io
+
 import geopandas as gpd
 import pandas as pd
+import pyogrio
 import requests
 
 SRID = 4674
@@ -46,3 +49,37 @@ def fetch_wfs(url, type_name, cql_filter=None, properties=None, sort_by=None):
     if not frames:
         raise ValueError(f"A API não retornou dados da camada {type_name}.")
     return gpd.GeoDataFrame(pd.concat(frames, ignore_index=True), crs=f"EPSG:{SRID}")
+
+
+def fetch_wfs_gml(url, type_name, sort_by, extra_params=None):
+    """Como `fetch_wfs`, para servidores MapServer que só entregam GML (ex.:
+    i3Geo do Acervo Fundiário do INCRA). A projeção vem no próprio GML; o
+    importador reprojeta para SIRGAS 2000."""
+    # O GML aponta para o esquema no servidor de origem; baixá-lo a cada
+    # página é lento (o i3Geo leva dezenas de segundos) e desnecessário.
+    pyogrio.set_gdal_config_options({"GML_DOWNLOAD_SCHEMA": "NO"})
+    params = {
+        **(extra_params or {}),
+        "service": "WFS",
+        "version": "2.0.0",
+        "request": "GetFeature",
+        "typenames": type_name,
+        "sortby": sort_by,
+        "count": PAGE_SIZE,
+    }
+
+    session = requests.Session()
+    frames, start = [], 0
+    while True:
+        response = session.get(url, params={**params, "startindex": start}, timeout=TIMEOUT)
+        response.raise_for_status()
+        page = gpd.read_file(io.BytesIO(response.content))
+        if page.empty:
+            break
+        frames.append(page)
+        if len(page) < PAGE_SIZE:
+            break
+        start += PAGE_SIZE
+    if not frames:
+        raise ValueError(f"A API não retornou dados da camada {type_name}.")
+    return gpd.GeoDataFrame(pd.concat(frames, ignore_index=True), crs=frames[0].crs)

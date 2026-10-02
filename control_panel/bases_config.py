@@ -152,6 +152,8 @@ BASES_CONFIG = [
         "nome_base": "Base de Dados Sigef",
         "tabela": "tb_area_sigef",
         "arquivo_upload": "sigef_zip_file",
+        # Sem shapefile: o importador busca direto do Acervo Fundiário do INCRA (i3Geo).
+        "fonte_api": "API do Acervo Fundiário do INCRA — imóveis certificados SIGEF (particulares e públicos), Tocantins",
         "cor": "#D81B60",
         "colunas_extraidas": [
             {"campo": "name", "coluna_bd": "nome_area", "rotulo": "Nome da Área", "saida": "nome"},
@@ -166,6 +168,8 @@ BASES_CONFIG = [
         "nome_base": "Base de Dados de Assentamentos Rurais",
         "tabela": "tb_assentamento_rural",
         "arquivo_upload": "ruralsettlement_zip_file",
+        # Sem shapefile: o importador busca direto do Acervo Fundiário do INCRA (i3Geo).
+        "fonte_api": "API do Acervo Fundiário do INCRA — projetos de assentamento, Tocantins",
         "cor": "#00ACC1",
         "colunas_extraidas": [
             {"campo": "project_name", "coluna_bd": "nome_proje", "rotulo": "Nome do Projeto", "saida": "nome"},
@@ -178,6 +182,8 @@ BASES_CONFIG = [
         "nome_base": "Base de Dados SNIC Total",
         "tabela": "tb_snic_total",
         "arquivo_upload": "snic_total_zip_file",
+        # Sem shapefile: o importador busca direto do Acervo Fundiário do INCRA (i3Geo).
+        "fonte_api": "API do Acervo Fundiário do INCRA — imóveis certificados SNCI (privados e públicos), Tocantins",
         "cor": "#EF6C00",
         "colunas_extraidas": [
             {"campo": "property_name", "coluna_bd": "nome_imove", "rotulo": "Nome do Imóvel", "saida": "nome"},
