@@ -196,6 +196,8 @@ BASES_CONFIG = [
         "nome_base": "Base de Deforestação Mapbiomas",
         "tabela": "tb_area_deforestation_mapbiomas",
         "arquivo_upload": "deforestation_mapbiomas_zip_file",
+        # Sem shapefile: o importador busca direto do GeoServer público do MapBiomas Alerta.
+        "fonte_api": "API do MapBiomas Alerta — alertas de desmatamento do Tocantins (atualização semanal)",
         "cor": "#FF0000",
         "colunas_extraidas": [
             {"campo": "alert_code", "coluna_bd": "CODEALERTA", "rotulo": "Código do Alerta", "saida": "alert_code"},
