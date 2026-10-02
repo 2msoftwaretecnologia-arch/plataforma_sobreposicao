@@ -52,6 +52,8 @@
         .loc-flag--plus { background:#e0ecff; color:#1849a9; }
         .loc-flag--div { background:#fef0c7; color:#93370d; }
         .loc-flag--none { background:#fee4e2; color:#b42318; }
+        .loc-flag--fora { background:#f3e8ff; color:#7e22ce; }
+        .loc-stat--fora strong { color:#9c36b5; }
         .loc-zoom { background:none; border:none; color:#2f6b3f; cursor:pointer; text-decoration:underline; padding:0; font:inherit; text-align:left; }
         .loc-points-table td, .loc-cars-table td { vertical-align:top; }
         .loc-num { text-align:right; white-space:nowrap; }
@@ -165,7 +167,12 @@
                 <div class="loc-stat loc-stat--main"><strong>{{ cars|length }}</strong><span>CARs encontrados (cada imóvel conta uma vez)</span></div>
                 <div class="loc-stat"><strong>{{ total_points }}</strong><span>localizações lidas ({{ distinct_positions }} posições distintas)</span></div>
                 <div class="loc-stat"><strong>{{ with_car }}</strong><span>localizações dentro de algum CAR</span></div>
+                {% if outside_to is not None %}
+                <div class="loc-stat"><strong>{{ without_car_in_to }}</strong><span>sem CAR, dentro do Tocantins</span></div>
+                <div class="loc-stat loc-stat--fora"><strong>{{ outside_to }}</strong><span>fora do Tocantins (o SICAR do sistema não cobre)</span></div>
+                {% else %}
                 <div class="loc-stat"><strong>{{ without_car }}</strong><span>localizações sem CAR</span></div>
+                {% endif %}
                 {% if from_plus_code %}<div class="loc-stat"><strong>{{ from_plus_code }}</strong><span>posição recuperada pelo Plus Code</span></div>{% endif %}
                 {% if divergent %}<div class="loc-stat loc-stat--warn"><strong>{{ divergent }}</strong><span>posição corrigida pelo Plus Code</span></div>{% endif %}
                 {% if skipped %}<div class="loc-stat loc-stat--warn"><strong>{{ skipped|length }}</strong><span>ignorados (sem posição)</span></div>{% endif %}
@@ -173,7 +180,7 @@
             <ul class="loc-files">
                 {% for a in arquivos %}<li class="badge">{{ a }}</li>{% endfor %}
             </ul>
-            <p class="loc-hint">O SICAR do sistema cobre só o Tocantins: localizações no Pará ou no Maranhão aparecem como "sem CAR".</p>
+            <p class="loc-hint">O SICAR do sistema cobre só o Tocantins{% if outside_to %}: as {{ outside_to }} localizações fora do estado (pelos limites oficiais do IBGE) ficam sem CAR por isso, e não porque não exista imóvel lá{% endif %}.</p>
             {% if divergent %}
             <p class="loc-hint">
                 <strong>Posição corrigida:</strong> o ponto do arquivo estava a mais de 200 m do Plus Code do próprio nome — o Google Earth não achou o endereço e colocou o ponto no centro da cidade ou numa cidade de mesmo nome em outro estado. Nesses casos foi usada a posição do Plus Code (o endereço original).
@@ -198,6 +205,7 @@
             <div class="loc-legend">
                 <span><i style="background:#2f9e44"></i>ponto central dentro de CAR</span>
                 <span><i style="background:#e03131"></i>sem CAR</span>
+                {% if outside_to %}<span><i style="background:#9c36b5"></i>fora do Tocantins</span>{% endif %}
                 <span><b style="border-color:#5fe08a;background:rgba(95,224,138,.15)"></b>CAR ativo</span>
                 <span><b style="border-color:#ffd23f;background:rgba(255,210,63,.15)"></b>pendente</span>
                 <span><b style="border-color:#ff6b3d;background:rgba(255,107,61,.15)"></b>suspenso</span>
@@ -266,7 +274,8 @@
                 <select id="loc_filtro">
                     <option value="">Todas as localizações</option>
                     <option value="com">Dentro de CAR</option>
-                    <option value="sem">Sem CAR</option>
+                    <option value="sem">Sem CAR, dentro do Tocantins</option>
+                    {% if outside_to %}<option value="fora">Fora do Tocantins</option>{% endif %}
                     <option value="div">Posição corrigida pelo Plus Code</option>
                     <option value="plus">Recuperadas pelo Plus Code</option>
                 </select>
@@ -456,13 +465,16 @@
                 const cars = p.cars.length
                     ? '<div class="secao"><strong>Dentro do CAR</strong><div>' + p.cars.map((k) =>
                         '<button type="button" class="loc-zoom loc-car" data-ficha="' + escape(carsData[k].car) + '">' + escape(carsData[k].car) + '</button>').join('<br>') + '</div></div>'
-                    : '<div class="secao"><strong>Fora de qualquer CAR</strong><div style="color:#6b7280">Nenhum imóvel do SICAR (Tocantins) contém este ponto.</div></div>';
+                    : (p.fora
+                        ? '<div class="secao"><strong>Fora do Tocantins</strong><div style="color:#6b7280">O SICAR do sistema só cobre o Tocantins, então não há como saber o CAR deste ponto.</div></div>'
+                        : '<div class="secao"><strong>Fora de qualquer CAR</strong><div style="color:#6b7280">Nenhum imóvel do SICAR contém este ponto.</div></div>');
                 const lat = Number(p.lat).toFixed(6), lon = Number(p.lon).toFixed(6);
                 return '<div class="loc-ficha">' +
                     '<h3>Localização #' + p.i + '</h3>' +
                     '<div style="font-weight:600">' + escape(p.n) + '</div>' +
                     '<dl>' +
                     (sources.length > 1 ? '<dt>Arquivo</dt><dd>' + escape(sources[p.f]) + '</dd>' : '') +
+                    '<dt>Município</dt><dd>' + (p.mun ? escape(p.mun) + ' - TO' : (p.fora ? '<span class="loc-flag loc-flag--fora">fora do Tocantins</span>' : '—')) + '</dd>' +
                     '<dt>Coordenadas</dt><dd>' + lat + ', ' + lon + '<button type="button" class="copy" data-copy="' + lat + ', ' + lon + '">copiar</button></dd>' +
                     (p.plus ? '<dt>Posição</dt><dd>recuperada pelo Plus Code do nome</dd>' : '') +
                     (p.div != null ? '<dt>Posição</dt><dd>corrigida pelo Plus Code (o ponto do arquivo estava a ' + (p.div >= 1000 ? fmt(p.div / 1000, 1) + ' km' : fmt(p.div) + ' m') + ')</dd>' : '') +
@@ -475,7 +487,7 @@
                 const dentro = p.cars.length > 0;
                 const marker = L.circleMarker([p.lat, p.lon], {
                     renderer: renderer, radius: 5, weight: 1, color: '#fff', fillOpacity: .9,
-                    fillColor: dentro ? '#2f9e44' : '#e03131',
+                    fillColor: dentro ? '#2f9e44' : (p.fora ? '#9c36b5' : '#e03131'),
                     // Dentro de CAR o clique passa para o polígono embaixo (ficha do CAR).
                     interactive: !dentro
                 });
@@ -510,7 +522,8 @@
                         '<div class="total">' + fmt(total) + '<small>CAR' + (total === 1 ? '' : 's') + ' encontrado' + (total === 1 ? '' : 's') + '</small></div>' +
                         '<ul>' + linhas + '</ul><hr><ul>' +
                         '<li><span style="--c:#2f9e44">Pontos em CAR</span><strong>' + fmt({{ with_car|unlocalize }}) + '</strong></li>' +
-                        '<li><span style="--c:#e03131">Pontos sem CAR</span><strong>' + fmt({{ without_car|unlocalize }}) + '</strong></li></ul>';
+                        {% if outside_to is not None %}'<li><span style="--c:#e03131">Pontos sem CAR no TO</span><strong>' + fmt({{ without_car_in_to|unlocalize }}) + '</strong></li>' +
+                        '<li><span style="--c:#9c36b5">Pontos fora do TO</span><strong>' + fmt({{ outside_to|unlocalize }}) + '</strong></li></ul>';{% else %}'<li><span style="--c:#e03131">Pontos sem CAR</span><strong>' + fmt({{ without_car|unlocalize }}) + '</strong></li></ul>';{% endif %}
                     L.DomEvent.disableClickPropagation(div);
                     L.DomEvent.disableScrollPropagation(div);
                     return div;
@@ -578,10 +591,12 @@
                     '<td><button type="button" class="loc-zoom" data-zoom="' + p.i + '">' + p.i + '</button></td>' +
                     '<td>' + escape(p.n) + '<br>' +
                     (sources.length > 1 ? '<small style="color:#6b7280">' + escape(sources[p.f]) + '</small><br>' : '') +
+                    (p.mun ? '<small style="color:#6b7280">' + escape(p.mun) + ' - TO</small><br>' : '') +
+                    (p.fora ? flag('fora', 'fora do Tocantins') : '') +
                     (p.plus ? flag('plus', 'recuperado do Plus Code') : '') +
                     (p.div != null ? flag('div', 'posição corrigida pelo Plus Code (o ponto do arquivo estava a ' + (p.div >= 1000 ? fmt(p.div / 1000, 1) + ' km' : fmt(p.div) + ' m') + ')') : '') + '</td>' +
                     '<td><a href="https://www.google.com/maps?q=' + coord(p.lat) + ',' + coord(p.lon) + '" target="_blank" rel="noopener">' + coord(p.lat) + ', ' + coord(p.lon) + '</a></td>' +
-                    '<td>' + (cars || flag('none', 'sem CAR')) + '</td>' +
+                    '<td>' + (cars || (p.fora ? '<span style="color:#6b7280">—</span>' : flag('none', 'sem CAR'))) + '</td>' +
                     '</tr>';
             });
 
@@ -591,7 +606,8 @@
                 const a = arquivo && arquivo.value !== '' ? +arquivo.value : null;
                 const lista = data.filter(function (p) {
                     if (f === 'com' && !p.cars.length) return false;
-                    if (f === 'sem' && p.cars.length) return false;
+                    if (f === 'sem' && (p.cars.length || p.fora)) return false;
+                    if (f === 'fora' && !p.fora) return false;
                     if (f === 'div' && p.div == null) return false;
                     if (f === 'plus' && !p.plus) return false;
                     if (a !== null && p.f !== a) return false;
@@ -669,10 +685,10 @@
 
             // Uma linha por localização x CAR.
             document.getElementById('loc_csv').addEventListener('click', function () {
-                const lines = [['localizacao', 'nome', 'arquivo', 'latitude', 'longitude', 'car'].join(';')];
+                const lines = [['localizacao', 'nome', 'arquivo', 'latitude', 'longitude', 'municipio', 'fora_do_tocantins', 'car'].join(';')];
                 data.forEach(function (p) {
                     (p.cars.length ? p.cars : [null]).forEach(function (k) {
-                        lines.push([p.i, csvCell(p.n), csvCell(sources[p.f]), num(p.lat, 6), num(p.lon, 6), k == null ? '' : carsData[k].car].join(';'));
+                        lines.push([p.i, csvCell(p.n), csvCell(sources[p.f]), num(p.lat, 6), num(p.lon, 6), csvCell(p.mun), p.fora ? 'sim' : 'nao', k == null ? '' : carsData[k].car].join(';'));
                     });
                 });
                 baixarCsv('localizacoes_car.csv', lines);

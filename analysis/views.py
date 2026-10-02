@@ -39,6 +39,7 @@ from analysis.services.view_services.kmz_points_service import (
     car_details,
     car_perimeters,
     locate_cars,
+    locate_municipalities,
     parse_location_points,
     summarize_cars,
 )
@@ -609,6 +610,13 @@ class LocalizacoesKmzView(View):
         except Exception as e:
             return render(request, self.template_name, {'erro': f'Erro ao processar os arquivos: {e}'})
 
+        try:
+            locate_municipalities(points)
+            municipios_ok = True
+        except Exception:
+            # Sem os limites municipais a tela só não separa quem está fora do TO.
+            municipios_ok = False
+
         cars = summarize_cars(points)
         car_numbers = [c['car_number'] for c in cars]
         try:
@@ -625,6 +633,7 @@ class LocalizacoesKmzView(View):
         sources = [f.name for f in files]
         car_position = {c['car_number']: i for i, c in enumerate(cars)}
         with_car = sum(1 for p in points if p.cars)
+        outside_to = sum(1 for p in points if p.municipality is None) if municipios_ok else None
         context = {
             'arquivos': sources,
             'points': points,
@@ -634,6 +643,8 @@ class LocalizacoesKmzView(View):
             'distinct_positions': len({(round(p.lon, 5), round(p.lat, 5)) for p in points}),
             'with_car': with_car,
             'without_car': len(points) - with_car,
+            'outside_to': outside_to,
+            'without_car_in_to': len(points) - with_car - (outside_to or 0),
             'from_plus_code': sum(1 for p in points if p.from_plus_code),
             'divergent': sum(1 for p in points if p.is_divergent),
             # Dados compactos para o mapa e para as tabelas, que são montadas no
@@ -647,6 +658,8 @@ class LocalizacoesKmzView(View):
                     'lon': round(p.lon, 6),
                     'plus': p.from_plus_code,
                     'div': round(p.divergence_m) if p.is_divergent else None,
+                    'mun': p.municipality or '',
+                    'fora': municipios_ok and p.municipality is None,
                     # Posições dos CARs em `map_cars`.
                     'cars': [car_position[c['car_number']] for c in p.cars],
                 }

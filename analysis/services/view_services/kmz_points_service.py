@@ -40,6 +40,9 @@ class LocationPoint:
     lon: float
     lat: float
     source: str = ''
+    # Município do Tocantins onde o ponto cai (limites do IBGE); `None` quando
+    # está fora do estado — ver `locate_municipalities`.
+    municipality: str = None
     from_plus_code: bool = False
     # Distância (m) entre o ponto do arquivo e o Plus Code do nome. Quando o
     # Google Earth não consegue geocodificar o endereço ele joga o ponto no
@@ -376,3 +379,32 @@ def car_details(car_numbers: list) -> dict:
             if car in details:
                 details[car]['hydrography'].append({'theme': theme, 'count': count, 'area_ha': area_ha})
     return details
+
+
+def locate_municipalities(points: list) -> list:
+    """Preenche `point.municipality` com o município do Tocantins onde cada
+    ponto cai, usando os limites oficiais em `tb_area_municipios`. Pontos fora
+    de todos os municípios (outro estado) ficam com `None` — o SICAR do sistema
+    só cobre o Tocantins, então nunca vão achar CAR."""
+    if not points:
+        return points
+    sql = """
+        SELECT p.idx, m.nome
+        FROM unnest(%s::int[], %s::float8[], %s::float8[]) AS p(idx, lon, lat)
+        LEFT JOIN LATERAL (
+            SELECT "NOME" AS nome
+            FROM tb_area_municipios m
+            WHERE ST_Intersects(m.geometria_util, ST_SetSRID(ST_MakePoint(p.lon, p.lat), 4674))
+            LIMIT 1
+        ) m ON TRUE
+    """
+    by_index = {p.index: p for p in points}
+    with connection.cursor() as cursor:
+        cursor.execute(sql, [
+            [p.index for p in points],
+            [p.lon for p in points],
+            [p.lat for p in points],
+        ])
+        for idx, name in cursor.fetchall():
+            by_index[idx].municipality = name
+    return points
