@@ -9,7 +9,7 @@
     <link rel="stylesheet" type="text/css" href="{% static 'control_panel/css/dashboard.css' %}">
 </head>
 
-<body>
+<body class="{% block body_class %}{% endblock %}">
     <div class="dashboard-layout">
         <aside class="sidebar">
             <div class="sidebar-header">

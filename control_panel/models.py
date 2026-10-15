@@ -188,3 +188,14 @@ class LayerFieldToggle(models.Model):
     def __str__(self):
         return f"{self.modelo}.{self.campo} ({'ativo' if self.ativo else 'inativo'})"
 
+
+
+class LayerAccessPolicy(models.Model):
+    """Ausência de política mantém a base disponível aos usuários da plataforma."""
+    modelo = models.CharField(max_length=100, unique=True)
+    restrita = models.BooleanField(default=False)
+    grupos = models.ManyToManyField('auth.Group', blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tb_layer_access_policy'

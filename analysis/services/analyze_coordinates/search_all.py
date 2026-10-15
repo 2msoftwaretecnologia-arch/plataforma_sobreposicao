@@ -20,7 +20,8 @@ class SearchAll:
     - Tracking performance (timing each step)
     """
 
-    def __init__(self):
+    def __init__(self, user=None):
+        self.user = user
         self.pipeline = OverlapPipeline()
         self.builder = FinalResultBuilder()
         self.formatters = FormatterRegister()
@@ -89,7 +90,9 @@ class SearchAll:
         """
         Obtém a lista de modelos-camada que serão avaliados.
         """
-        return list(self.formatters.formatters.keys())
+        from control_panel.access_service import denied_layers
+        denied = denied_layers(self.user)
+        return [layer for layer in self.formatters.formatters if layer.__name__ not in denied]
 
     def _run_pipeline(self, target, layers):
         """

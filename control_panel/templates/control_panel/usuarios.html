@@ -2,9 +2,11 @@
 
 {% block title %}Usuários — Painel Administrativo{% endblock %}
 
+{% block body_class %}access-management-page{% endblock %}
+
 {% block content %}
 <div class="page-header">
-    <h1>Usuários</h1>
+    <div><span class="access-eyebrow">PESSOAS E PERMISSÕES</span><h1>Usuários</h1><p class="access-page-description">Gerencie sua equipe e o acesso às bases da empresa.</p></div>
 </div>
 
 <div class="cards-row">
@@ -14,36 +16,71 @@
     </div>
 </div>
 
+<section class="card access-group-manager" aria-labelledby="access-groups-title">
+    <div class="access-group-overview">
+        <div class="access-policy-heading">
+            <span class="access-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6m3 10v-3a6 6 0 0 0-3-5"/></svg></span>
+            <div><span class="access-eyebrow">ORGANIZE OS ACESSOS</span><h2 id="access-groups-title">Grupos de acesso</h2></div>
+        </div>
+        <p>Reúna pessoas com as mesmas permissões. Use <strong>Funcionários</strong> para sua equipe e crie outros grupos conforme precisar.</p>
+        <div class="access-group-catalog" aria-label="Grupos disponíveis">
+            {% for grupo in grupos_acesso %}<span class="access-group-chip"><span class="access-dot" aria-hidden="true"></span>{{ grupo.name }}</span>{% empty %}<span class="access-help">Crie seu primeiro grupo ao lado.</span>{% endfor %}
+        </div>
+        <p class="access-admin-note">Os grupos liberam acesso às bases. O acesso administrativo é gerenciado separadamente.</p>
+    </div>
+    <form method="post" action="{% url 'control_panel:grupo_criar' %}" class="access-create-group">
+        {% csrf_token %}
+        <label for="access-group-name">Criar novo grupo</label>
+        <p class="access-help" id="access-group-name-help">Escolha um nome que identifique as pessoas.</p>
+        <input id="access-group-name" name="nome" maxlength="150" required placeholder="Ex.: Parceiros ou Consultores" aria-describedby="access-group-name-help">
+        <button type="submit" class="access-button"><span aria-hidden="true">+</span> Criar grupo</button>
+    </form>
+</section>
 <div class="card table-card">
     {% if usuarios %}
     <div class="table-scroll">
-        <table class="users-table">
+        <table class="users-table access-users-table">
             <thead>
                 <tr>
                     <th>Usuário</th>
-                    <th>E-mail</th>
-                    <th>Objetivo</th>
-                    <th>Profissão</th>
+                    <th>Perfil</th>
                     <th>Cadastrado em</th>
-                    <th>Status</th>
+                    <th>Status</th><th>Grupos de acesso</th>
                 </tr>
             </thead>
             <tbody>
                 {% for usuario in usuarios %}
                 <tr>
-                    <td class="users-table-name">{{ usuario.username }}</td>
-                    <td>{{ usuario.email|default:"—" }}</td>
-                    <td>{{ usuario.profile.objetivo_exibicao|default:"—" }}</td>
-                    <td>{{ usuario.profile.profissao_exibicao|default:"—" }}</td>
+                    <td class="users-table-name"><span class="access-user-identity"><span class="access-avatar" aria-hidden="true">{{ usuario.username|slice:":1"|upper }}</span><span>{{ usuario.username }}<span class="access-user-email">{{ usuario.email|default:"Sem e-mail" }}</span></span></span></td>
+                    <td><span class="access-profile-primary">{{ usuario.profile.profissao_exibicao|default:"—" }}</span><span class="access-profile-secondary">{{ usuario.profile.objetivo_exibicao|default:"—" }}</span></td>
                     <td>{{ usuario.date_joined|date:"d/m/Y H:i" }}</td>
                     <td>
                         {% if usuario.is_staff %}
-                        <span class="status-badge status-staff">Staff</span>
+                        <span class="status-badge status-staff">Administrador</span>
                         {% elif usuario.profile.onboarding_completo %}
                         <span class="status-badge status-seguro">Completo</span>
                         {% else %}
                         <span class="status-badge status-quase_cheio">Onboarding pendente</span>
                         {% endif %}
+                    </td>
+                    <td class="access-user-groups">
+                        <details class="access-user-editor">
+                            <summary><span class="access-user-group-summary">
+                                {% for grupo in grupos_acesso %}{% if grupo.pk in usuario.access_group_ids %}<span class="access-group-chip">{{ grupo.name }}</span>{% endif %}{% endfor %}
+                                {% if not usuario.access_group_ids %}<span class="access-no-groups">Sem grupo atribuído</span>{% endif %}
+                            </span><span class="access-edit-label">Gerenciar acesso <span aria-hidden="true">⌄</span></span></summary>
+                            <form method="post" action="{% url 'control_panel:usuario_grupos' usuario.pk %}" class="access-user-form">
+                                {% csrf_token %}
+                                <fieldset class="access-group-fieldset"><legend>Grupos de {{ usuario.username }}</legend>
+                                    <div class="access-options">
+                                    {% for grupo in grupos_acesso %}
+                                    <label class="access-option"><input type="checkbox" name="grupos" value="{{ grupo.pk }}" {% if grupo.pk in usuario.access_group_ids %}checked{% endif %}><span>{{ grupo.name }}</span><span class="access-option-check" aria-hidden="true">✓</span></label>
+                                    {% empty %}<p class="access-help">Crie um grupo para atribuir acesso.</p>{% endfor %}
+                                    </div>
+                                </fieldset>
+                                <button type="submit" class="access-button" aria-label="Salvar grupos de {{ usuario.username }}">Salvar grupos</button>
+                            </form>
+                        </details>
                     </td>
                 </tr>
                 {% endfor %}

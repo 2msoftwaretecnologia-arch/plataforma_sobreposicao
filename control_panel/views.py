@@ -1,8 +1,9 @@
 from django.contrib import messages
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import Q
-from django.http import Http404
+from django.http import Http404, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
@@ -119,11 +120,14 @@ def armazenamento_refresh_view(request):
 
 
 def usuarios_view(request):
-    usuarios_qs = User.objects.select_related('profile').order_by('-date_joined')
+    usuarios_qs = User.objects.select_related('profile').prefetch_related('groups').order_by('-date_joined')
     paginator = Paginator(usuarios_qs, 25)
     page_obj = paginator.get_page(request.GET.get('page'))
 
+    for usuario in page_obj:
+        usuario.access_group_ids = {g.pk for g in usuario.groups.all()}
     context = {
+        'grupos_acesso': Group.objects.filter(permissions__isnull=True).distinct().order_by('name'),
         'active_nav': 'usuarios',
         'usuarios': page_obj,
         'page_obj': page_obj,
@@ -201,9 +205,15 @@ def _file_info(file_mgmt, field_name):
 
 
 def bases_dados_view(request):
+    from .models import LayerAccessPolicy
+    policies = {p.modelo: p for p in LayerAccessPolicy.objects.prefetch_related('grupos')}
+    groups = Group.objects.filter(permissions__isnull=True).distinct().order_by('name')
     bases = get_bases_config()
     file_mgmt = utils.get_file_management()
     for base in bases:
+        policy = policies.get(base['modelo'])
+        base['restrita'] = policy.restrita if policy else False
+        base['access_group_ids'] = {g.pk for g in policy.grupos.all()} if policy else set()
         base['total_registros'] = cached_model_count(LAYER_REGISTRY[base['modelo']]['model'])
         base['arquivo_nome'], base['arquivo_tamanho'] = _file_info(file_mgmt, base['arquivo_upload'])
 
@@ -231,6 +241,7 @@ def bases_dados_view(request):
         base['tem_colunas_togglable'] = len(campos_saida) > 0
 
     context = {
+        'grupos_acesso': groups,
         'active_nav': 'bases_dados',
         'bases': bases,
         'total_bases': len(bases),
@@ -310,3 +321,51 @@ def base_excluir_view(request, modelo):
         f"\"{base_cfg['nome_base']}\" excluída: arquivo removido e todos os registros apagados da tabela."
     )
     return redirect('control_panel:bases_dados')
+
+
+@require_POST
+@transaction.atomic
+def base_acesso_view(request, modelo):
+    _get_base_cfg(modelo)
+    from .models import LayerAccessPolicy
+    try:
+        group_ids = [int(value) for value in request.POST.getlist('grupos')]
+    except ValueError:
+        return HttpResponseBadRequest('Grupo inválido.')
+    groups = Group.objects.filter(pk__in=group_ids, permissions__isnull=True).distinct()
+    if len(group_ids) != groups.count():
+        return HttpResponseBadRequest('Grupo inválido.')
+    policy, _ = LayerAccessPolicy.objects.get_or_create(modelo=modelo)
+    policy.restrita = request.POST.get('restrita') == '1'
+    policy.save()
+    policy.grupos.set(groups)
+    messages.success(request, 'Acesso à base atualizado. Base restrita sem grupos fica disponível somente aos administradores.')
+    return redirect('control_panel:bases_dados')
+
+
+@require_POST
+@transaction.atomic
+def usuario_grupos_view(request, pk):
+    user = get_object_or_404(User, pk=pk)
+    available = Group.objects.filter(permissions__isnull=True).distinct()
+    try:
+        ids = [int(value) for value in request.POST.getlist('grupos')]
+    except ValueError:
+        return HttpResponseBadRequest('Grupo inválido.')
+    selected = available.filter(pk__in=ids)
+    if len(ids) != selected.count():
+        return HttpResponseBadRequest('Grupo inválido.')
+    user.groups.remove(*available)
+    user.groups.add(*selected)
+    messages.success(request, 'Grupos de acesso do usuário atualizados.')
+    return redirect('control_panel:usuarios')
+
+
+@require_POST
+def grupo_criar_view(request):
+    name = request.POST.get('nome', '').strip()
+    if not name or len(name) > 150:
+        return HttpResponseBadRequest('Informe um nome de grupo com até 150 caracteres.')
+    Group.objects.get_or_create(name=name)
+    messages.success(request, 'Grupo de acesso disponível para atribuição aos usuários e às bases.')
+    return redirect('control_panel:usuarios')

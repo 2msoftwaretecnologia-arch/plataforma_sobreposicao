@@ -108,6 +108,8 @@ def create_batch(user, title: str, cars: list, kind: str = CrossBatch.Kind.CAR) 
     ou o código da parcela. Só entram identificadores que existem na base;
     situação e área vêm do banco, não do navegador.
     """
+    from control_panel.access_service import require_layer
+    require_layer('Sigef' if kind == CrossBatch.Kind.SIGEF else 'SicarRecord', user)
     by_number = {}
     for car in cars:
         number = str(car.get('car') or '').strip().upper()
@@ -290,16 +292,16 @@ def _process_item_safely(item_id: int):
 
 
 def _process_item(item_id: int):
-    item = CrossBatchItem.objects.select_related('batch').get(pk=item_id)
+    item = CrossBatchItem.objects.select_related('batch__user').get(pk=item_id)
     if item.status != CrossBatchItem.Status.PENDING:
         return
     try:
         if item.batch.kind == CrossBatch.Kind.SIGEF:
-            result = SearchForSigef().execute(item.car_number, save_debug_files=False)
+            result = SearchForSigef().execute(item.car_number, save_debug_files=False, user=item.batch.user)
             if not result:
                 raise ValueError('Parcela não encontrada ou sem geometria válida no SIGEF.')
         else:
-            result = SearchForCar().execute(item.car_number, save_debug_files=False)
+            result = SearchForCar().execute(item.car_number, save_debug_files=False, user=item.batch.user)
             if not result:
                 raise ValueError('CAR não encontrado ou sem geometria válida no SICAR.')
         summary = summarize_result(result)

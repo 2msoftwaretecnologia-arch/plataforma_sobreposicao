@@ -25,6 +25,9 @@ def _staff_only(view):
 
 
 urlpatterns = [
+    path('usuarios/<int:pk>/grupos/', _staff_only(views.usuario_grupos_view), name='usuario_grupos'),
+    path('grupos/criar/', _staff_only(views.grupo_criar_view), name='grupo_criar'),
+    path('bases-de-dados/<str:modelo>/acesso/', _staff_only(views.base_acesso_view), name='base_acesso'),
     path('', _staff_only(views.dashboard_home_view), name='home'),
     path('armazenamento/', _staff_only(views.armazenamento_view), name='armazenamento'),
     path('armazenamento/atualizar/', _staff_only(views.armazenamento_refresh_view), name='armazenamento_refresh'),

@@ -9,7 +9,9 @@ class SearchForSigef:
     o equivalente ao `SearchForCar` para o SIGEF. A própria parcela não
     aparece na camada do SIGEF (ver `OverlapService._is_target_itself`)."""
 
-    def execute(self, parcel_code: str, save_debug_files: bool = True) -> dict:
+    def execute(self, parcel_code: str, save_debug_files: bool = True, user=None) -> dict:
+        from control_panel.access_service import require_layer
+        require_layer('Sigef', user)
         obj = Sigef.objects.filter(installment_code__iexact=(parcel_code or '').strip()).first()
         if obj is None:
             return {}
@@ -19,4 +21,4 @@ class SearchForSigef:
                 obj.usable_geometry = geom if geom.valid else geom.buffer(0)
             except Exception:
                 return {}
-        return SearchAll().execute(obj, save_debug_files=save_debug_files)
+        return SearchAll(user=user).execute(obj, save_debug_files=save_debug_files)

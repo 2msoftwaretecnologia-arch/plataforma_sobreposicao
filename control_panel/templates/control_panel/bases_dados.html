@@ -2,9 +2,11 @@
 
 {% block title %}Bases de Dados — Painel Administrativo{% endblock %}
 
+{% block body_class %}access-management-page{% endblock %}
+
 {% block content %}
 <div class="page-header">
-    <h1>Bases de Dados (SHP)</h1>
+    <div><span class="access-eyebrow">DADOS E PERMISSÕES</span><h1>Bases de Dados</h1><p class="access-page-description">Organize suas bases e defina quem pode consultar cada uma.</p></div>
 </div>
 
 <div class="cards-row">
@@ -30,12 +32,37 @@
         <summary class="bd-summary">
             <span class="bd-color-dot" style="background: {{ base.cor }};"></span>
             <span class="bd-nome">{{ base.nome_base }}</span>
-            <span class="bd-tabela">{{ base.tabela }}</span>
+            <span class="access-badge {% if base.restrita %}access-badge-restricted{% else %}access-badge-open{% endif %}"><span class="access-dot" aria-hidden="true"></span>{% if base.restrita %}Acesso restrito{% else %}Acesso aberto{% endif %}</span>
             <span class="bd-status-badge bd-status-{{ base.status_code }}">{{ base.status_label }}</span>
             <span class="bd-count-badge">{{ base.total_colunas }} coluna{{ base.total_colunas|pluralize }} extraída{{ base.total_colunas|pluralize }}</span>
         </summary>
 
         <div class="bd-body">
+            <form method="post" action="{% url 'control_panel:base_acesso' base.modelo %}" class="access-policy">
+                {% csrf_token %}
+                <div class="access-policy-heading">
+                    <span class="access-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3 4 6v6c0 4 5 7 8 9 3-2 8-5 8-9V6l-8-3Z"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg></span>
+                    <div><span class="access-eyebrow">PERMISSÕES DA BASE</span><h3>Quem pode acessar?</h3><p>Controle a consulta aos dados e aos cruzamentos desta base.</p></div>
+                </div>
+                <label class="access-switch-row">
+                    <span><strong>Restringir esta base</strong><span class="access-help">Ative para permitir apenas grupos autorizados.</span></span>
+                    <span class="access-switch"><input type="checkbox" name="restrita" value="1" {% if base.restrita %}checked{% endif %}><span class="access-switch-track" aria-hidden="true"></span></span>
+                </label>
+                <fieldset class="access-group-fieldset">
+                    <legend>Grupos autorizados</legend>
+                    <p class="access-help">Selecione um ou mais grupos que poderão consultar esta base.</p>
+                    <div class="access-options">
+                    {% for grupo in grupos_acesso %}
+                        <label class="access-option"><input type="checkbox" name="grupos" value="{{ grupo.pk }}" {% if grupo.pk in base.access_group_ids %}checked{% endif %}><span>{{ grupo.name }}</span><span class="access-option-check" aria-hidden="true">✓</span></label>
+                    {% empty %}<p class="access-empty">Nenhum grupo criado. <a href="{% url 'control_panel:usuarios' %}">Criar grupo em Usuários</a></p>{% endfor %}
+                    </div>
+                </fieldset>
+                <div class="access-policy-footer">
+                    <p class="access-state access-state-open"><span class="access-dot" aria-hidden="true"></span>Disponível para todos os usuários da plataforma.</p>
+                    <p class="access-state access-state-restricted"><span class="access-dot" aria-hidden="true"></span>Somente grupos selecionados e administradores. Sem seleção, apenas administradores.</p>
+                    <button type="submit" class="access-button">Salvar acesso <span aria-hidden="true">→</span></button>
+                </div>
+            </form>
             <div class="bd-meta">
                 <span><strong>Modelo:</strong> {{ base.modelo }}</span>
                 <span><strong>Tabela no banco:</strong> {{ base.tabela }}</span>

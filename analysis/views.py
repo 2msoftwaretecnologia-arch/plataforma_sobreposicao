@@ -19,6 +19,8 @@ from django.views import View
 import geopandas as gpd
 from shapely import wkt as shapely_wkt
 
+from control_panel.access_service import denied_layers, require_layer, filter_result, filter_batch_item
+
 # Local apps – analysis
 from analysis.models import CrossBatch, CrossBatchItem, SearchHistory
 from analysis.services.analyze_coordinates.search_all import SearchAll
@@ -95,7 +97,7 @@ class ResultsPageView(View):
     template_name = 'analysis/results.html'
 
     def get(self, request):
-        data = request.session.get('last_analysis') or {}
+        data = filter_result(request.session.get('last_analysis') or {}, request.user)
         data['planet_tiles_url'] = planet_tiles_url()
         data = format_data_map(data)
         return render(request, self.template_name, data)
@@ -114,10 +116,11 @@ class ResultsPageView(View):
     def _process_coordinates(self, request, coordenadas_input, car_input):
         """Executa a pesquisa nas bases, persiste na sessão e redireciona para GET."""
         try:
-            resultado = SearchAll().execute(coordenadas_input)
+            resultado = SearchAll(user=request.user).execute(coordenadas_input)
 
             municipio, uf = None, None
             try:
+                require_layer('MunicipalBoundaries', request.user)
                 municipio, uf = locate_city_state(coordenadas_input)
             except Exception:
                 pass
@@ -158,7 +161,13 @@ class HistoricoView(View):
     template_name = 'analysis/historico.html'
 
     def get(self, request):
+        denied = denied_layers(request.user)
         historico_qs = SearchHistory.objects.filter(user=request.user)
+        if 'Sigef' in denied:
+            historico_qs = historico_qs.exclude(search_type=SearchHistory.SearchType.SIGEF)
+        if 'SicarRecord' in denied:
+            historico_qs = historico_qs.exclude(search_type__in=[SearchHistory.SearchType.CAR, SearchHistory.SearchType.DEMONSTRATIVO, SearchHistory.SearchType.RECIBO])
+        total_buscas = historico_qs.count()
 
         filtro_tipo = request.GET.get('tipo', '').strip()
         if filtro_tipo:
@@ -172,10 +181,19 @@ class HistoricoView(View):
 
         paginator = Paginator(historico_qs, 10)
         page_obj = paginator.get_page(request.GET.get('page'))
+        for history in page_obj:
+            if 'MunicipalBoundaries' in denied:
+                history.municipio = ''
+            if denied:
+                data = dict(history.result_data or {})
+                data['source_model'] = 'Sigef' if history.search_type == SearchHistory.SearchType.SIGEF else ''
+                # A lista não inclui os resultados de bases revogadas.
+                data['car_input'] = ''
+                history.conflitos_count = (filter_result(data, denied=denied).get('resultado') or {}).get('total_areas_com_sobreposicao', 0)
 
         context = {
             'page_obj': page_obj,
-            'total_buscas': SearchHistory.objects.filter(user=request.user).count(),
+            'total_buscas': total_buscas,
             'search_types': SearchHistory.SearchType.choices,
             'filtro_tipo': filtro_tipo,
             'busca_texto': busca_texto,
@@ -189,7 +207,10 @@ class HistoricoDetalheView(View):
     def get(self, request, pk):
         historico = get_object_or_404(SearchHistory, pk=pk, user=request.user)
 
-        data = dict(historico.result_data or {})
+        stored = dict(historico.result_data or {})
+        if historico.search_type == SearchHistory.SearchType.SIGEF:
+            stored['source_model'] = 'Sigef'
+        data = filter_result(stored, request.user)
         data['planet_tiles_url'] = planet_tiles_url()
         data = format_data_map(data)
         data['is_historico'] = True
@@ -205,7 +226,7 @@ class ReportPrintView(View):
     template_name = 'analysis/report_print.html'
 
     def get(self, request):
-        data = request.session.get('last_analysis') or {}
+        data = filter_result(request.session.get('last_analysis') or {}, request.user)
         data = self.format_data(data)
         return render(request, self.template_name, data)
 
@@ -257,7 +278,7 @@ class ReportPrintView(View):
 
 class DownloadPropertyShapefileView(View):
     def get(self, request):
-        data = request.session.get('last_analysis') or {}
+        data = filter_result(request.session.get('last_analysis') or {}, request.user)
         resultado = data.get('resultado') or {}
         alvo_wkt = resultado.get('alvo_wkt')
 
@@ -276,6 +297,7 @@ class DownloadPropertyShapefileView(View):
         status_car = demonstrativo.get('registration_status') or ''
 
         if not status_car and car_value:
+            require_layer('SicarRecord', request.user)
             qs = get_sicar_record(car_number__iexact=car_value)
             if qs.exists():
                 status_car = getattr(qs.first(), 'status', '') or ''
@@ -311,7 +333,7 @@ class DownloadPropertyShapefileView(View):
 
 class DownloadPropertyKmlView(View):
     def get(self, request):
-        data = request.session.get('last_analysis') or {}
+        data = filter_result(request.session.get('last_analysis') or {}, request.user)
         resultado = data.get('resultado') or {}
         alvo_wkt = resultado.get('alvo_wkt')
 
@@ -330,6 +352,7 @@ class DownloadPropertyKmlView(View):
         status_car = demonstrativo.get('registration_status') or ''
 
         if not status_car and car_value:
+            require_layer('SicarRecord', request.user)
             qs = get_sicar_record(car_number__iexact=car_value)
             if qs.exists():
                 status_car = getattr(qs.first(), 'status', '') or ''
@@ -363,8 +386,8 @@ def _bases_3d_config(request):
     return {
         'tilesUrl': sample.replace('/BASE/0/0/0.pbf', '/{base}/{z}/{x}/{y}.pbf'),
         'maxTileZoom': MAX_TILE_ZOOM,
-        'bases': bases_summary(),
-        'cities': cities_summary(),
+        'bases': [b for b in bases_summary() if b['modelo'] not in denied_layers(request.user)],
+        'cities': cities_summary() if 'SicarRecord' not in denied_layers(request.user) else [],
     }
 
 
@@ -464,17 +487,18 @@ class UploadZipCarView(View):
     # Métodos auxiliares
     # =====================================================================
 
-    def _get_car_data(self, car_number):
+    def _get_car_data(self, car_number, user=None):
         """Busca dados do CAR e localidade."""
         resultado = {}
         municipio, state = None, None
         
         if car_number:
             try:
-                resultado = SearchForCar().execute(car_number) or {}
+                resultado = SearchForCar().execute(car_number, user=user) or {}
                 qs = get_sicar_record(car_number__iexact=car_number)
                 if qs.exists():
                     geometry = qs.first().geometry
+                    require_layer('MunicipalBoundaries', user)
                     municipio, state = locate_city_state(geometry)
             except Exception:
                 pass
@@ -499,7 +523,7 @@ class UploadZipCarView(View):
             
             car_extraido = (info.car or car_input or '').strip()
 
-            resultado, municipio, state = self._get_car_data(car_extraido)
+            resultado, municipio, state = self._get_car_data(car_extraido, request.user)
 
             #esultado, municipio, state = {}, "Palmas", "TO"
             data = {
@@ -524,7 +548,7 @@ class UploadZipCarView(View):
     def _handle_only_car(self, request, car_input, context):
         """Processa requisição apenas com o CAR (sem ZIP)."""
         try:
-            resultado, municipality, state = self._get_car_data(car_input)
+            resultado, municipality, state = self._get_car_data(car_input, request.user)
 
             data = {
                 'resultado': resultado,
@@ -544,9 +568,10 @@ class UploadZipCarView(View):
     def _process_coordinates(self, request, coordenadas_input, car_input):
         """Processa os dados extraídos do shapefile."""
         try:
-            resultado = SearchAll().execute(coordenadas_input)
+            resultado = SearchAll(user=request.user).execute(coordenadas_input)
             municipio, uf = None, None
             try:
+                require_layer('MunicipalBoundaries', request.user)
                 municipio, uf = locate_city_state(coordenadas_input)
             except Exception:
                 pass
@@ -610,14 +635,18 @@ class LocalizacoesKmzView(View):
                 file_points, file_skipped = parse_location_points(f, first_index=len(points) + 1, source=f.name)
                 points += file_points
                 skipped += [f'{name} ({f.name})' for name in file_skipped]
-            locate_cars(points)
-            locate_sigef(points)
+            denied = denied_layers(request.user)
+            if 'SicarRecord' not in denied:
+                locate_cars(points)
+            if 'Sigef' not in denied:
+                locate_sigef(points)
         except KmzPointsError as e:
             return render(request, self.template_name, {'erro': str(e)})
         except Exception as e:
             return render(request, self.template_name, {'erro': f'Erro ao processar os arquivos: {e}'})
 
         try:
+            require_layer('MunicipalBoundaries', request.user)
             locate_municipalities(points)
             municipios_ok = True
         except Exception:
@@ -633,9 +662,12 @@ class LocalizacoesKmzView(View):
             perimeters = {}
         try:
             details = car_details(car_numbers)
+            if 'DeclaredHydrography' in denied_layers(request.user):
+                for detail in details.values():
+                    detail['hydrography'] = []
         except Exception:
             details = {}
-        municipios = _municipios_por_codigo()
+        municipios = _municipios_por_codigo() if 'MunicipalBoundaries' not in denied_layers(request.user) else {}
 
         parcels = summarize_parcels(points)
         try:
@@ -732,12 +764,12 @@ class AnaliseParcelaSigefView(View):
 
     def post(self, request):
         code = request.POST.get('parcela', '').strip()
-        data = {'car_input': code, 'sucesso': True}
+        data = {'car_input': code, 'source_model': 'Sigef', 'sucesso': True}
         try:
-            resultado = SearchForSigef().execute(code)
+            resultado = SearchForSigef().execute(code, user=request.user)
             if not resultado:
                 raise ValueError('Parcela não encontrada no SIGEF.')
-            data.update({'resultado': resultado, 'municipio': _municipio_da_parcela(code), 'uf': 'TO'})
+            data.update({'resultado': resultado, 'municipio': _municipio_da_parcela(code) if 'MunicipalBoundaries' not in denied_layers(request.user) else '', 'uf': 'TO'})
         except Exception as e:
             data.update({'sucesso': False, 'erro': f'Erro ao analisar a parcela do SIGEF: {e}'})
         _save_search_history(request, data, SearchHistory.SearchType.SIGEF)
@@ -765,7 +797,9 @@ def _municipio_da_parcela(code: str) -> str:
 def _get_batch_for(request, pk):
     """O lote, se for do usuário logado (equipe vê todos)."""
     qs = CrossBatch.objects.all() if request.user.is_staff else CrossBatch.objects.filter(user=request.user)
-    return get_object_or_404(qs, pk=pk)
+    batch = get_object_or_404(qs, pk=pk)
+    require_layer('Sigef' if batch.kind == CrossBatch.Kind.SIGEF else 'SicarRecord', request.user)
+    return batch
 
 
 def _batch_item_row(item) -> dict:
@@ -849,7 +883,12 @@ class LotesCruzamentoListView(View):
     template_name = 'analysis/lotes_cruzamento.html'
 
     def get(self, request):
+        denied = denied_layers(request.user)
         batches = CrossBatch.objects.filter(user=request.user)
+        if 'SicarRecord' in denied:
+            batches = batches.exclude(kind=CrossBatch.Kind.CAR)
+        if 'Sigef' in denied:
+            batches = batches.exclude(kind=CrossBatch.Kind.SIGEF)
         page_obj = Paginator(batches, 15).get_page(request.GET.get('page'))
         for lote in page_obj:
             if cross_batch_service.resume_if_stale(lote):
@@ -873,11 +912,12 @@ class LoteCruzamentoDetailView(View):
         batch = _get_batch_for(request, pk)
         cross_batch_service.resume_if_stale(batch)
         batch.refresh_from_db()
+        denied = denied_layers(request.user)
         return render(request, self.template_name, {
             'batch': batch,
             'labels': _batch_labels(batch),
             'progress': _batch_progress(batch),
-            'items': [_batch_item_row(item) for item in batch.items.all()],
+            'items': [_batch_item_row(filter_batch_item(item, denied=denied)) for item in batch.items.all()],
         })
 
 
@@ -889,6 +929,7 @@ class LoteCruzamentoStatusView(View):
         batch = _get_batch_for(request, pk)
         cross_batch_service.resume_if_stale(batch)
         batch.refresh_from_db()
+        denied = denied_layers(request.user)
         items = batch.items.exclude(status=CrossBatchItem.Status.PENDING)
         desde = request.GET.get('desde')
         if desde:
@@ -901,7 +942,7 @@ class LoteCruzamentoStatusView(View):
                 pass
         return JsonResponse({
             'progress': _batch_progress(batch),
-            'items': [_batch_item_row(item) for item in items],
+            'items': [_batch_item_row(filter_batch_item(item, denied=denied)) for item in items],
         })
 
 
@@ -911,18 +952,20 @@ class LoteCruzamentoPrintView(View):
 
     def get(self, request, pk):
         batch = _get_batch_for(request, pk)
+        denied = denied_layers(request.user)
         items = batch.items.filter(status=CrossBatchItem.Status.DONE)
         car = request.GET.get('car', '').strip()
         nivel = request.GET.get('nivel', '').strip()
         if car:
             items = items.filter(car_number__iexact=car)
-        if nivel == 'critical':
-            items = items.filter(critical_count__gt=0)
-        elif nivel == 'alertas':
-            items = items.filter(Q(critical_count__gt=0) | Q(warning_count__gt=0))
         if not items.exists() and car:
             raise Http404('CAR não encontrado neste lote.')
-        cars = [self._print_car(item) for item in items.order_by('-critical_count', '-warning_count', 'car_number')]
+        cars = [self._print_car(filter_batch_item(item, denied=denied)) for item in items.order_by('-critical_count', '-warning_count', 'car_number')]
+        if nivel == 'critical':
+            cars = [c for c in cars if c['item'].critical_count]
+        elif nivel == 'alertas':
+            cars = [c for c in cars if c['item'].critical_count or c['item'].warning_count]
+        cars.sort(key=lambda c: (-c['item'].critical_count, -c['item'].warning_count, c['item'].car_number))
         return render(request, self.template_name, {
             'batch': batch,
             'labels': _batch_labels(batch),
@@ -981,6 +1024,7 @@ class BaseTileView(View):
     """Vector tile (MVT) de uma base, recortado pelo Tocantins."""
 
     def get(self, request, modelo, z, x, y):
+        require_layer(modelo, request.user)
         tile = render_tile(modelo, z, x, y)
         if not tile:
             return HttpResponse(status=204)
