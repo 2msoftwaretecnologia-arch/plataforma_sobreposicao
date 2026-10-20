@@ -127,7 +127,7 @@ class ResultsPageView(View):
 
             data = {
                 'resultado': resultado,
-                'coordenadas_recebidas': coordenadas_input,
+                'coordenadas_recebidas': str(coordenadas_input),
                 'car_input': car_input,
                 'municipio': municipio,
                 'uf': uf,
@@ -140,7 +140,7 @@ class ResultsPageView(View):
         except Exception as e:
             data = {
                 'erro': f'Erro ao processar coordenadas: {str(e)}',
-                'coordenadas_recebidas': coordenadas_input,
+                'coordenadas_recebidas': str(coordenadas_input),
                 'car_input': car_input,
                 'sucesso': False
             }
@@ -577,7 +577,7 @@ class UploadZipCarView(View):
                 pass
             data = {
                 'resultado': resultado,
-                'coordenadas_recebidas': coordenadas_input,
+                'coordenadas_recebidas': str(coordenadas_input),
                 'car_input': car_input,
                 'municipio': municipio,
                 'uf': uf,
@@ -589,7 +589,7 @@ class UploadZipCarView(View):
         except Exception as e:
             data = {
                 'erro': f'Erro ao processar coordenadas: {str(e)}',
-                'coordenadas_recebidas': coordenadas_input,
+                'coordenadas_recebidas': str(coordenadas_input),
                 'car_input': car_input,
                 'sucesso': False
             }

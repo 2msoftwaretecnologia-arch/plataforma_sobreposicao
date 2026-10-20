@@ -100,14 +100,59 @@
         });
     }
 
+    const ZIP_LABEL_DEFAULT = 'Arraste e solte o ZIP aqui ou clique para selecionar!';
+    const dragZoneZip = groupZip.querySelector('.drag-zone');
+
+    function isZip(file) {
+        if (!file) return false;
+        const nameOk = (file.name || '').toLowerCase().endsWith('.zip');
+        const type = (file.type || '').toLowerCase();
+        const typeOk = type === 'application/zip' || type === 'application/x-zip-compressed';
+        return nameOk || typeOk;
+    }
+
     zipInput.addEventListener('change', function () {
         if (zipInput.files && zipInput.files.length > 0) {
             zipLabelText.textContent = zipInput.files[0].name;
             clientError.style.display = 'none';
         } else {
-            zipLabelText.textContent = 'Selecionar arquivo ZIP';
+            zipLabelText.textContent = ZIP_LABEL_DEFAULT;
         }
     });
+
+    if (dragZoneZip) {
+        ['dragenter','dragover'].forEach(evt => {
+            dragZoneZip.addEventListener(evt, function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dragZoneZip.classList.add('active');
+            });
+        });
+        ['dragleave','drop'].forEach(evt => {
+            dragZoneZip.addEventListener(evt, function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dragZoneZip.classList.remove('active');
+            });
+        });
+        dragZoneZip.addEventListener('drop', function (e) {
+            const files = e.dataTransfer && e.dataTransfer.files ? e.dataTransfer.files : null;
+            if (files && files.length > 0) {
+                const zipFile = Array.from(files).find(f => isZip(f));
+                if (zipFile) {
+                    const dt = new DataTransfer();
+                    dt.items.add(zipFile);
+                    zipInput.files = dt.files;
+                    zipLabelText.textContent = zipFile.name;
+                    clientError.style.display = 'none';
+                } else {
+                    clientError.style.display = 'block';
+                    clientError.textContent = '❌ Por favor, selecione um arquivo ZIP.';
+                    zipLabelText.textContent = ZIP_LABEL_DEFAULT;
+                }
+            }
+        });
+    }
 
     function isPdf(file) {
         if (!file) return false;
