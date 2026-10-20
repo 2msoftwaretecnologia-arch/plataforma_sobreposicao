@@ -25,8 +25,9 @@
      */
     function getBaseLayers(imagery) {
         imagery = imagery || {};
+        var esriSatUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
         var baseOSM = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 });
-        var baseEsriSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 16 });
+        var baseEsriSat = L.tileLayer(esriSatUrl, { maxZoom: 16 });
         var baseCartoLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 });
         var baseTopo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17 });
 
@@ -68,6 +69,13 @@
                 param: 'release',
                 label: 'Data da imagem',
                 listUrl: imagery.wayback_releases_url,
+                // Os tiles da Wayback demoram ~1 s cada (redirecionamento +
+                // servidor lento): a lista de datas é buscada já ao abrir o
+                // mapa, e a Esri atual fica por baixo enquanto eles chegam.
+                // Só na Wayback: é a mesma imagem da Esri, então o fundo não
+                // se confunde com a imagem escolhida.
+                prefetch: true,
+                backdrop: L.tileLayer(esriSatUrl, { maxZoom: 19, maxNativeZoom: 16, zIndex: 0 }),
                 parse: function (json) {
                     return (json.releases || []).map(function (r) {
                         return { value: String(r.id), text: formatDateBR(r.date) };
@@ -89,7 +97,8 @@
 
     /**
      * Controle com a lista de mosaicos/datas, visível só quando o mapa base
-     * ativo é uma fonte com seletor. A lista é buscada na primeira ativação.
+     * ativo é uma fonte com seletor. A lista é buscada na primeira ativação
+     * (ou ao abrir o mapa, nas fontes com `prefetch`).
      */
     function setupImageryPicker(map, pickers) {
         if (!pickers.length) return;
@@ -155,7 +164,11 @@
 
             selectEl.style.display = 'none';
             setStatus('Carregando…');
-            if (picker.loading) return;
+            load(picker);
+        }
+
+        function load(picker) {
+            if (picker.loading || picker.options) return;
             picker.loading = true;
             fetch(picker.listUrl, { credentials: 'same-origin' })
                 .then(function (r) {
@@ -173,14 +186,27 @@
                 })
                 .then(function () {
                     picker.loading = false;
-                    if (picker.options.length) apply(picker, picker.options[0].value);
+                    if (picker.options.length) {
+                        apply(picker, picker.options[0].value);
+                    } else if (picker.backdrop && map.hasLayer(picker.backdrop)) {
+                        // Sem datas, o fundo passaria pela imagem histórica.
+                        map.removeLayer(picker.backdrop);
+                    }
                     if (current === picker) show(picker);
                 });
         }
 
+        pickers.forEach(function (p) { if (p.prefetch) load(p); });
+
         map.on('baselayerchange', function (e) {
+            pickers.forEach(function (p) {
+                if (p.backdrop && p.layer !== e.layer && map.hasLayer(p.backdrop)) map.removeLayer(p.backdrop);
+            });
             var picker = pickers.find(function (p) { return p.layer === e.layer; });
             if (picker) {
+                // Com a lista já carregada e vazia (falhou no prefetch), sem fundo.
+                var semImagens = picker.options && !picker.options.length;
+                if (picker.backdrop && !semImagens) picker.backdrop.addTo(map);
                 show(picker);
             } else {
                 current = null;
