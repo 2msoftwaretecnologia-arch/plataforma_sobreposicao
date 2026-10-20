@@ -931,19 +931,10 @@ body { background: var(--cream-50); color: var(--ink-900); }
 
 .map-panel-link:hover { background: var(--green-900); border-color: var(--green-900); color: var(--gold-400); }
 
-/* Lado direito da comparação: só aparece enquanto ela está ligada. */
-.map-panel-compare {
-  display: none;
-  margin-bottom: 18px;
-  padding: 12px;
-  border: 1.5px solid var(--gold-400);
-  border-radius: 12px;
-  background: #fffaf0;
-}
-
-.map-panel.is-comparing .map-panel-compare { display: block; }
-.map-panel-compare .map-panel-hint { margin-bottom: 8px; }
-.map-panel-compare .imagery-picker { margin: 0; background: #fff; }
+/* Na comparação o painel se duplica (maps.js, setupCompare): cada um com
+   a borda dourada para mostrar que controla só o seu lado. */
+.map-panel.is-comparing .map-panel-box { box-shadow: 0 0 0 2px var(--gold-400), 0 10px 30px rgba(23, 48, 31, 0.28); }
+.map-panel.is-comparing .map-panel-hint { margin-bottom: 8px; }
 
 .map-panel-compare-only { display: none; }
 .map-panel.is-comparing .map-panel-compare-only { display: inline; color: var(--gold-500); }

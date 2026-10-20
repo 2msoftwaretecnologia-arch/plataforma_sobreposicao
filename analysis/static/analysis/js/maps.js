@@ -399,9 +399,15 @@
      * temáticas. Fica dentro do mapa para continuar visível em tela cheia;
      * em mapas estreitos (celular) começa recolhido.
      *
-     * Devolve { section(aba), show(aba), open(aba), setComparing(bool) }.
+     * `opts.tabs`/`opts.openLabel` montam outro painel com as mesmas
+     * peças (o do lado direito da comparação).
+     *
+     * Devolve { section(aba), show(aba), open(aba), setOpen(bool),
+     * setComparing(bool), setPosition(canto), remove() }.
      */
-    function setupMapPanel(map) {
+    function setupMapPanel(map, opts) {
+        opts = opts || {};
+        var panelTabs = opts.tabs || PANEL_TABS;
         var root, box, body, sections = {}, tabs = {};
         var control = L.control({ position: 'topright' });
 
@@ -410,8 +416,8 @@
 
             var openBtn = L.DomUtil.create('button', 'map-panel-open', root);
             openBtn.type = 'button';
-            openBtn.title = 'Mostrar bases, imagens e camadas';
-            openBtn.innerHTML = LAYERS_ICON + '<span>Camadas</span>';
+            openBtn.title = opts.openTitle || 'Mostrar bases, imagens e camadas';
+            openBtn.innerHTML = LAYERS_ICON + '<span>' + (opts.openLabel || 'Camadas') + '</span>';
             openBtn.addEventListener('click', function () { setOpen(true); });
 
             box = L.DomUtil.create('div', 'map-panel-box', root);
@@ -426,7 +432,7 @@
             closeBtn.addEventListener('click', function () { setOpen(false); });
 
             body = L.DomUtil.create('div', 'map-panel-body', box);
-            PANEL_TABS.forEach(function (t) {
+            panelTabs.forEach(function (t) {
                 var tab = L.DomUtil.create('button', 'map-panel-tab', tablist);
                 tab.type = 'button';
                 tab.id = 'map-panel-tab-' + t.key;
@@ -447,7 +453,7 @@
         control.addTo(map);
 
         function show(key) {
-            PANEL_TABS.forEach(function (t) {
+            panelTabs.forEach(function (t) {
                 var on = t.key === key;
                 tabs[t.key].classList.toggle('is-active', on);
                 tabs[t.key].setAttribute('aria-selected', String(on));
@@ -461,15 +467,17 @@
         }
 
         // O painel rola por dentro em vez de passar da altura do mapa
-        // (deixa espaço para a atribuição no rodapé).
+        // (deixa espaço para a atribuição no rodapé). No canto esquerdo ele
+        // fica abaixo dos botões de zoom/comparar, por isso conta o topo.
         function fit() {
-            box.style.maxHeight = Math.max(180, map.getSize().y - 56) + 'px';
+            var top = root.getBoundingClientRect().top - map.getContainer().getBoundingClientRect().top;
+            box.style.maxHeight = Math.max(180, map.getSize().y - Math.max(10, top) - 46) + 'px';
         }
 
         map.on('resize', fit);
         fit();
-        show(PANEL_TABS[0].key);
-        setOpen(map.getSize().x >= 640);
+        show(panelTabs[0].key);
+        setOpen(opts.open !== undefined ? opts.open : map.getSize().x >= 640);
 
         return {
             section: function (key) { return sections[key]; },
@@ -478,7 +486,18 @@
                 setOpen(true);
                 if (key) show(key);
             },
+            setOpen: setOpen,
             setComparing: function (on) { root.classList.toggle('is-comparing', on); },
+            // Move o mesmo elemento de canto (control.setPosition rodaria o
+            // onAdd de novo e perderia o conteúdo montado nas abas).
+            setPosition: function (position) {
+                map._controlCorners[position].appendChild(root);
+                fit();
+            },
+            remove: function () {
+                map.off('resize', fit);
+                control.remove();
+            },
             // Margem para o fitBounds não esconder a geometria atrás do painel aberto.
             fitPadding: function (base) {
                 var covered = root.classList.contains('is-open') ? root.offsetWidth + 20 : 0;
@@ -954,15 +973,19 @@
 
     /**
      * Comparação lado a lado: o mapa principal (mapa base + camadas
-     * temáticas) fica à esquerda e uma segunda imagem, escolhida em `slot`
-     * (aba "Imagem" do painel lateral), à direita de uma barra arrastável.
+     * temáticas) fica à esquerda e uma segunda imagem à direita de uma barra
+     * arrastável. Durante ela o painel se duplica: o principal vai para o
+     * canto esquerdo (controla o lado esquerdo) e um segundo painel, no
+     * canto direito, escolhe a imagem do lado direito.
      * Cada lado é um "pane" do Leaflet recortado com `clip` (CSS) nas
      * coordenadas das camadas.
      */
     var COMPARE_PANE = 'compareRight';
     var THEMATIC_PANE = 'thematic';
+    // Abaixo disso os dois painéis abertos cobririam o mapa: começam recolhidos.
+    var COMPARE_PANELS_MIN_WIDTH = 900;
 
-    function setupCompare(map, imagery, panel, slot) {
+    function setupCompare(map, imagery, panel) {
         var state = null;
         var button = L.control({ position: 'topleft' });
         button.onAdd = function () {
@@ -1028,9 +1051,24 @@
             L.DomEvent.disableClickPropagation(divider);
             L.DomEvent.disableScrollPropagation(divider);
 
-            state = { ratio: 0.5, divider: divider, layer: null, base: base };
+            var wide = map.getSize().x >= COMPARE_PANELS_MIN_WIDTH;
             panel.setComparing(true);
-            panel.open('imagem');
+            panel.setPosition('topleft');
+            panel.show('imagem');
+            panel.setOpen(wide);
+
+            var rightPanel = setupMapPanel(map, {
+                tabs: [{ key: 'imagem', label: 'Imagem · lado direito' }],
+                openLabel: 'Lado direito',
+                openTitle: 'Escolher a imagem do lado direito',
+                open: wide
+            });
+            rightPanel.setComparing(true);
+            var slot = rightPanel.section('imagem');
+            L.DomUtil.create('p', 'map-panel-hint', slot).textContent =
+                'Arraste a barra no mapa para comparar com o lado esquerdo (painel à esquerda).';
+
+            state = { ratio: 0.5, divider: divider, layer: null, base: base, rightPanel: rightPanel };
             state.panel = setupImageryPanel(map, base, {
                 mount: slot,
                 idSuffix: '-direita',
@@ -1077,7 +1115,10 @@
             state.unbind();
             if (state.layer) map.removeLayer(state.layer);
             state.panel.destroy();
+            state.rightPanel.remove();
             panel.setComparing(false);
+            panel.setPosition('topright');
+            panel.setOpen(map.getSize().x >= 640);
             L.DomUtil.remove(state.divider);
             map.getPane(COMPARE_PANE).style.clip = '';
             leftPanes().forEach(function (p) { map.getPane(p).style.clip = ''; });
@@ -1378,13 +1419,9 @@
             setupLegend(legendEl, data.legend, data.layersByFonte, map);
             setupToggleAll(toggleAllBtn, data.layersByFonte, map, legendEl);
 
-            // Aba "Imagem": lado direito da comparação (só durante ela) e a
-            // lista de mapas base, com os detalhes da imagem logo abaixo da
-            // opção escolhida.
+            // Aba "Imagem": lista de mapas base, com os detalhes da imagem
+            // logo abaixo da opção escolhida (na comparação, é o lado esquerdo).
             var imagem = panel.section('imagem');
-            var compareSlot = L.DomUtil.create('div', 'map-panel-compare', imagem);
-            L.DomUtil.create('div', 'map-panel-heading', compareSlot).textContent = 'Lado direito da comparação';
-            L.DomUtil.create('p', 'map-panel-hint', compareSlot).textContent = 'Arraste a barra no mapa para comparar com o lado esquerdo.';
             var baseHeading = L.DomUtil.create('div', 'map-panel-heading', imagem);
             baseHeading.innerHTML = 'Mapa base<span class="map-panel-compare-only"> · lado esquerdo</span>';
             var imageryPanel = setupImageryPanel(map, baseLayersInfo, { mount: imagem });
@@ -1400,7 +1437,7 @@
             L.DomUtil.create('p', 'map-panel-hint', tematicas).textContent =
                 'Sobreponha dados de uso do solo, desmatamento, fogo e relevo. Marque uma camada para escolher o período e a opacidade.';
             if (global.setupThematicLayers) global.setupThematicLayers(map, options.imagery || {}, THEMATIC_PANE, tematicas);
-            setupCompare(map, options.imagery || {}, panel, compareSlot);
+            setupCompare(map, options.imagery || {}, panel);
 
             if (data.allGroup.getLayers().length) {
                 map.fitBounds(data.allGroup.getBounds(), panel.fitPadding(12));
