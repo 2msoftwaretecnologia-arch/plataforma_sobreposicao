@@ -385,19 +385,170 @@
         return lines;
     }
 
+    var LAYERS_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3.5 8.5 4.5L12 12.5 3.5 8z"/><path d="m3.5 12.5 8.5 4.5 8.5-4.5M3.5 16.5 12 21l8.5-4.5"/></svg>';
+
+    var PANEL_TABS = [
+        { key: 'analise', label: 'Análise' },
+        { key: 'imagem', label: 'Imagem' },
+        { key: 'tematicas', label: 'Temáticas' }
+    ];
+
     /**
-     * Painel das imagens de satélite, visível quando o mapa base ativo tem
-     * `imageryInfo`: seletor de mosaico/data (Planet, Wayback, CBERS...) e a
-     * resolução da imagem no centro do mapa. A lista do seletor é buscada na
-     * primeira ativação (ou ao abrir o mapa, nas fontes com `prefetch`).
+     * Painel lateral do mapa (canto superior direito) que reúne, em abas, as
+     * bases da análise, o mapa base/imagem de satélite e as camadas
+     * temáticas. Fica dentro do mapa para continuar visível em tela cheia;
+     * em mapas estreitos (celular) começa recolhido.
      *
-     * `opts.position` (padrão 'bottomleft'); `opts.idSuffix` deixa os ids
-     * únicos quando há dois painéis (comparação); `opts.chooser` ({nome:
-     * camada}) e `opts.onChoose(camada)` põem no topo um seletor de qual
-     * imagem mostrar (lado direito da comparação).
+     * Devolve { section(aba), show(aba), open(aba), setComparing(bool) }.
+     */
+    function setupMapPanel(map) {
+        var root, box, body, sections = {}, tabs = {};
+        var control = L.control({ position: 'topright' });
+
+        control.onAdd = function () {
+            root = L.DomUtil.create('div', 'map-panel');
+
+            var openBtn = L.DomUtil.create('button', 'map-panel-open', root);
+            openBtn.type = 'button';
+            openBtn.title = 'Mostrar bases, imagens e camadas';
+            openBtn.innerHTML = LAYERS_ICON + '<span>Camadas</span>';
+            openBtn.addEventListener('click', function () { setOpen(true); });
+
+            box = L.DomUtil.create('div', 'map-panel-box', root);
+            var head = L.DomUtil.create('div', 'map-panel-head', box);
+            var tablist = L.DomUtil.create('div', 'map-panel-tabs', head);
+            tablist.setAttribute('role', 'tablist');
+            var closeBtn = L.DomUtil.create('button', 'map-panel-close', head);
+            closeBtn.type = 'button';
+            closeBtn.title = 'Recolher painel';
+            closeBtn.setAttribute('aria-label', 'Recolher painel');
+            closeBtn.textContent = '×';
+            closeBtn.addEventListener('click', function () { setOpen(false); });
+
+            body = L.DomUtil.create('div', 'map-panel-body', box);
+            PANEL_TABS.forEach(function (t) {
+                var tab = L.DomUtil.create('button', 'map-panel-tab', tablist);
+                tab.type = 'button';
+                tab.id = 'map-panel-tab-' + t.key;
+                tab.textContent = t.label;
+                tab.setAttribute('role', 'tab');
+                tab.addEventListener('click', function () { show(t.key); });
+                var section = L.DomUtil.create('div', 'map-panel-section', body);
+                section.setAttribute('role', 'tabpanel');
+                section.setAttribute('aria-labelledby', tab.id);
+                tabs[t.key] = tab;
+                sections[t.key] = section;
+            });
+
+            L.DomEvent.disableClickPropagation(root);
+            L.DomEvent.disableScrollPropagation(root);
+            return root;
+        };
+        control.addTo(map);
+
+        function show(key) {
+            PANEL_TABS.forEach(function (t) {
+                var on = t.key === key;
+                tabs[t.key].classList.toggle('is-active', on);
+                tabs[t.key].setAttribute('aria-selected', String(on));
+                sections[t.key].hidden = !on;
+            });
+            body.scrollTop = 0;
+        }
+
+        function setOpen(open) {
+            root.classList.toggle('is-open', open);
+        }
+
+        // O painel rola por dentro em vez de passar da altura do mapa
+        // (deixa espaço para a atribuição no rodapé).
+        function fit() {
+            box.style.maxHeight = Math.max(180, map.getSize().y - 56) + 'px';
+        }
+
+        map.on('resize', fit);
+        fit();
+        show(PANEL_TABS[0].key);
+        setOpen(map.getSize().x >= 640);
+
+        return {
+            section: function (key) { return sections[key]; },
+            show: show,
+            open: function (key) {
+                setOpen(true);
+                if (key) show(key);
+            },
+            setComparing: function (on) { root.classList.toggle('is-comparing', on); },
+            // Margem para o fitBounds não esconder a geometria atrás do painel aberto.
+            fitPadding: function (base) {
+                var covered = root.classList.contains('is-open') ? root.offsetWidth + 20 : 0;
+                return { paddingTopLeft: [base, base], paddingBottomRight: [base + covered, base] };
+            }
+        };
+    }
+
+    /**
+     * Lista dos mapas base no painel, separada entre imagens de satélite (as
+     * camadas com `imageryInfo`) e mapas de referência. `onChange(camada,
+     * linha)` é chamado com o mapa base inicial e a cada troca.
+     */
+    function setupBaseList(map, baseLayersInfo, mount, onChange) {
+        var groups = [
+            { title: 'Imagens de satélite', test: function (l) { return !!l.imageryInfo; } },
+            { title: 'Mapas de referência', test: function (l) { return !l.imageryInfo; } }
+        ];
+        var active = baseLayersInfo.defaultLayer;
+        var rows = [];
+
+        groups.forEach(function (group) {
+            var names = Object.keys(baseLayersInfo.layers).filter(function (n) {
+                return group.test(baseLayersInfo.layers[n]);
+            });
+            if (!names.length) return;
+            L.DomUtil.create('div', 'map-panel-subheading', mount).textContent = group.title;
+            var list = L.DomUtil.create('div', 'base-list', mount);
+            names.forEach(function (name) {
+                var layer = baseLayersInfo.layers[name];
+                var row = L.DomUtil.create('label', 'base-option', list);
+                var radio = L.DomUtil.create('input', '', row);
+                radio.type = 'radio';
+                radio.name = 'map-base-layer';
+                radio.checked = layer === active;
+                L.DomUtil.create('span', '', row).textContent = name;
+                rows.push({ row: row, layer: layer });
+                radio.addEventListener('change', function () {
+                    if (!radio.checked || layer === active) return;
+                    map.removeLayer(active);
+                    active = layer;
+                    map.addLayer(layer);
+                    select(row);
+                });
+            });
+        });
+
+        function select(row) {
+            rows.forEach(function (r) { r.row.classList.toggle('is-active', r.layer === active); });
+            onChange(active, row);
+        }
+
+        var initial = rows.find(function (r) { return r.layer === active; });
+        if (initial) select(initial.row);
+    }
+
+    /**
+     * Detalhes da imagem de satélite ativa, montados em `opts.mount` (no
+     * painel lateral) e visíveis quando o mapa base tem `imageryInfo`:
+     * seletor de mosaico/data (Planet, Wayback, CBERS...) e a resolução da
+     * imagem no centro do mapa. A lista do seletor é buscada na primeira
+     * ativação (ou ao abrir o mapa, nas fontes com `prefetch`).
      *
-     * Devolve { activate(camada), destroy() }: quem troca o mapa base avisa
-     * o painel por `activate`.
+     * `opts.idSuffix` deixa os ids únicos quando há dois painéis
+     * (comparação); `opts.chooser` ({nome: camada}) e `opts.onChoose(camada)`
+     * põem no topo um seletor de qual imagem mostrar (lado direito da
+     * comparação).
+     *
+     * Devolve { element, activate(camada), destroy() }: quem troca o mapa
+     * base avisa o painel por `activate`.
      */
     function setupImageryPanel(map, baseLayersInfo, opts) {
         opts = opts || {};
@@ -407,11 +558,10 @@
         var activeBase = opts.initial || baseLayersInfo.defaultLayer;
         var infoSeq = 0, infoTimer = null;
 
-        var control = L.control({ position: opts.position || 'bottomleft' });
         var container, chooserEl, labelEl, selectEl, subLabelEl, subSelectEl, statusEl, infoEl, current = null;
 
-        control.onAdd = function () {
-            container = L.DomUtil.create('div', 'imagery-picker leaflet-bar');
+        (function build() {
+            container = L.DomUtil.create('div', 'imagery-picker', opts.mount);
             if (opts.chooser) {
                 var chooserLabel = L.DomUtil.create('label', 'imagery-picker-label imagery-picker-side', container);
                 chooserLabel.textContent = opts.chooserLabel || 'Imagem';
@@ -451,9 +601,7 @@
                 current.secondary.onSelect(subSelectEl.value);
                 refreshInfo();
             });
-            return container;
-        };
-        control.addTo(map);
+        })();
 
         function selectedOption(picker) {
             if (!picker || !picker.options) return null;
@@ -676,7 +824,7 @@
             if (picker) {
                 show(picker);
             } else {
-                labelEl.textContent = layer.imageryInfo.name;
+                labelEl.textContent = 'Detalhes da imagem';
                 selectEl.style.display = 'none';
                 fillSecondary(null);
                 setStatus('');
@@ -790,6 +938,7 @@
         showBase(activeBase);
 
         return {
+            element: container,
             activate: activate,
             destroy: function () {
                 clearTimeout(infoTimer);
@@ -798,21 +947,22 @@
                 pickers.forEach(function (p) {
                     if (p.backdrop && map.hasLayer(p.backdrop)) map.removeLayer(p.backdrop);
                 });
-                control.remove();
+                L.DomUtil.remove(container);
             }
         };
     }
 
     /**
      * Comparação lado a lado: o mapa principal (mapa base + camadas
-     * temáticas) fica à esquerda e uma segunda imagem, escolhida no painel
-     * da direita, à direita de uma barra arrastável. Cada lado é um "pane"
-     * do Leaflet recortado com `clip` (CSS) nas coordenadas das camadas.
+     * temáticas) fica à esquerda e uma segunda imagem, escolhida em `slot`
+     * (aba "Imagem" do painel lateral), à direita de uma barra arrastável.
+     * Cada lado é um "pane" do Leaflet recortado com `clip` (CSS) nas
+     * coordenadas das camadas.
      */
     var COMPARE_PANE = 'compareRight';
     var THEMATIC_PANE = 'thematic';
 
-    function setupCompare(map, imagery) {
+    function setupCompare(map, imagery, panel, slot) {
         var state = null;
         var button = L.control({ position: 'topleft' });
         button.onAdd = function () {
@@ -821,7 +971,7 @@
             link.href = '#';
             link.title = 'Comparar duas imagens lado a lado';
             link.setAttribute('role', 'button');
-            link.textContent = '⇆';
+            link.innerHTML = '<span aria-hidden="true">⇆</span> Comparar';
             L.DomEvent.on(link, 'click', function (e) {
                 L.DomEvent.preventDefault(e);
                 if (state) { stop(); } else { start(); }
@@ -879,8 +1029,10 @@
             L.DomEvent.disableScrollPropagation(divider);
 
             state = { ratio: 0.5, divider: divider, layer: null, base: base };
+            panel.setComparing(true);
+            panel.open('imagem');
             state.panel = setupImageryPanel(map, base, {
-                position: 'bottomright',
+                mount: slot,
                 idSuffix: '-direita',
                 initial: base.layers[initialName],
                 chooser: base.layers,
@@ -925,6 +1077,7 @@
             state.unbind();
             if (state.layer) map.removeLayer(state.layer);
             state.panel.destroy();
+            panel.setComparing(false);
             L.DomUtil.remove(state.divider);
             map.getPane(COMPARE_PANE).style.clip = '';
             leftPanes().forEach(function (p) { map.getPane(p).style.clip = ''; });
@@ -1075,16 +1228,24 @@
         for (var j = 0; j < keys.length; j++) {
             (function () {
                 var k = keys[j];
-                var item = document.createElement('div');
+                var item = document.createElement('button');
+                item.type = 'button';
                 item.className = 'legend-item';
-                
+
+                // Caixa de seleção visual: marcada enquanto o item não tem `.off`.
+                var check = document.createElement('span');
+                check.className = 'legend-check';
+                check.setAttribute('aria-hidden', 'true');
+
                 var sw = document.createElement('span');
                 sw.className = 'legend-swatch';
                 sw.style.backgroundColor = legendData[k];
-                
+
                 var lbl = document.createElement('span');
+                lbl.className = 'legend-label';
                 lbl.textContent = k;
-                
+
+                item.appendChild(check);
                 item.appendChild(sw);
                 item.appendChild(lbl);
 
@@ -1127,7 +1288,7 @@
         }
 
         var allOn = baseFontes().some(function (f) { return map.hasLayer(layersByFonte[f]); });
-        toggleBtn.textContent = allOn ? 'Desmarcar todas as bases' : 'Marcar todas as bases';
+        toggleBtn.textContent = allOn ? 'Desmarcar todas' : 'Marcar todas';
 
         toggleBtn.addEventListener('click', function () {
             var fontes = baseFontes();
@@ -1153,7 +1314,7 @@
             }
 
             allOn = !allOn;
-            this.textContent = allOn ? 'Desmarcar todas as bases' : 'Marcar todas as bases';
+            this.textContent = allOn ? 'Desmarcar todas' : 'Marcar todas';
         });
     }
 
@@ -1200,22 +1361,50 @@
                 if (map.hasLayer(grp)) { map.removeLayer(grp); }
             });
 
-            // Only add layer controls and legend if NOT static
-            L.control.layers(baseLayersInfo.layers, data.overlays, { collapsed: false }).addTo(map);
-            var imageryPanel = setupImageryPanel(map, baseLayersInfo);
-            map.on('baselayerchange', function (e) { imageryPanel.activate(e.layer); });
+            // Only add the panel and legend if NOT static
+            var panel = setupMapPanel(map);
+
+            // Aba "Análise": bases da análise, ligadas/desligadas pela legenda.
+            var analise = panel.section('analise');
+            var analiseHead = L.DomUtil.create('div', 'map-panel-heading-row', analise);
+            L.DomUtil.create('div', 'map-panel-heading', analiseHead).textContent = 'Bases da análise';
+            var toggleAllBtn = L.DomUtil.create('button', 'map-panel-link', analiseHead);
+            toggleAllBtn.type = 'button';
+            toggleAllBtn.id = 'toggle-all-layers';
+            L.DomUtil.create('p', 'map-panel-hint', analise).textContent =
+                'Clique em uma base para mostrá-la ou escondê-la no mapa. Passe o mouse sobre um polígono para ver os detalhes.';
+            var legendEl = L.DomUtil.create('div', '', analise);
+            legendEl.id = 'legend-imoveis';
+            setupLegend(legendEl, data.legend, data.layersByFonte, map);
+            setupToggleAll(toggleAllBtn, data.layersByFonte, map, legendEl);
+
+            // Aba "Imagem": lado direito da comparação (só durante ela) e a
+            // lista de mapas base, com os detalhes da imagem logo abaixo da
+            // opção escolhida.
+            var imagem = panel.section('imagem');
+            var compareSlot = L.DomUtil.create('div', 'map-panel-compare', imagem);
+            L.DomUtil.create('div', 'map-panel-heading', compareSlot).textContent = 'Lado direito da comparação';
+            L.DomUtil.create('p', 'map-panel-hint', compareSlot).textContent = 'Arraste a barra no mapa para comparar com o lado esquerdo.';
+            var baseHeading = L.DomUtil.create('div', 'map-panel-heading', imagem);
+            baseHeading.innerHTML = 'Mapa base<span class="map-panel-compare-only"> · lado esquerdo</span>';
+            var imageryPanel = setupImageryPanel(map, baseLayersInfo, { mount: imagem });
+            setupBaseList(map, baseLayersInfo, imagem, function (layer, row) {
+                row.parentNode.insertBefore(imageryPanel.element, row.nextSibling);
+                imageryPanel.activate(layer);
+            });
 
             // Camadas temáticas (MapBiomas, DETER, focos, relevo) num pane
             // entre o mapa base (200) e os polígonos da análise (400).
             map.createPane(THEMATIC_PANE).style.zIndex = 350;
-            if (global.setupThematicLayers) global.setupThematicLayers(map, options.imagery || {}, THEMATIC_PANE);
-            setupCompare(map, options.imagery || {});
+            var tematicas = panel.section('tematicas');
+            L.DomUtil.create('p', 'map-panel-hint', tematicas).textContent =
+                'Sobreponha dados de uso do solo, desmatamento, fogo e relevo. Marque uma camada para escolher o período e a opacidade.';
+            if (global.setupThematicLayers) global.setupThematicLayers(map, options.imagery || {}, THEMATIC_PANE, tematicas);
+            setupCompare(map, options.imagery || {}, panel, compareSlot);
 
-            var legendEl = document.getElementById('legend-imoveis');
-            setupLegend(legendEl, data.legend, data.layersByFonte, map);
-            
-            var toggleAllBtn = document.getElementById('toggle-all-layers');
-            setupToggleAll(toggleAllBtn, data.layersByFonte, map, legendEl);
+            if (data.allGroup.getLayers().length) {
+                map.fitBounds(data.allGroup.getBounds(), panel.fitPadding(12));
+            }
         } else {
             // If static, ensure legend is empty
             var legendEl = document.getElementById('legend-imoveis');
@@ -1225,7 +1414,8 @@
         mapState = {
             map: map,
             layersByFonte: data.layersByFonte,
-            legendEl: (!isStatic) ? document.getElementById('legend-imoveis') : null
+            legendEl: (!isStatic) ? document.getElementById('legend-imoveis') : null,
+            panel: (!isStatic) ? panel : null
         };
     };
 
@@ -1256,6 +1446,9 @@
         if (!mapState || !fonte) return false;
         var grp = mapState.layersByFonte[fonte];
         if (!grp) return false;
+
+        // Mostra a base ligada na aba "Análise" (sem abrir o painel recolhido).
+        if (mapState.panel) mapState.panel.show('analise');
 
         if (!mapState.map.hasLayer(grp)) {
             mapState.map.addLayer(grp);
@@ -1290,7 +1483,9 @@
         var focusLayer = target || grp;
         if (focusLayer.getBounds) {
             try {
-                mapState.map.fitBounds(focusLayer.getBounds(), { padding: [24, 24], maxZoom: 17 });
+                var fitOpts = mapState.panel ? mapState.panel.fitPadding(24) : { padding: [24, 24] };
+                fitOpts.maxZoom = 17;
+                mapState.map.fitBounds(focusLayer.getBounds(), fitOpts);
             } catch (e) {
                 // geometria sem bounds válidos: mantém o mapa como está
             }

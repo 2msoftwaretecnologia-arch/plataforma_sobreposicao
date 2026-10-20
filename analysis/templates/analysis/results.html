@@ -229,16 +229,17 @@
 
             <div class="map-frame">
                 <div class="map-frame-header">
-                    <div class="map-title">
-                        <svg class="ico" style="width:16px;height:16px;margin-right:8px;vertical-align:-3px"><use href="#i-layers"/></svg>
-                        Camadas ativáveis
+                    <div>
+                        <div class="map-title">
+                            <svg class="ico" style="width:16px;height:16px;margin-right:8px;vertical-align:-3px"><use href="#i-layers"/></svg>
+                            Propriedade e bases sobrepostas
+                        </div>
+                        <p class="map-frame-hint">Use o painel <strong>Camadas</strong> no mapa para ligar as bases da análise, trocar a imagem de satélite e adicionar camadas temáticas.</p>
                     </div>
                     <span class="online">online</span>
                 </div>
                 <div id="map-imoveis"></div>
             </div>
-            <div id="legend-controls"><button id="toggle-all-layers" type="button">Desmarcar todas as bases</button></div>
-            <div id="legend-imoveis"></div>
         </section>
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
         <script src='https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/Leaflet.fullscreen.min.js'></script>

@@ -274,40 +274,25 @@
         return items;
     }
 
-    function setupThematicLayers(map, imagery, pane) {
+    /**
+     * Monta a lista de camadas em `mount` (aba "Temáticas" do painel
+     * lateral do maps.js).
+     */
+    function setupThematicLayers(map, imagery, pane, mount) {
         if (!map.getPane(RELIEF_PANE)) {
             var relief = map.createPane(RELIEF_PANE);
             relief.style.zIndex = 340;
             relief.style.mixBlendMode = 'multiply';
         }
-        var items = buildItems(imagery, pane);
-
-        var control = L.control({ position: 'topleft' });
-        control.onAdd = function () {
-            var box = L.DomUtil.create('div', 'thematic-panel leaflet-bar');
-            var toggle = L.DomUtil.create('button', 'thematic-toggle', box);
-            toggle.type = 'button';
-            toggle.textContent = 'Camadas temáticas';
-            toggle.setAttribute('aria-expanded', 'false');
-            var body = L.DomUtil.create('div', 'thematic-body', box);
-            body.hidden = true;
-            toggle.addEventListener('click', function () {
-                body.hidden = !body.hidden;
-                toggle.setAttribute('aria-expanded', String(!body.hidden));
-            });
-            items.forEach(function (item) { buildItem(item, body); });
-            L.DomEvent.disableClickPropagation(box);
-            L.DomEvent.disableScrollPropagation(box);
-            return box;
-        };
-        control.addTo(map);
+        var list = L.DomUtil.create('div', 'thematic-list', mount);
+        buildItems(imagery, pane).forEach(function (item) { buildItem(item, list); });
 
         function buildItem(item, body) {
             var wrap = L.DomUtil.create('div', 'thematic-item', body);
             var label = L.DomUtil.create('label', 'thematic-check', wrap);
             var check = L.DomUtil.create('input', '', label);
             check.type = 'checkbox';
-            label.appendChild(document.createTextNode(' ' + item.name));
+            L.DomUtil.create('span', '', label).textContent = item.name;
             var controls = L.DomUtil.create('div', 'thematic-controls', wrap);
             controls.hidden = true;
 
@@ -323,7 +308,7 @@
                 });
             }
             var opacityRow = L.DomUtil.create('label', 'thematic-opacity', controls);
-            opacityRow.appendChild(document.createTextNode('Opacidade '));
+            opacityRow.appendChild(document.createTextNode('Opacidade'));
             var opacity = L.DomUtil.create('input', '', opacityRow);
             opacity.type = 'range';
             opacity.min = '0.1';
@@ -370,6 +355,7 @@
 
             check.addEventListener('change', function () {
                 controls.hidden = !check.checked;
+                wrap.classList.toggle('is-on', check.checked);
                 if (check.checked) {
                     if (!layer) {
                         layer = item.create();
