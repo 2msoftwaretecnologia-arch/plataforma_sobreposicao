@@ -26,10 +26,15 @@ from analysis.models import CrossBatch, CrossBatchItem, SearchHistory
 from analysis.services.analyze_coordinates.search_all import SearchAll
 from analysis.services.analyze_coordinates.search_for_car import SearchForCar
 from analysis.services.analyze_coordinates.search_for_sigef import SearchForSigef
-from analysis.services.view_services.result_map_formatter import (
-    format_data_map,
-    planet_tiles_url,
+from analysis.services.view_services.imagery_service import (
+    ImageryError,
+    google_tile,
+    imagery_config,
+    planet_layers,
+    planet_tile,
+    wayback_releases,
 )
+from analysis.services.view_services.result_map_formatter import format_data_map
 from analysis.services.view_services.bases_3d import (
     MAX_TILE_ZOOM,
     MUNICIPIOS_JSON,
@@ -98,7 +103,7 @@ class ResultsPageView(View):
 
     def get(self, request):
         data = filter_result(request.session.get('last_analysis') or {}, request.user)
-        data['planet_tiles_url'] = planet_tiles_url()
+        data['imagery'] = imagery_config()
         data = format_data_map(data)
         return render(request, self.template_name, data)
 
@@ -153,7 +158,7 @@ class ResultsPageView(View):
             'erro': message,
             'car_input': car_input,
             'sucesso': False,
-            'planet_tiles_url': planet_tiles_url()
+            'imagery': imagery_config()
         })
 
 class HistoricoView(View):
@@ -211,7 +216,7 @@ class HistoricoDetalheView(View):
         if historico.search_type == SearchHistory.SearchType.SIGEF:
             stored['source_model'] = 'Sigef'
         data = filter_result(stored, request.user)
-        data['planet_tiles_url'] = planet_tiles_url()
+        data['imagery'] = imagery_config()
         data = format_data_map(data)
         data['is_historico'] = True
         data['historico'] = historico
@@ -1031,3 +1036,48 @@ class BaseTileView(View):
         response = HttpResponse(tile, content_type='application/vnd.mapbox-vector-tile')
         response['Cache-Control'] = 'private, max-age=3600'
         return response
+
+
+def _image_tile_response(fetch):
+    """Resposta de um tile de imagem de satélite vindo por proxy: 204 sem
+    imagem naquele ponto, 502 quando o provedor falha."""
+    try:
+        tile = fetch()
+    except ImageryError:
+        return HttpResponse(status=502)
+    if tile is None:
+        return HttpResponse(status=204)
+    content, content_type = tile
+    response = HttpResponse(content, content_type=content_type)
+    response['Cache-Control'] = 'private, max-age=86400'
+    return response
+
+
+class PlanetLayersView(View):
+    """Camadas/mosaicos da Planet disponíveis para o seletor do mapa."""
+
+    def get(self, request):
+        try:
+            return JsonResponse({'layers': planet_layers()})
+        except ImageryError as e:
+            return JsonResponse({'erro': str(e), 'layers': []}, status=502)
+
+
+class PlanetTileView(View):
+    def get(self, request, layer, z, x, y):
+        return _image_tile_response(lambda: planet_tile(layer, z, x, y))
+
+
+class GoogleTileView(View):
+    def get(self, request, z, x, y):
+        return _image_tile_response(lambda: google_tile(z, x, y))
+
+
+class WaybackReleasesView(View):
+    """Datas da imagem histórica da Esri (Wayback)."""
+
+    def get(self, request):
+        try:
+            return JsonResponse({'releases': wayback_releases()})
+        except ImageryError as e:
+            return JsonResponse({'erro': str(e), 'releases': []}, status=502)

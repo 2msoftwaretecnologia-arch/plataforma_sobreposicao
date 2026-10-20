@@ -1,17 +1,3 @@
-from django.conf import settings
-
-
-def planet_tiles_url():
-    try:
-        mosaic = getattr(settings, 'PLANET_BASEMAP_MOSAIC', '')
-        key = getattr(settings, 'PLANET_API_KEY', '')
-        if mosaic and key:
-            return f"https://tiles.planet.com/basemaps/v1/planet-tiles/{mosaic}/gmap/{{z}}/{{x}}/{{y}}.png?api_key={key}"
-    except Exception:
-        pass
-    return ''
-
-
 def format_data_map(data):
     """Monta `data['map_items']` a partir de `data['resultado']`, no formato
     esperado pelo template `analysis/results.html` / `maps.js`."""

@@ -123,8 +123,9 @@ Variáveis esperadas:
 - `GEOS_LIBRARY_PATH`: caminho da biblioteca GEOS.
 - `CELERY_BROKER_URL`: URL do RabbitMQ.
 - `CELERY_RESULT_BACKEND`: backend de resultado Celery.
-- `PLANET_API_KEY`: chave opcional para tiles Planet.
-- `PLANET_BASEMAP_MOSAIC`: mosaico opcional do basemap Planet.
+- `PLANET_WMS_URL`: link WMS/WMTS opcional da Planet (com a chave), como o usado no QGIS.
+- `PLANET_API_KEY`: alternativa ao link; usa os mosaicos de basemap da conta Planet.
+- `GOOGLE_MAPS_API_KEY`: chave opcional do Google com a Map Tiles API ativada (imagem de satélite do Google).
 - `STATIC_VERSION`: versão/cache-busting de arquivos estáticos.
 
 ## Comandos úteis de importação

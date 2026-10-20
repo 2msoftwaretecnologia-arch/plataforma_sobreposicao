@@ -9,10 +9,8 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from analysis.models import SearchHistory
-from analysis.services.view_services.result_map_formatter import (
-    format_data_map,
-    planet_tiles_url,
-)
+from analysis.services.view_services.imagery_service import imagery_config
+from analysis.services.view_services.result_map_formatter import format_data_map
 from kernel.utils import cached_model_count, reset_db
 
 from . import utils
@@ -176,7 +174,7 @@ def busca_detalhe_view(request, pk):
     historico = get_object_or_404(SearchHistory.objects.select_related('user'), pk=pk)
 
     data = dict(historico.result_data or {})
-    data['planet_tiles_url'] = planet_tiles_url()
+    data['imagery'] = imagery_config()
     data = format_data_map(data)
     data['is_historico'] = True
     data['historico'] = historico

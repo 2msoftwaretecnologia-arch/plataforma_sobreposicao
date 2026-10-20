@@ -193,8 +193,12 @@ USE_TZ = True
 GDAL_LIBRARY_PATH = config('GDAL_LIBRARY_PATH')
 GEOS_LIBRARY_PATH = config('GEOS_LIBRARY_PATH')
 
+# Imagens de satélite do mapa de resultados (ver
+# `analysis/services/view_services/imagery_service.py`). As chaves ficam só
+# no servidor; o navegador recebe os tiles por proxy.
+PLANET_WMS_URL = config('PLANET_WMS_URL', default='')
 PLANET_API_KEY = config('PLANET_API_KEY', default='')
-PLANET_BASEMAP_MOSAIC = config('PLANET_BASEMAP_MOSAIC', default='')
+GOOGLE_MAPS_API_KEY = config('GOOGLE_MAPS_API_KEY', default='')
 
 
 # Porta pública do nginx no host (mesma variável usada no docker-compose.yml).

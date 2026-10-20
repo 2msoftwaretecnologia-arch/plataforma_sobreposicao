@@ -9,33 +9,184 @@
     // começa marcada por padrão no mapa interativo.
     var PROPERTY_FONTE = 'Área da Propriedade';
 
+    // Tile vazio usado pelas fontes com seletor (Planet, Wayback) enquanto a
+    // lista de mosaicos/datas não chega, para não pedir tiles sem a opção.
+    var BLANK_TILE = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+
+    function formatDateBR(isoDate) {
+        var p = (isoDate || '').split('-');
+        return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : isoDate;
+    }
+
     /**
      * Creates and returns the base layers for the map.
-     * @param {string|null} planetTilesUrl 
-     * @returns {object} { layers: object, defaultLayer: L.layer }
+     * @param {object} imagery URLs de `imagery_config()` (imagery_service.py)
+     * @returns {object} { layers: object, defaultLayer: L.layer, pickers: array }
      */
-    function getBaseLayers(planetTilesUrl) {
+    function getBaseLayers(imagery) {
+        imagery = imagery || {};
         var baseOSM = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 });
         var baseEsriSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 16 });
         var baseCartoLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 });
         var baseTopo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17 });
 
-        var layers = {
-            'Satélite (Esri)': baseEsriSat,
-            'OpenStreetMap': baseOSM,
-            'Carto Light': baseCartoLight,
-            'OpenTopoMap': baseTopo
-        };
+        var layers = { 'Satélite (Esri)': baseEsriSat };
+        // Fontes cuja imagem depende de uma escolha (mosaico/data), feita no
+        // controle montado por setupImageryPicker.
+        var pickers = [];
 
-        if (planetTilesUrl) {
-            var basePlanet = L.tileLayer(planetTilesUrl, { maxZoom: 19, attribution: 'Planet' });
-            layers['Satélite (Planet)'] = basePlanet;
+        if (imagery.google_tile_url) {
+            layers['Satélite (Google)'] = L.tileLayer(imagery.google_tile_url, {
+                maxZoom: 20,
+                attribution: 'Imagens &copy; Google'
+            });
         }
+
+        if (imagery.planet_tile_url && imagery.planet_layers_url) {
+            var basePlanet = L.tileLayer(BLANK_TILE, { maxZoom: 19, layer: '', attribution: 'Imagens &copy; Planet Labs PBC' });
+            layers['Satélite (Planet)'] = basePlanet;
+            pickers.push({
+                layer: basePlanet,
+                template: imagery.planet_tile_url,
+                param: 'layer',
+                label: 'Mosaico Planet',
+                listUrl: imagery.planet_layers_url,
+                parse: function (json) {
+                    return (json.layers || []).map(function (l) {
+                        return { value: encodeURIComponent(l.id), text: l.title, maxZoom: l.max_zoom };
+                    });
+                }
+            });
+        }
+
+        if (imagery.wayback_tile_url && imagery.wayback_releases_url) {
+            var baseWayback = L.tileLayer(BLANK_TILE, { maxZoom: 19, release: '', attribution: 'Imagens &copy; Esri (World Imagery Wayback)' });
+            layers['Histórico (Esri Wayback)'] = baseWayback;
+            pickers.push({
+                layer: baseWayback,
+                template: imagery.wayback_tile_url,
+                param: 'release',
+                label: 'Data da imagem',
+                listUrl: imagery.wayback_releases_url,
+                parse: function (json) {
+                    return (json.releases || []).map(function (r) {
+                        return { value: String(r.id), text: formatDateBR(r.date) };
+                    });
+                }
+            });
+        }
+
+        layers['OpenStreetMap'] = baseOSM;
+        layers['Carto Light'] = baseCartoLight;
+        layers['OpenTopoMap'] = baseTopo;
 
         return {
             layers: layers,
-            defaultLayer: baseEsriSat
+            defaultLayer: baseEsriSat,
+            pickers: pickers
         };
+    }
+
+    /**
+     * Controle com a lista de mosaicos/datas, visível só quando o mapa base
+     * ativo é uma fonte com seletor. A lista é buscada na primeira ativação.
+     */
+    function setupImageryPicker(map, pickers) {
+        if (!pickers.length) return;
+
+        var control = L.control({ position: 'bottomleft' });
+        var container, labelEl, selectEl, statusEl, current = null;
+
+        control.onAdd = function () {
+            container = L.DomUtil.create('div', 'imagery-picker leaflet-bar');
+            labelEl = L.DomUtil.create('label', 'imagery-picker-label', container);
+            selectEl = L.DomUtil.create('select', 'imagery-picker-select', container);
+            statusEl = L.DomUtil.create('div', 'imagery-picker-status', container);
+            labelEl.setAttribute('for', 'imagery-picker-select');
+            selectEl.id = 'imagery-picker-select';
+            container.style.display = 'none';
+            L.DomEvent.disableClickPropagation(container);
+            L.DomEvent.disableScrollPropagation(container);
+            selectEl.addEventListener('change', function () {
+                if (current) apply(current, selectEl.value);
+            });
+            return container;
+        };
+        control.addTo(map);
+
+        function apply(picker, value) {
+            var opt = picker.options.find(function (o) { return o.value === value; }) || {};
+            picker.selected = value;
+            picker.layer.options[picker.param] = value;
+            picker.layer.options.maxNativeZoom = opt.maxZoom;
+            // setUrl não redesenha quando a URL-modelo é a mesma; aqui só
+            // muda o parâmetro ({layer}/{release}), então o redraw é explícito.
+            picker.layer.setUrl(picker.template, true);
+            picker.layer.redraw();
+        }
+
+        function fillSelect(picker) {
+            selectEl.innerHTML = '';
+            picker.options.forEach(function (opt) {
+                var o = document.createElement('option');
+                o.value = opt.value;
+                o.textContent = opt.text;
+                selectEl.appendChild(o);
+            });
+            selectEl.value = picker.selected;
+            selectEl.style.display = picker.options.length ? '' : 'none';
+        }
+
+        function setStatus(text) {
+            statusEl.textContent = text || '';
+            statusEl.style.display = text ? '' : 'none';
+        }
+
+        function show(picker) {
+            current = picker;
+            container.style.display = '';
+            labelEl.textContent = picker.label;
+
+            if (picker.options) {
+                fillSelect(picker);
+                setStatus(picker.options.length ? '' : picker.error);
+                return;
+            }
+
+            selectEl.style.display = 'none';
+            setStatus('Carregando…');
+            if (picker.loading) return;
+            picker.loading = true;
+            fetch(picker.listUrl, { credentials: 'same-origin' })
+                .then(function (r) {
+                    return r.json().catch(function () { return {}; }).then(function (json) {
+                        return { ok: r.ok, json: json };
+                    });
+                })
+                .then(function (res) {
+                    picker.options = picker.parse(res.json);
+                    picker.error = res.json.erro || 'Nenhuma imagem disponível.';
+                })
+                .catch(function () {
+                    picker.options = [];
+                    picker.error = 'Não foi possível carregar a lista de imagens.';
+                })
+                .then(function () {
+                    picker.loading = false;
+                    if (picker.options.length) apply(picker, picker.options[0].value);
+                    if (current === picker) show(picker);
+                });
+        }
+
+        map.on('baselayerchange', function (e) {
+            var picker = pickers.find(function (p) { return p.layer === e.layer; });
+            if (picker) {
+                show(picker);
+            } else {
+                current = null;
+                container.style.display = 'none';
+            }
+        });
     }
 
     /**
@@ -283,7 +434,7 @@
         var map = createMapInstance(elementId, isStatic, options);
 
         // 2. Base Layers
-        var baseLayersInfo = getBaseLayers(options.planet_tiles_url);
+        var baseLayersInfo = getBaseLayers(isStatic ? {} : options.imagery);
         baseLayersInfo.defaultLayer.addTo(map);
 
         // 3. Process & Add Items (Overlays)
@@ -308,6 +459,7 @@
 
             // Only add layer controls and legend if NOT static
             L.control.layers(baseLayersInfo.layers, data.overlays, { collapsed: false }).addTo(map);
+            setupImageryPicker(map, baseLayersInfo.pickers);
             
             var legendEl = document.getElementById('legend-imoveis');
             setupLegend(legendEl, data.legend, data.layersByFonte, map);

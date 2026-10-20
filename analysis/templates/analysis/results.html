@@ -244,13 +244,14 @@
         <script src='https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/Leaflet.fullscreen.min.js'></script>
         <script src="{% static 'analysis/js/maps.js' %}"></script>
         {{ map_items|json_script:"map-items" }}
+        {{ imagery|json_script:"map-imagery" }}
         <script>
             const items = JSON.parse(
                 document.getElementById("map-items").textContent
             );
 
             const options = {
-                planet_tiles_url: "{{ planet_tiles_url|default:'' }}"
+                imagery: JSON.parse(document.getElementById("map-imagery").textContent) || {}
             };
 
             initImoveisMap(items, options);
