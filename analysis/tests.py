@@ -165,11 +165,14 @@ class ImageryServiceTests(SimpleTestCase):
     @patch.object(svc, '_http')
     def test_wayback_releases_sorted_newest_first(self, http):
         http.get.return_value = http_response(json={
-            '1': {'itemTitle': 'World Imagery (Wayback 2014-02-20)'},
-            '63116': {'itemTitle': 'World Imagery (Wayback 2026-09-24)'},
+            '1': {'itemTitle': 'World Imagery (Wayback 2014-02-20)', 'metadataLayerUrl': 'https://m/2014'},
+            '63116': {'itemTitle': 'World Imagery (Wayback 2026-09-24)', 'metadataLayerUrl': 'https://m/2026'},
             '9': {'itemTitle': 'sem data'},
         })
-        self.assertEqual(svc.wayback_releases(), [{'id': 63116, 'date': '2026-09-24'}, {'id': 1, 'date': '2014-02-20'}])
+        self.assertEqual(svc.wayback_releases(), [
+            {'id': 63116, 'date': '2026-09-24', 'metadata_url': 'https://m/2026'},
+            {'id': 1, 'date': '2014-02-20', 'metadata_url': 'https://m/2014'},
+        ])
 
     @override_settings(PLANET_WMS_URL='', PLANET_API_KEY='', GOOGLE_MAPS_API_KEY='')
     def test_config_without_keys_only_offers_wayback(self):

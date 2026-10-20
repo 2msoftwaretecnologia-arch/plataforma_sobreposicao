@@ -31,20 +31,26 @@
         var baseCartoLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 });
         var baseTopo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17 });
 
+        // `imageryInfo` diz ao painel de setupImageryPanel de onde vem a
+        // resolução de cada imagem de satélite (camadas sem ele não têm painel).
+        baseEsriSat.imageryInfo = { kind: 'esri', name: 'Satélite (Esri)' };
         var layers = { 'Satélite (Esri)': baseEsriSat };
         // Fontes cuja imagem depende de uma escolha (mosaico/data), feita no
-        // controle montado por setupImageryPicker.
+        // mesmo painel.
         var pickers = [];
 
         if (imagery.google_tile_url) {
-            layers['Satélite (Google)'] = L.tileLayer(imagery.google_tile_url, {
+            var baseGoogle = L.tileLayer(imagery.google_tile_url, {
                 maxZoom: 20,
                 attribution: 'Imagens &copy; Google'
             });
+            baseGoogle.imageryInfo = { kind: 'text', name: 'Satélite (Google)', text: 'Resolução não informada pelo Google.' };
+            layers['Satélite (Google)'] = baseGoogle;
         }
 
         if (imagery.planet_tile_url && imagery.planet_layers_url) {
             var basePlanet = L.tileLayer(BLANK_TILE, { maxZoom: 19, layer: '', attribution: 'Imagens &copy; Planet Labs PBC' });
+            basePlanet.imageryInfo = { kind: 'planet' };
             layers['Satélite (Planet)'] = basePlanet;
             pickers.push({
                 layer: basePlanet,
@@ -62,6 +68,7 @@
 
         if (imagery.wayback_tile_url && imagery.wayback_releases_url) {
             var baseWayback = L.tileLayer(BLANK_TILE, { maxZoom: 19, release: '', attribution: 'Imagens &copy; Esri (World Imagery Wayback)' });
+            baseWayback.imageryInfo = { kind: 'esri' };
             layers['Histórico (Esri Wayback)'] = baseWayback;
             pickers.push({
                 layer: baseWayback,
@@ -78,7 +85,7 @@
                 backdrop: L.tileLayer(esriSatUrl, { maxZoom: 19, maxNativeZoom: 16, zIndex: 0 }),
                 parse: function (json) {
                     return (json.releases || []).map(function (r) {
-                        return { value: String(r.id), text: formatDateBR(r.date) };
+                        return { value: String(r.id), text: formatDateBR(r.date), metadataUrl: r.metadata_url };
                     });
                 }
             });
@@ -95,22 +102,75 @@
         };
     }
 
+    // Metros por pixel de um tile Web Mercator de 256 px no zoom e latitude dados.
+    function metersPerPixel(zoom, lat) {
+        return 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, zoom);
+    }
+
+    function formatMeters(m) {
+        return m.toLocaleString('pt-BR', { maximumFractionDigits: m < 1 ? 2 : 1 }) + ' m';
+    }
+
     /**
-     * Controle com a lista de mosaicos/datas, visível só quando o mapa base
-     * ativo é uma fonte com seletor. A lista é buscada na primeira ativação
-     * (ou ao abrir o mapa, nas fontes com `prefetch`).
+     * Atributos da imagem da Esri no ponto (sensor, data de captura,
+     * resolução), do serviço de metadados de cada versão da World Imagery.
+     * As camadas do serviço vão de 0 (1,9 cm, zoom 23) a 13 (150 m, zoom ≤ 10);
+     * sem imagem naquele nível, tenta os dois mais grosseiros.
      */
-    function setupImageryPicker(map, pickers) {
-        if (!pickers.length) return;
+    function queryEsriMetadata(metadataUrl, latlng, zoom) {
+        var first = Math.max(0, Math.min(13, 23 - Math.round(zoom)));
+        function attempt(layerId) {
+            if (layerId > Math.min(13, first + 2)) return Promise.resolve(null);
+            var params = new URLSearchParams({
+                f: 'json',
+                geometry: latlng.lng + ',' + latlng.lat,
+                geometryType: 'esriGeometryPoint',
+                inSR: '4326',
+                spatialRel: 'esriSpatialRelIntersects',
+                outFields: 'SRC_DATE2,SRC_RES,SRC_ACC,SRC_DESC,NICE_DESC',
+                returnGeometry: 'false'
+            });
+            return fetch(metadataUrl + '/' + layerId + '/query?' + params)
+                .then(function (r) { return r.json(); })
+                .then(function (json) {
+                    var f = json.features && json.features[0];
+                    return f ? f.attributes : attempt(layerId + 1);
+                });
+        }
+        return attempt(first);
+    }
+
+    function esriInfoLines(a) {
+        var lines = [];
+        if (a.SRC_RES) lines.push('Resolução: ' + formatMeters(a.SRC_RES));
+        if (a.SRC_DATE2) lines.push('Captura: ' + new Date(a.SRC_DATE2).toLocaleDateString('pt-BR', { timeZone: 'UTC' }));
+        var fonte = [a.SRC_DESC, a.NICE_DESC].filter(Boolean).join(' · ');
+        if (fonte) lines.push('Fonte: ' + fonte);
+        if (a.SRC_ACC) lines.push('Precisão posicional: ±' + formatMeters(a.SRC_ACC));
+        return lines;
+    }
+
+    /**
+     * Painel das imagens de satélite, visível quando o mapa base ativo tem
+     * `imageryInfo`: seletor de mosaico/data (Planet, Wayback) e a resolução
+     * da imagem no centro do mapa. A lista do seletor é buscada na primeira
+     * ativação (ou ao abrir o mapa, nas fontes com `prefetch`).
+     */
+    function setupImageryPanel(map, baseLayersInfo) {
+        var pickers = baseLayersInfo.pickers;
+        var wayback = pickers.find(function (p) { return p.param === 'release'; });
+        var activeBase = baseLayersInfo.defaultLayer;
+        var infoSeq = 0, infoTimer = null;
 
         var control = L.control({ position: 'bottomleft' });
-        var container, labelEl, selectEl, statusEl, current = null;
+        var container, labelEl, selectEl, statusEl, infoEl, current = null;
 
         control.onAdd = function () {
             container = L.DomUtil.create('div', 'imagery-picker leaflet-bar');
             labelEl = L.DomUtil.create('label', 'imagery-picker-label', container);
             selectEl = L.DomUtil.create('select', 'imagery-picker-select', container);
             statusEl = L.DomUtil.create('div', 'imagery-picker-status', container);
+            infoEl = L.DomUtil.create('div', 'imagery-picker-info', container);
             labelEl.setAttribute('for', 'imagery-picker-select');
             selectEl.id = 'imagery-picker-select';
             container.style.display = 'none';
@@ -123,6 +183,11 @@
         };
         control.addTo(map);
 
+        function selectedOption(picker) {
+            if (!picker || !picker.options) return null;
+            return picker.options.find(function (o) { return o.value === picker.selected; }) || null;
+        }
+
         function apply(picker, value) {
             var opt = picker.options.find(function (o) { return o.value === value; }) || {};
             picker.selected = value;
@@ -132,6 +197,92 @@
             // muda o parâmetro ({layer}/{release}), então o redraw é explícito.
             picker.layer.setUrl(picker.template, true);
             picker.layer.redraw();
+            refreshInfo();
+        }
+
+        function setInfo(lines) {
+            infoEl.innerHTML = '';
+            lines.forEach(function (text, i) {
+                var line = document.createElement('div');
+                line.textContent = text;
+                if (i === lines.length - 1) line.className = 'imagery-picker-zoom';
+                infoEl.appendChild(line);
+            });
+        }
+
+        // Última linha do painel: quanto vale 1 px da tela agora, e se o
+        // zoom já passou da resolução da imagem (pixels ampliados).
+        function zoomLine(resolution) {
+            var px = metersPerPixel(map.getZoom(), map.getCenter().lat);
+            var text = 'Zoom atual: 1 px ≈ ' + formatMeters(px);
+            if (resolution && px < resolution / 2) text += ' (ampliado além da resolução)';
+            return text;
+        }
+
+        function refreshInfo() {
+            clearTimeout(infoTimer);
+            infoTimer = setTimeout(renderInfo, 400);
+        }
+
+        function renderInfo() {
+            var info = activeBase && activeBase.imageryInfo;
+            if (!info) return;
+            var seq = ++infoSeq;
+
+            if (info.kind === 'text') {
+                setInfo([info.text, zoomLine()]);
+                return;
+            }
+
+            if (info.kind === 'planet') {
+                var mosaic = selectedOption(current);
+                if (!mosaic) { setInfo([]); return; }
+                if (mosaic.maxZoom === undefined || mosaic.maxZoom === null) {
+                    setInfo(['Resolução não informada pelo serviço.', zoomLine()]);
+                    return;
+                }
+                var res = metersPerPixel(mosaic.maxZoom, map.getCenter().lat);
+                setInfo(['Resolução: ~' + formatMeters(res) + ' (pixel do mosaico)', zoomLine(res)]);
+                return;
+            }
+
+            // Esri: a imagem atual é a da versão mais recente da Wayback.
+            var release = activeBase === baseLayersInfo.defaultLayer
+                ? (wayback && wayback.options && wayback.options[0])
+                : selectedOption(current);
+            if (!release || !release.metadataUrl) {
+                // Lista de datas ainda chegando: load() chama refreshInfo depois.
+                setInfo(wayback && wayback.options ? ['Resolução não disponível.', zoomLine()] : ['Consultando resolução…', zoomLine()]);
+                return;
+            }
+            setInfo(['Consultando resolução…', zoomLine()]);
+            queryEsriMetadata(release.metadataUrl, map.getCenter(), map.getZoom())
+                .then(function (a) {
+                    if (seq !== infoSeq) return;
+                    setInfo(a ? esriInfoLines(a).concat(zoomLine(a.SRC_RES)) : ['Sem metadados para este ponto.', zoomLine()]);
+                })
+                .catch(function () {
+                    if (seq === infoSeq) setInfo(['Metadados da Esri indisponíveis.', zoomLine()]);
+                });
+        }
+
+        function showBase(layer) {
+            activeBase = layer;
+            var picker = pickers.find(function (p) { return p.layer === layer; }) || null;
+            current = picker;
+            if (!layer.imageryInfo) {
+                container.style.display = 'none';
+                return;
+            }
+            container.style.display = '';
+            if (picker) {
+                show(picker);
+            } else {
+                labelEl.textContent = layer.imageryInfo.name;
+                selectEl.style.display = 'none';
+                setStatus('');
+            }
+            refreshInfo();
         }
 
         function fillSelect(picker) {
@@ -193,6 +344,8 @@
                         map.removeLayer(picker.backdrop);
                     }
                     if (current === picker) show(picker);
+                    // A resolução da Esri atual vem da lista da Wayback.
+                    refreshInfo();
                 });
         }
 
@@ -203,16 +356,14 @@
                 if (p.backdrop && p.layer !== e.layer && map.hasLayer(p.backdrop)) map.removeLayer(p.backdrop);
             });
             var picker = pickers.find(function (p) { return p.layer === e.layer; });
-            if (picker) {
-                // Com a lista já carregada e vazia (falhou no prefetch), sem fundo.
-                var semImagens = picker.options && !picker.options.length;
-                if (picker.backdrop && !semImagens) picker.backdrop.addTo(map);
-                show(picker);
-            } else {
-                current = null;
-                container.style.display = 'none';
-            }
+            // Com a lista já carregada e vazia (falhou no prefetch), sem fundo.
+            var semImagens = picker && picker.options && !picker.options.length;
+            if (picker && picker.backdrop && !semImagens) picker.backdrop.addTo(map);
+            showBase(e.layer);
         });
+
+        map.on('moveend', refreshInfo);
+        showBase(activeBase);
     }
 
     /**
@@ -485,7 +636,7 @@
 
             // Only add layer controls and legend if NOT static
             L.control.layers(baseLayersInfo.layers, data.overlays, { collapsed: false }).addTo(map);
-            setupImageryPicker(map, baseLayersInfo.pickers);
+            setupImageryPanel(map, baseLayersInfo);
             
             var legendEl = document.getElementById('legend-imoveis');
             setupLegend(legendEl, data.legend, data.layersByFonte, map);

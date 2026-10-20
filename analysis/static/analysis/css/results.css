@@ -774,6 +774,26 @@ body { background: var(--cream-50); color: var(--ink-900); }
   color: var(--green-800);
 }
 
+/* Resolução, data de captura e fonte da imagem no centro do mapa. */
+.imagery-picker-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--green-900);
+}
+
+.imagery-picker-info:empty { display: none; }
+
+.imagery-picker-zoom {
+  margin-top: 3px;
+  padding-top: 3px;
+  border-top: 1px solid var(--cream-200);
+  font-size: 11px;
+  color: var(--green-800);
+}
+
 #legend-controls { margin-top: 14px; }
 
 #legend-controls button {

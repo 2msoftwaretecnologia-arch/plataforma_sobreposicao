@@ -34,7 +34,8 @@ GOOGLE_TILES_URL = 'https://tile.googleapis.com/v1'
 
 CAPABILITIES_CACHE_KEY = 'imagery:planet:capabilities'
 CAPABILITIES_TTL = 60 * 60
-WAYBACK_CACHE_KEY = 'imagery:wayback:releases'
+# v2: entradas passaram a ter metadata_url (a v1 em cache não tem).
+WAYBACK_CACHE_KEY = 'imagery:wayback:releases:v2'
 WAYBACK_TTL = 24 * 60 * 60
 GOOGLE_SESSION_CACHE_KEY = 'imagery:google:session'
 
@@ -408,7 +409,13 @@ def wayback_releases():
     for release_id, info in response.json().items():
         match = re.search(r'(\d{4}-\d{2}-\d{2})', info.get('itemTitle', ''))
         if match:
-            releases.append({'id': int(release_id), 'date': match.group(1)})
+            releases.append({
+                'id': int(release_id),
+                'date': match.group(1),
+                # Serviço com sensor, data de captura e resolução por região
+                # daquela versão (consultado direto pelo maps.js).
+                'metadata_url': info.get('metadataLayerUrl', ''),
+            })
     releases.sort(key=lambda r: r['date'], reverse=True)
     cache.set(WAYBACK_CACHE_KEY, releases, WAYBACK_TTL)
     return releases
