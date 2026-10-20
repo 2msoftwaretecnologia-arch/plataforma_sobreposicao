@@ -139,6 +139,14 @@ def imagery_config():
             '/CENA/0/0/0.webp', '/{scene}/{z}/{x}/{y}.webp'),
         'min_zoom': raster_tiles.CBERS_MIN_ZOOM,
     }
+    config['landsat_legacy'] = {
+        'scenes_url': reverse('imagery_landsat_legacy_scenes'),
+        'tile_url': reverse('imagery_landsat_legacy_tile', args=('CENA', 'COMP', 0, 0, 0)).replace(
+            '/CENA/COMP/0/0/0.png', '/{scene}/{comp}/{z}/{x}/{y}.png'),
+        'max_native_zoom': LANDSAT_LEGACY_MAX_NATIVE_ZOOM,
+        'years': list(LANDSAT_LEGACY_YEARS),
+        'compositions': [{'value': k, 'text': v['label']} for k, v in LANDSAT_LEGACY_COMPOSITIONS.items()],
+    }
     return config
 
 
@@ -472,3 +480,109 @@ def wayback_releases():
     releases.sort(key=lambda r: r['date'], reverse=True)
     cache.set(WAYBACK_CACHE_KEY, releases, WAYBACK_TTL)
     return releases
+
+
+# ---------------------------------------------------------------------------
+# Landsat 4/5/7 (1984–2012) – Microsoft Planetary Computer
+# ---------------------------------------------------------------------------
+# Acervo Landsat Collection 2 nível 2 (reflectância de superfície), público e
+# sem chave. O serviço Landsat da Esri (já no mapa) só tem as épocas GLS
+# antes de 2013; daqui vêm as cenas anuais, ex.: 2008 (marco do Código Florestal).
+
+PC_STAC_SEARCH = 'https://planetarycomputer.microsoft.com/api/stac/v1/search'
+PC_TILE_URL = 'https://planetarycomputer.microsoft.com/api/data/v1/item/tiles/WebMercatorQuad/{z}/{x}/{y}@1x.png'
+LANDSAT_LEGACY_COLLECTION = 'landsat-c2-l2'
+LANDSAT_LEGACY_YEARS = (1984, 2012)
+LANDSAT_LEGACY_PLATFORMS = ['landsat-4', 'landsat-5', 'landsat-7']
+LANDSAT_LEGACY_MAX_CLOUD = 40
+# Cenas por ano no seletor (as de menos nuvem).
+LANDSAT_LEGACY_PER_YEAR = 5
+# O Landsat 7 tem faixas sem dado desde 31/05/2003 (falha do SLC): perde
+# para uma cena do Landsat 5 com até esse tanto a mais de nuvem.
+LANDSAT7_SLC_OFF_YEAR = 2003
+LANDSAT7_SLC_OFF_PENALTY = 15
+LANDSAT_LEGACY_SCENES_TTL = 24 * 60 * 60
+LANDSAT_LEGACY_TILE_TTL = 7 * 24 * 60 * 60
+LANDSAT_LEGACY_MAX_NATIVE_ZOOM = 15
+LANDSAT_SCENE_RE = re.compile(r'^L[TE]0[457]_L2SP_\d{6}_(\d{8})_\d{2}_T[12]$')
+
+# Bandas e contraste (valores digitais da Collection 2: refl = DN·0,0000275 − 0,2).
+LANDSAT_LEGACY_COMPOSITIONS = {
+    'natural': {'label': 'Cor natural', 'assets': ['red', 'green', 'blue'], 'rescale': '7500,13500'},
+    'falsa_cor': {'label': 'Falsa cor (vegetação em vermelho)', 'assets': ['nir08', 'red', 'green'], 'rescale': '7500,22000'},
+    'infravermelho': {'label': 'Infravermelho (SWIR – solo exposto e desmate)', 'assets': ['swir16', 'nir08', 'red'], 'rescale': '7500,24000'},
+}
+
+
+def _landsat_legacy_rank(scene):
+    penalty = LANDSAT7_SLC_OFF_PENALTY if scene['platform'] == 'landsat-7' and int(scene['date'][:4]) >= LANDSAT7_SLC_OFF_YEAR else 0
+    return scene['cloud'] + penalty
+
+
+def landsat_legacy_scenes(lon, lat):
+    """Cenas Landsat 4/5/7 de 1984 a 2012 sobre o ponto: as de menos nuvem de
+    cada ano, do ano mais recente ao mais antigo."""
+    key = f'imagery:landsat-legacy:scenes:{round(lon, 2)}:{round(lat, 2)}'
+    scenes = cache.get(key)
+    if scenes is not None:
+        return scenes
+    first, last = LANDSAT_LEGACY_YEARS
+    body = {
+        'collections': [LANDSAT_LEGACY_COLLECTION],
+        'intersects': {'type': 'Point', 'coordinates': [lon, lat]},
+        'datetime': f'{first}-01-01T00:00:00Z/{last}-12-31T23:59:59Z',
+        'query': {'platform': {'in': LANDSAT_LEGACY_PLATFORMS}, 'eo:cloud_cover': {'lt': LANDSAT_LEGACY_MAX_CLOUD}},
+        'fields': {'include': ['id', 'properties.datetime', 'properties.platform', 'properties.eo:cloud_cover']},
+        'limit': 1000,
+    }
+    features = []
+    # Paginação pelo link "next" (POST com o corpo que ele traz).
+    for _ in range(5):
+        try:
+            response = _http.post(PC_STAC_SEARCH, json=body, timeout=TIMEOUT)
+        except requests.RequestException as e:
+            logger.warning('Falha de conexão com o catálogo do Planetary Computer: %s', type(e).__name__)
+            raise ImageryError('Catálogo do Landsat indisponível.') from None
+        if response.status_code != 200:
+            raise ImageryError(f'Catálogo do Landsat respondeu com erro {response.status_code}.')
+        page = response.json()
+        features.extend(page.get('features', []))
+        nxt = next((link for link in page.get('links', []) if link.get('rel') == 'next'), None)
+        if not nxt or not nxt.get('body'):
+            break
+        body = nxt['body']
+
+    by_year = {}
+    for feature in features:
+        props = feature.get('properties', {})
+        if not LANDSAT_SCENE_RE.match(feature.get('id', '')):
+            continue
+        scene = {
+            'id': feature['id'],
+            'date': (props.get('datetime') or '')[:10],
+            'platform': props.get('platform', ''),
+            'cloud': round(props.get('eo:cloud_cover') or 0),
+        }
+        by_year.setdefault(scene['date'][:4], []).append(scene)
+    scenes = []
+    for year in sorted(by_year, reverse=True):
+        best = sorted(by_year[year], key=_landsat_legacy_rank)[:LANDSAT_LEGACY_PER_YEAR]
+        scenes.extend(sorted(best, key=lambda s: s['date'], reverse=True))
+    cache.set(key, scenes, LANDSAT_LEGACY_SCENES_TTL)
+    return scenes
+
+
+def landsat_legacy_tile(scene, composition, z, x, y):
+    """(PNG com transparência, content-type), ou None fora da cena."""
+    comp = LANDSAT_LEGACY_COMPOSITIONS.get(composition)
+    if comp is None or not LANDSAT_SCENE_RE.match(scene or '') or z > LANDSAT_LEGACY_MAX_NATIVE_ZOOM:
+        return None
+    key = f'imagery:landsat-legacy:{scene}:{composition}:{z}:{x}:{y}'
+    tile = cache.get(key)
+    if tile is not None:
+        return tile
+    params = [('collection', LANDSAT_LEGACY_COLLECTION), ('item', scene), ('nodata', '0'), ('rescale', comp['rescale'])]
+    params += [('assets', asset) for asset in comp['assets']]
+    tile = _image_response(_get(PC_TILE_URL.format(z=z, x=x, y=y), params), 'Planetary Computer')
+    cache.set(key, tile, LANDSAT_LEGACY_TILE_TTL)
+    return tile

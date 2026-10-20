@@ -183,7 +183,40 @@ class ImageryServiceTests(SimpleTestCase):
     def test_config_without_keys_only_offers_public_sources(self):
         config = svc.imagery_config()
         self.assertEqual(config['providers'], [])
-        self.assertEqual(set(config), {'wayback_tile_url', 'wayback_releases_url', 'providers', 'mapbiomas', 'cbers'})
+        self.assertEqual(set(config), {'wayback_tile_url', 'wayback_releases_url', 'providers', 'mapbiomas', 'cbers',
+                                       'landsat_legacy'})
+        self.assertTrue(config['landsat_legacy']['tile_url'].endswith('/imagens/landsat-antigo/{scene}/{comp}/{z}/{x}/{y}.png'))
+
+    @patch.object(svc, '_http')
+    def test_landsat_legacy_keeps_least_cloudy_per_year_and_avoids_slc_off(self, http):
+        def feature(scene_id, date, platform, cloud):
+            return {'id': scene_id, 'properties': {'datetime': date + 'T13:00:00Z', 'platform': platform, 'eo:cloud_cover': cloud}}
+        scenes = [feature(f'LT05_L2SP_222067_200807{d:02d}_02_T1', f'2008-07-{d:02d}', 'landsat-5', d) for d in range(1, 8)]
+        scenes += [
+            # Landsat 7 sem nuvem, mas com as faixas do SLC: perde para o L5.
+            feature('LE07_L2SP_222067_20080830_02_T1', '2008-08-30', 'landsat-7', 0),
+            feature('LT05_L2SP_222067_19950610_02_T1', '1995-06-10', 'landsat-5', 3),
+            feature('nao-landsat', '2008-01-01', 'landsat-5', 0),
+        ]
+        http.post.return_value = http_response(json={'features': scenes, 'links': []})
+        result = svc.landsat_legacy_scenes(-48.36, -10.24)
+        self.assertEqual([s['date'] for s in result],
+                         ['2008-07-05', '2008-07-04', '2008-07-03', '2008-07-02', '2008-07-01', '1995-06-10'])
+        body = http.post.call_args.kwargs['json']
+        self.assertEqual(body['query']['platform']['in'], ['landsat-4', 'landsat-5', 'landsat-7'])
+        self.assertTrue(body['datetime'].startswith('1984-01-01'))
+
+    @patch.object(svc, '_http')
+    def test_landsat_legacy_tile_validates_scene_and_composition(self, http):
+        http.get.return_value = http_response(content=b'PNG')
+        self.assertIsNone(svc.landsat_legacy_tile('../../etc', 'natural', 12, 1, 1))
+        self.assertIsNone(svc.landsat_legacy_tile('LT05_L2SP_222067_20080722_02_T1', 'nao_existe', 12, 1, 1))
+        self.assertIsNone(svc.landsat_legacy_tile('LT05_L2SP_222067_20080722_02_T1', 'natural', 18, 1, 1))
+        http.get.assert_not_called()
+        self.assertEqual(svc.landsat_legacy_tile('LT05_L2SP_222067_20080722_02_T1', 'falsa_cor', 12, 1497, 2163), (b'PNG', 'image/png'))
+        params = http.get.call_args.kwargs['params']
+        self.assertIn(('item', 'LT05_L2SP_222067_20080722_02_T1'), params)
+        self.assertEqual([v for k, v in params if k == 'assets'], ['nir08', 'red', 'green'])
 
     @override_settings(PLANET_WMS_URL='https://x/wms?key=SEGREDO', COPERNICUS_WMS_URL='https://c/ogc/wms/CSEGREDO',
                        GOOGLE_MAPS_API_KEY='GSEGREDO')

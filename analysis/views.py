@@ -31,6 +31,8 @@ from analysis.services.view_services.imagery_service import (
     ImageryError,
     google_tile,
     imagery_config,
+    landsat_legacy_scenes,
+    landsat_legacy_tile,
     provider_layers,
     provider_source_url,
     provider_tile,
@@ -1111,6 +1113,28 @@ class CbersScenesView(View):
 class CbersTileView(View):
     def get(self, request, scene, z, x, y):
         return _image_tile_response(lambda: cbers_tile(scene, z, x, y))
+
+
+class LandsatLegacyScenesView(View):
+    """Cenas Landsat 4/5/7 (1984–2012) que cobrem o ponto (?lat=&lon=)."""
+
+    def get(self, request):
+        try:
+            lat = float(request.GET.get('lat', ''))
+            lon = float(request.GET.get('lon', ''))
+        except ValueError:
+            return JsonResponse({'erro': 'Informe lat e lon.', 'scenes': []}, status=400)
+        if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+            return JsonResponse({'erro': 'Coordenadas inválidas.', 'scenes': []}, status=400)
+        try:
+            return JsonResponse({'scenes': landsat_legacy_scenes(lon, lat)})
+        except ImageryError as e:
+            return JsonResponse({'erro': str(e), 'scenes': []}, status=502)
+
+
+class LandsatLegacyTileView(View):
+    def get(self, request, scene, comp, z, x, y):
+        return _image_tile_response(lambda: landsat_legacy_tile(scene, comp, z, x, y))
 
 
 class WaybackReleasesView(View):

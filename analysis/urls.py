@@ -26,6 +26,9 @@ urlpatterns = [
     path('imagens/mapbiomas/<str:product>/<int:year>/<int:z>/<int:x>/<int:y>.png', login_required(views.MapbiomasTileView.as_view()), name='imagery_mapbiomas_tile'),
     path('imagens/cbers/cenas/', login_required(views.CbersScenesView.as_view()), name='imagery_cbers_scenes'),
     path('imagens/cbers/<str:scene>/<int:z>/<int:x>/<int:y>.webp', login_required(views.CbersTileView.as_view()), name='imagery_cbers_tile'),
+    # Landsat 4/5/7 de 1984–2012 (Microsoft Planetary Computer, sem chave).
+    path('imagens/landsat-antigo/cenas/', login_required(views.LandsatLegacyScenesView.as_view()), name='imagery_landsat_legacy_scenes'),
+    path('imagens/landsat-antigo/<str:scene>/<str:comp>/<int:z>/<int:x>/<int:y>.png', login_required(views.LandsatLegacyTileView.as_view()), name='imagery_landsat_legacy_tile'),
     # Provedores OGC (planet, copernicus): ver OGC_PROVIDERS em imagery_service.py.
     path('imagens/<str:provider>/camadas/', login_required(views.ProviderLayersView.as_view()), name='imagery_provider_layers'),
     path('imagens/<str:provider>/<str:layer>/<int:z>/<int:x>/<int:y>', login_required(views.ProviderTileView.as_view()), name='imagery_provider_tile'),

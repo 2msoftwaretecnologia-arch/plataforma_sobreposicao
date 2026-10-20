@@ -273,6 +273,59 @@
             });
         }
 
+        // Landsat 4/5/7 de 1984 a 2012 (Planetary Computer), 30 m: as cenas
+        // de menos nuvem de cada ano no centro do mapa; começa na melhor de
+        // 2008 (marco de 22/07/2008 do Código Florestal).
+        if (imagery.landsat_legacy) {
+            var ll = imagery.landsat_legacy;
+            var baseLandsatLegacy = L.tileLayer(BLANK_TILE, {
+                maxZoom: 19, maxNativeZoom: ll.max_native_zoom, scene: '', comp: ll.compositions[0].value, pane: pane,
+                attribution: 'Landsat (USGS/NASA) via Microsoft Planetary Computer'
+            });
+            baseLandsatLegacy.imageryInfo = { kind: 'landsat_legacy', years: ll.years };
+            layers['Landsat 5/7 (' + ll.years[0] + '–' + ll.years[1] + ')'] = baseLandsatLegacy;
+            pickers.push({
+                layer: baseLandsatLegacy,
+                template: ll.tile_url,
+                param: 'scene',
+                label: 'Cena (ano · data · satélite · nuvens)',
+                listUrl: function (center) {
+                    return ll.scenes_url + '?lat=' + center.lat.toFixed(3) + '&lon=' + center.lng.toFixed(3);
+                },
+                parse: function (json) {
+                    return (json.scenes || []).map(function (s) {
+                        var sat = s.platform.replace('landsat-', 'Landsat ');
+                        var stripes = s.platform === 'landsat-7' && +s.date.slice(0, 4) >= 2003 ? ' (com faixas)' : '';
+                        return {
+                            value: s.id,
+                            year: s.date.slice(0, 4),
+                            text: s.date.slice(0, 4) + ' · ' + formatDateBR(s.date).slice(0, 5) + ' · ' + sat + stripes + ' · ' + s.cloud + '% nuvens',
+                            sceneText: formatDateBR(s.date) + ' · ' + sat + stripes,
+                            cloud: s.cloud,
+                            // apply() copia para o maxNativeZoom da camada.
+                            maxZoom: ll.max_native_zoom
+                        };
+                    });
+                },
+                // Primeira cena de 2008 da lista (a de menos nuvem fica entre
+                // as 5 do ano); sem 2008 ali, a mais recente.
+                initial: function (options) {
+                    var y2008 = options.filter(function (o) { return o.year === '2008'; });
+                    if (!y2008.length) return null;
+                    return y2008.reduce(function (best, o) { return o.cloud < best.cloud ? o : best; }).value;
+                },
+                secondary: {
+                    label: 'Composição',
+                    options: ll.compositions,
+                    selected: ll.compositions[0].value,
+                    onSelect: function (comp) {
+                        baseLandsatLegacy.options.comp = comp;
+                        baseLandsatLegacy.redraw();
+                    }
+                }
+            });
+        }
+
         // Uso do solo do MapBiomas como mapa base: só no lado direito da
         // comparação (no mapa principal ele é camada temática, por cima).
         if (opts.withMapbiomas && imagery.mapbiomas) {
@@ -710,6 +763,26 @@
                 return;
             }
 
+            if (info.kind === 'landsat_legacy') {
+                var legacy = current;
+                // Como no CBERS: a lista de cenas vale para onde foi pedida.
+                if (legacy.listCenter && !legacy.loading && map.getCenter().distanceTo(legacy.listCenter) > 20000) {
+                    legacy.options = null;
+                    show(legacy);
+                }
+                var legacyScene = selectedOption(legacy);
+                var legacyLines = ['Resolução: 30 m'];
+                if (legacyScene) {
+                    legacyLines.push('Cena: ' + legacyScene.sceneText, 'Nuvens na cena: ' + legacyScene.cloud + '%');
+                    if (/com faixas/.test(legacyScene.sceneText)) legacyLines.push('Landsat 7 após 2003: faixas sem imagem (falha do SLC).');
+                } else if (legacy.options && !legacy.options.length) {
+                    legacyLines.push('Nenhuma cena de ' + info.years[0] + '–' + info.years[1] + ' com menos de 40% de nuvens neste ponto.');
+                }
+                legacyLines.push('Fonte: Landsat Collection 2 (USGS/NASA) – Microsoft Planetary Computer');
+                setInfo(legacyLines.concat(zoomLine(30)));
+                return;
+            }
+
             if (info.kind === 'mapbiomas') {
                 var mbLines = ['Resolução: 30 m', 'Ano: ' + (current && current.selected || ''), 'Fonte: MapBiomas Coleção 11'];
                 if (map.getZoom() < info.minZoom) mbLines.push('Aproxime o mapa (zoom ' + info.minZoom + '+) para ver o mapa.');
@@ -913,7 +986,8 @@
                     if (picker.options.length) {
                         // Numa lista recarregada (CBERS), mantém a escolha se ela continua lá.
                         var kept = picker.options.find(function (o) { return o.value === picker.selected; });
-                        apply(picker, kept ? kept.value : picker.options[0].value);
+                        var initial = !kept && picker.initial ? picker.initial(picker.options) : null;
+                        apply(picker, kept ? kept.value : (initial || picker.options[0].value));
                     } else if (picker.backdrop && map.hasLayer(picker.backdrop)) {
                         // Sem datas, o fundo passaria pela imagem histórica.
                         map.removeLayer(picker.backdrop);
