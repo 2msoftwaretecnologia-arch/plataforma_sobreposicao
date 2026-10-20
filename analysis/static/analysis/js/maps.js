@@ -13,6 +13,18 @@
     // lista de mosaicos/datas não chega, para não pedir tiles sem a opção.
     var BLANK_TILE = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 
+    // Sentinel-2 (Copernicus) no Living Atlas da Esri: público, cenas dos
+    // últimos ~14 meses, com composições de banda prontas no servidor.
+    var SENTINEL2_URL = 'https://sentinel.arcgis.com/arcgis/rest/services/Sentinel2/ImageServer';
+    // `res`: resolução das bandas usadas (visível e NIR 10 m; SWIR 20 m).
+    var SENTINEL2_RENDERINGS = [
+        { value: 'Color Infrared with DRA', text: 'Infravermelho falsa-cor (vegetação em vermelho)', res: 10 },
+        { value: 'NDVI Colormap', text: 'NDVI (vigor da vegetação)', res: 10 },
+        { value: 'Agriculture with DRA', text: 'Agricultura (SWIR · NIR · azul)', res: 20 },
+        { value: 'Short-wave Infrared with DRA', text: 'Infravermelho de ondas curtas (SWIR)', res: 20 },
+        { value: 'Natural Color with DRA', text: 'Cor natural', res: 10 }
+    ];
+
     function formatDateBR(isoDate) {
         var p = (isoDate || '').split('-');
         return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : isoDate;
@@ -91,6 +103,32 @@
             });
         }
 
+        // O servidor gera a imagem na hora (~3 s por pedido): em vez de tiles,
+        // o esri-leaflet pede uma imagem do tamanho da tela a cada movimento.
+        if (global.L.esri && L.esri.imageMapLayer) {
+            var baseInfrared = L.esri.imageMapLayer({
+                url: SENTINEL2_URL,
+                renderingRule: { rasterFunction: SENTINEL2_RENDERINGS[0].value },
+                format: 'jpgpng',
+                f: 'image',
+                pane: 'tilePane',
+                attribution: 'Sentinel-2 (Copernicus) &copy; Esri'
+            });
+            baseInfrared.imageryInfo = { kind: 'sentinel2' };
+            layers['Infravermelho (Sentinel-2)'] = baseInfrared;
+            pickers.push({
+                layer: baseInfrared,
+                label: 'Composição',
+                options: SENTINEL2_RENDERINGS,
+                selected: SENTINEL2_RENDERINGS[0].value,
+                // Imagem lenta: o painel mostra "Carregando imagem…".
+                slow: true,
+                onSelect: function (value) {
+                    baseInfrared.setRenderingRule({ rasterFunction: value });
+                }
+            });
+        }
+
         layers['OpenStreetMap'] = baseOSM;
         layers['Carto Light'] = baseCartoLight;
         layers['OpenTopoMap'] = baseTopo;
@@ -138,6 +176,31 @@
                 });
         }
         return attempt(first);
+    }
+
+    /**
+     * Cena do Sentinel-2 desenhada no ponto: o serviço monta o mosaico pelo
+     * campo `best` (menor primeiro), então a primeira por `best` é a visível.
+     */
+    function querySentinel2Scene(latlng) {
+        var params = new URLSearchParams({
+            f: 'json',
+            where: 'category = 1',
+            geometry: latlng.lng + ',' + latlng.lat,
+            geometryType: 'esriGeometryPoint',
+            inSR: '4326',
+            spatialRel: 'esriSpatialRelIntersects',
+            outFields: 'acquisitiondate,cloudcover',
+            orderByFields: 'best',
+            resultRecordCount: '1',
+            returnGeometry: 'false'
+        });
+        return fetch(SENTINEL2_URL + '/query?' + params)
+            .then(function (r) { return r.json(); })
+            .then(function (json) {
+                var f = json.features && json.features[0];
+                return f ? f.attributes : null;
+            });
     }
 
     function esriInfoLines(a) {
@@ -191,12 +254,16 @@
         function apply(picker, value) {
             var opt = picker.options.find(function (o) { return o.value === value; }) || {};
             picker.selected = value;
-            picker.layer.options[picker.param] = value;
-            picker.layer.options.maxNativeZoom = opt.maxZoom;
-            // setUrl não redesenha quando a URL-modelo é a mesma; aqui só
-            // muda o parâmetro ({layer}/{release}), então o redraw é explícito.
-            picker.layer.setUrl(picker.template, true);
-            picker.layer.redraw();
+            if (picker.onSelect) {
+                picker.onSelect(value);
+            } else {
+                picker.layer.options[picker.param] = value;
+                picker.layer.options.maxNativeZoom = opt.maxZoom;
+                // setUrl não redesenha quando a URL-modelo é a mesma; aqui só
+                // muda o parâmetro ({layer}/{release}), então o redraw é explícito.
+                picker.layer.setUrl(picker.template, true);
+                picker.layer.redraw();
+            }
             refreshInfo();
         }
 
@@ -243,6 +310,31 @@
                 }
                 var res = metersPerPixel(mosaic.maxZoom, map.getCenter().lat);
                 setInfo(['Resolução: ~' + formatMeters(res) + ' (pixel do mosaico)', zoomLine(res)]);
+                return;
+            }
+
+            if (info.kind === 'sentinel2') {
+                var rendering = selectedOption(current) || {};
+                var resLine = 'Resolução: ' + formatMeters(rendering.res) + (rendering.res > 10 ? ' (bandas SWIR)' : '');
+                setInfo([resLine, 'Consultando data da cena…', zoomLine(rendering.res)]);
+                querySentinel2Scene(map.getCenter())
+                    .then(function (a) {
+                        if (seq !== infoSeq) return;
+                        var lines = [resLine];
+                        if (a && a.acquisitiondate) {
+                            lines.push('Cena: ' + new Date(a.acquisitiondate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }));
+                            if (a.cloudcover !== null && a.cloudcover !== undefined) {
+                                lines.push('Nuvens na cena: ' + Math.round(a.cloudcover * 100) + '%');
+                            }
+                        } else {
+                            lines.push('Sem cena para este ponto.');
+                        }
+                        lines.push('Fonte: Sentinel-2 (Copernicus/ESA)');
+                        setInfo(lines.concat(zoomLine(rendering.res)));
+                    })
+                    .catch(function () {
+                        if (seq === infoSeq) setInfo([resLine, 'Data da cena indisponível.', zoomLine(rendering.res)]);
+                    });
                 return;
             }
 
@@ -309,7 +401,7 @@
 
             if (picker.options) {
                 fillSelect(picker);
-                setStatus(picker.options.length ? '' : picker.error);
+                setStatus(!picker.options.length ? picker.error : (picker.isLoading ? 'Carregando imagem…' : ''));
                 return;
             }
 
@@ -349,7 +441,21 @@
                 });
         }
 
-        pickers.forEach(function (p) { if (p.prefetch) load(p); });
+        pickers.forEach(function (p) {
+            if (p.prefetch) load(p);
+            if (p.slow) {
+                // O 1º 'loading' dispara ao entrar no mapa, antes do
+                // baselayerchange; show() lê `isLoading` para não perdê-lo.
+                p.layer.on('loading', function () {
+                    p.isLoading = true;
+                    if (current === p) setStatus('Carregando imagem…');
+                });
+                p.layer.on('load error', function () {
+                    p.isLoading = false;
+                    if (current === p) setStatus('');
+                });
+            }
+        });
 
         map.on('baselayerchange', function (e) {
             pickers.forEach(function (p) {
