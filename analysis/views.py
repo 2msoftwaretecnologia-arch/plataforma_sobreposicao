@@ -36,6 +36,7 @@ from analysis.services.view_services.imagery_service import (
     provider_tile,
     wayback_releases,
 )
+from analysis.services.view_services.raster_tiles import cbers_scenes, cbers_tile, mapbiomas_tile
 from analysis.services.view_services.result_map_formatter import format_data_map
 from analysis.services.view_services.bases_3d import (
     MAX_TILE_ZOOM,
@@ -1081,6 +1082,35 @@ class ProviderTileView(View):
 class GoogleTileView(View):
     def get(self, request, z, x, y):
         return _image_tile_response(lambda: google_tile(z, x, y))
+
+
+class MapbiomasTileView(View):
+    """Uso do solo ou área queimada do MapBiomas, gerado a partir do GeoTIFF."""
+
+    def get(self, request, product, year, z, x, y):
+        return _image_tile_response(lambda: mapbiomas_tile(product, year, z, x, y))
+
+
+class CbersScenesView(View):
+    """Cenas CBERS-4A de 2 m que cobrem o ponto (?lat=&lon=)."""
+
+    def get(self, request):
+        try:
+            lat = float(request.GET.get('lat', ''))
+            lon = float(request.GET.get('lon', ''))
+        except ValueError:
+            return JsonResponse({'erro': 'Informe lat e lon.', 'scenes': []}, status=400)
+        if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+            return JsonResponse({'erro': 'Coordenadas inválidas.', 'scenes': []}, status=400)
+        try:
+            return JsonResponse({'scenes': cbers_scenes(lon, lat)})
+        except ImageryError as e:
+            return JsonResponse({'erro': str(e), 'scenes': []}, status=502)
+
+
+class CbersTileView(View):
+    def get(self, request, scene, z, x, y):
+        return _image_tile_response(lambda: cbers_tile(scene, z, x, y))
 
 
 class WaybackReleasesView(View):

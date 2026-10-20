@@ -91,16 +91,30 @@
     // ImageServer da Esri que gera a imagem na hora (~3 s por pedido): em vez
     // de tiles, o esri-leaflet pede uma imagem do tamanho da tela a cada
     // movimento.
-    function imageServerLayer(url, rasterFunction, attribution) {
+    function imageServerLayer(url, rasterFunction, attribution, pane) {
         return L.esri.imageMapLayer({
             url: url,
             renderingRule: { rasterFunction: rasterFunction },
             format: 'jpgpng',
             f: 'image',
-            pane: 'tilePane',
+            pane: pane || 'tilePane',
             attribution: attribution
         });
     }
+
+    /**
+     * Camada de tiles que não pede nada abaixo de `minDataZoom` (tiles
+     * gerados no servidor a partir de GeoTIFF: afastado demais seria lento).
+     * O `minZoom` do Leaflet não serve: ele limita o zoom do mapa inteiro
+     * quando a camada é o mapa base.
+     */
+    var MinZoomTileLayer = L.TileLayer.extend({
+        getTileUrl: function (coords) {
+            if (coords.z < this.options.minDataZoom) return BLANK_TILE;
+            return L.TileLayer.prototype.getTileUrl.call(this, coords);
+        }
+    });
+    global.MinZoomTileLayer = MinZoomTileLayer;
 
     function formatDateBR(isoDate) {
         var p = (isoDate || '').split('-');
@@ -110,15 +124,20 @@
     /**
      * Creates and returns the base layers for the map.
      * @param {object} imagery URLs de `imagery_config()` (imagery_service.py)
+     * @param {object} opts `pane` (lado direito da comparação usa o seu),
+     *   `noBackdrop` (sem a Esri por baixo da Wayback) e `withMapbiomas`
+     *   (inclui o uso do solo do MapBiomas como opção de mapa base).
      * @returns {object} { layers: object, defaultLayer: L.layer, pickers: array }
      */
-    function getBaseLayers(imagery) {
+    function getBaseLayers(imagery, opts) {
         imagery = imagery || {};
+        opts = opts || {};
+        var pane = opts.pane || 'tilePane';
         var esriSatUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-        var baseOSM = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 });
-        var baseEsriSat = L.tileLayer(esriSatUrl, { maxZoom: 16 });
-        var baseCartoLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 });
-        var baseTopo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17 });
+        var baseOSM = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, pane: pane });
+        var baseEsriSat = L.tileLayer(esriSatUrl, { maxZoom: 16, pane: pane });
+        var baseCartoLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20, pane: pane });
+        var baseTopo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, pane: pane });
 
         // `imageryInfo` diz ao painel de setupImageryPanel de onde vem a
         // resolução de cada imagem de satélite (camadas sem ele não têm painel).
@@ -131,6 +150,7 @@
         if (imagery.google_tile_url) {
             var baseGoogle = L.tileLayer(imagery.google_tile_url, {
                 maxZoom: 20,
+                pane: pane,
                 attribution: 'Imagens &copy; Google'
             });
             baseGoogle.imageryInfo = { kind: 'text', name: 'Satélite (Google)', text: 'Resolução não informada pelo Google.' };
@@ -140,7 +160,7 @@
         // Provedores com link WMS/WMTS configurado no servidor (Planet,
         // Copernicus): tiles pelo proxy de `imagery_service.py`.
         (imagery.providers || []).forEach(function (provider) {
-            var baseProvider = L.tileLayer(BLANK_TILE, { maxZoom: 19, layer: '', attribution: provider.attribution });
+            var baseProvider = L.tileLayer(BLANK_TILE, { maxZoom: 19, layer: '', pane: pane, attribution: provider.attribution });
             baseProvider.imageryInfo = { kind: 'provider', resolutionHint: provider.resolution_hint };
             layers[provider.base_name] = baseProvider;
             pickers.push({
@@ -158,7 +178,7 @@
         });
 
         if (imagery.wayback_tile_url && imagery.wayback_releases_url) {
-            var baseWayback = L.tileLayer(BLANK_TILE, { maxZoom: 19, release: '', attribution: 'Imagens &copy; Esri (World Imagery Wayback)' });
+            var baseWayback = L.tileLayer(BLANK_TILE, { maxZoom: 19, release: '', pane: pane, attribution: 'Imagens &copy; Esri (World Imagery Wayback)' });
             baseWayback.imageryInfo = { kind: 'esri' };
             layers['Histórico (Esri Wayback)'] = baseWayback;
             pickers.push({
@@ -173,7 +193,7 @@
                 // Só na Wayback: é a mesma imagem da Esri, então o fundo não
                 // se confunde com a imagem escolhida.
                 prefetch: true,
-                backdrop: L.tileLayer(esriSatUrl, { maxZoom: 19, maxNativeZoom: 16, zIndex: 0 }),
+                backdrop: opts.noBackdrop ? null : L.tileLayer(esriSatUrl, { maxZoom: 19, maxNativeZoom: 16, zIndex: 0, pane: pane }),
                 parse: function (json) {
                     return (json.releases || []).map(function (r) {
                         return { value: String(r.id), text: formatDateBR(r.date), metadataUrl: r.metadata_url };
@@ -183,7 +203,7 @@
         }
 
         if (global.L.esri && L.esri.imageMapLayer) {
-            var baseInfrared = imageServerLayer(SENTINEL2_URL, SENTINEL2_RENDERINGS[0].value, 'Sentinel-2 (Copernicus) &copy; Esri');
+            var baseInfrared = imageServerLayer(SENTINEL2_URL, SENTINEL2_RENDERINGS[0].value, 'Sentinel-2 (Copernicus) &copy; Esri', pane);
             baseInfrared.imageryInfo = { kind: 'sentinel2' };
             layers['Infravermelho (Sentinel-2)'] = baseInfrared;
             pickers.push({
@@ -198,7 +218,7 @@
                 }
             });
 
-            var baseLandsat = imageServerLayer(LANDSAT_URL, LANDSAT_RENDERINGS[0].value, 'Landsat (USGS/NASA) &copy; Esri');
+            var baseLandsat = imageServerLayer(LANDSAT_URL, LANDSAT_RENDERINGS[0].value, 'Landsat (USGS/NASA) &copy; Esri', pane);
             baseLandsat.imageryInfo = { kind: 'landsat' };
             layers['Landsat (histórico)'] = baseLandsat;
             pickers.push({
@@ -224,6 +244,52 @@
                         }
                     }
                 }
+            });
+        }
+
+        // CBERS-4A (INPE), 2 m: tiles gerados no servidor a partir da cena
+        // escolhida; a lista de cenas depende do centro do mapa.
+        if (imagery.cbers) {
+            var baseCbers = new MinZoomTileLayer(BLANK_TILE, {
+                maxZoom: 19, minDataZoom: imagery.cbers.min_zoom, scene: '', pane: pane,
+                attribution: 'CBERS-4A &copy; INPE (Brazil Data Cube)'
+            });
+            baseCbers.imageryInfo = { kind: 'cbers', minZoom: imagery.cbers.min_zoom };
+            layers['CBERS-4A (2 m, INPE)'] = baseCbers;
+            pickers.push({
+                layer: baseCbers,
+                template: imagery.cbers.tile_url,
+                param: 'scene',
+                label: 'Cena CBERS-4A',
+                followsCenter: true,
+                listUrl: function (center) {
+                    return imagery.cbers.scenes_url + '?lat=' + center.lat.toFixed(3) + '&lon=' + center.lng.toFixed(3);
+                },
+                parse: function (json) {
+                    return (json.scenes || []).map(function (s) {
+                        return { value: s.id, text: formatDateBR(s.date) };
+                    });
+                }
+            });
+        }
+
+        // Uso do solo do MapBiomas como mapa base: só no lado direito da
+        // comparação (no mapa principal ele é camada temática, por cima).
+        if (opts.withMapbiomas && imagery.mapbiomas) {
+            var mb = imagery.mapbiomas;
+            var years = mb.products.cobertura.years;
+            var baseMapbiomas = new MinZoomTileLayer(BLANK_TILE, {
+                maxZoom: 19, maxNativeZoom: 15, minDataZoom: mb.min_zoom, year: '', pane: pane,
+                attribution: 'MapBiomas'
+            });
+            baseMapbiomas.imageryInfo = { kind: 'mapbiomas', minZoom: mb.min_zoom };
+            layers['MapBiomas – uso do solo'] = baseMapbiomas;
+            pickers.push({
+                layer: baseMapbiomas,
+                template: mb.tile_url.replace('{product}', 'cobertura'),
+                param: 'year',
+                label: 'Ano (MapBiomas)',
+                options: years.map(function (y) { return { value: String(y), text: String(y) }; })
             });
         }
 
@@ -321,21 +387,47 @@
 
     /**
      * Painel das imagens de satélite, visível quando o mapa base ativo tem
-     * `imageryInfo`: seletor de mosaico/data (Planet, Wayback) e a resolução
-     * da imagem no centro do mapa. A lista do seletor é buscada na primeira
-     * ativação (ou ao abrir o mapa, nas fontes com `prefetch`).
+     * `imageryInfo`: seletor de mosaico/data (Planet, Wayback, CBERS...) e a
+     * resolução da imagem no centro do mapa. A lista do seletor é buscada na
+     * primeira ativação (ou ao abrir o mapa, nas fontes com `prefetch`).
+     *
+     * `opts.position` (padrão 'bottomleft'); `opts.idSuffix` deixa os ids
+     * únicos quando há dois painéis (comparação); `opts.chooser` ({nome:
+     * camada}) e `opts.onChoose(camada)` põem no topo um seletor de qual
+     * imagem mostrar (lado direito da comparação).
+     *
+     * Devolve { activate(camada), destroy() }: quem troca o mapa base avisa
+     * o painel por `activate`.
      */
-    function setupImageryPanel(map, baseLayersInfo) {
+    function setupImageryPanel(map, baseLayersInfo, opts) {
+        opts = opts || {};
+        var suffix = opts.idSuffix || '';
         var pickers = baseLayersInfo.pickers;
         var wayback = pickers.find(function (p) { return p.param === 'release'; });
-        var activeBase = baseLayersInfo.defaultLayer;
+        var activeBase = opts.initial || baseLayersInfo.defaultLayer;
         var infoSeq = 0, infoTimer = null;
 
-        var control = L.control({ position: 'bottomleft' });
-        var container, labelEl, selectEl, subLabelEl, subSelectEl, statusEl, infoEl, current = null;
+        var control = L.control({ position: opts.position || 'bottomleft' });
+        var container, chooserEl, labelEl, selectEl, subLabelEl, subSelectEl, statusEl, infoEl, current = null;
 
         control.onAdd = function () {
             container = L.DomUtil.create('div', 'imagery-picker leaflet-bar');
+            if (opts.chooser) {
+                var chooserLabel = L.DomUtil.create('label', 'imagery-picker-label imagery-picker-side', container);
+                chooserLabel.textContent = opts.chooserLabel || 'Imagem';
+                chooserEl = L.DomUtil.create('select', 'imagery-picker-select', container);
+                chooserEl.id = 'imagery-picker-chooser' + suffix;
+                chooserLabel.setAttribute('for', chooserEl.id);
+                Object.keys(opts.chooser).forEach(function (name) {
+                    var o = document.createElement('option');
+                    o.value = name;
+                    o.textContent = name;
+                    chooserEl.appendChild(o);
+                });
+                chooserEl.addEventListener('change', function () {
+                    opts.onChoose(opts.chooser[chooserEl.value]);
+                });
+            }
             labelEl = L.DomUtil.create('label', 'imagery-picker-label', container);
             selectEl = L.DomUtil.create('select', 'imagery-picker-select', container);
             // Segundo seletor (ex.: ano do Landsat), só nas fontes com `secondary`.
@@ -343,10 +435,10 @@
             subSelectEl = L.DomUtil.create('select', 'imagery-picker-select', container);
             statusEl = L.DomUtil.create('div', 'imagery-picker-status', container);
             infoEl = L.DomUtil.create('div', 'imagery-picker-info', container);
-            labelEl.setAttribute('for', 'imagery-picker-select');
-            selectEl.id = 'imagery-picker-select';
-            subLabelEl.setAttribute('for', 'imagery-picker-sub');
-            subSelectEl.id = 'imagery-picker-sub';
+            selectEl.id = 'imagery-picker-select' + suffix;
+            labelEl.setAttribute('for', selectEl.id);
+            subSelectEl.id = 'imagery-picker-sub' + suffix;
+            subLabelEl.setAttribute('for', subSelectEl.id);
             container.style.display = 'none';
             L.DomEvent.disableClickPropagation(container);
             L.DomEvent.disableScrollPropagation(container);
@@ -427,6 +519,35 @@
                 }
                 var res = metersPerPixel(mosaic.maxZoom, map.getCenter().lat);
                 setInfo(['Resolução: ~' + formatMeters(res) + ' (pixel do mosaico)', zoomLine(res)]);
+                return;
+            }
+
+            if (info.kind === 'cbers') {
+                var cbers = current;
+                // A lista de cenas vale para onde foi pedida; longe dali (o
+                // usuário arrastou o mapa), busca de novo.
+                if (cbers.listCenter && !cbers.loading && map.getCenter().distanceTo(cbers.listCenter) > 20000) {
+                    cbers.options = null;
+                    show(cbers);
+                }
+                var scene = selectedOption(cbers);
+                var cbersLines = ['Resolução: 2 m'];
+                if (scene) {
+                    cbersLines.push('Cena: ' + scene.text);
+                } else if (cbers.options && !cbers.options.length) {
+                    cbersLines.push('Nenhuma cena CBERS-4A cobre este ponto.');
+                }
+                cbersLines.push('Satélite: CBERS-4A (câmera WPM)', 'Fonte: INPE – Brazil Data Cube');
+                if (map.getZoom() < info.minZoom) cbersLines.push('Aproxime o mapa (zoom ' + info.minZoom + '+) para ver a imagem.');
+                setInfo(cbersLines.concat(zoomLine(2)));
+                return;
+            }
+
+            if (info.kind === 'mapbiomas') {
+                var mbLines = ['Resolução: 30 m', 'Ano: ' + (current && current.selected || ''), 'Fonte: MapBiomas Coleção 11'];
+                if (map.getZoom() < info.minZoom) mbLines.push('Aproxime o mapa (zoom ' + info.minZoom + '+) para ver o mapa.');
+                mbLines.push('Legenda: em "Camadas temáticas".');
+                setInfo(mbLines.concat(zoomLine(30)));
                 return;
             }
 
@@ -600,7 +721,13 @@
         function load(picker) {
             if (picker.loading || picker.options) return;
             picker.loading = true;
-            fetch(picker.listUrl, { credentials: 'same-origin' })
+            var url = picker.listUrl;
+            if (typeof url === 'function') {
+                // Lista que depende do lugar (cenas CBERS no centro do mapa).
+                picker.listCenter = map.getCenter();
+                url = url(picker.listCenter);
+            }
+            fetch(url, { credentials: 'same-origin' })
                 .then(function (r) {
                     return r.json().catch(function () { return {}; }).then(function (json) {
                         return { ok: r.ok, json: json };
@@ -617,7 +744,9 @@
                 .then(function () {
                     picker.loading = false;
                     if (picker.options.length) {
-                        apply(picker, picker.options[0].value);
+                        // Numa lista recarregada (CBERS), mantém a escolha se ela continua lá.
+                        var kept = picker.options.find(function (o) { return o.value === picker.selected; });
+                        apply(picker, kept ? kept.value : picker.options[0].value);
                     } else if (picker.backdrop && map.hasLayer(picker.backdrop)) {
                         // Sem datas, o fundo passaria pela imagem histórica.
                         map.removeLayer(picker.backdrop);
@@ -630,6 +759,8 @@
 
         pickers.forEach(function (p) {
             if (p.prefetch) load(p);
+            // Lista fixa com URL-modelo (ano do MapBiomas): já nasce com a 1ª opção.
+            if (p.options && p.template && !p.selected) apply(p, p.options[0].value);
             if (p.slow) {
                 // O 1º 'loading' dispara ao entrar no mapa, antes do
                 // baselayerchange; show() lê `isLoading` para não perdê-lo.
@@ -644,19 +775,161 @@
             }
         });
 
-        map.on('baselayerchange', function (e) {
+        function activate(layer) {
             pickers.forEach(function (p) {
-                if (p.backdrop && p.layer !== e.layer && map.hasLayer(p.backdrop)) map.removeLayer(p.backdrop);
+                if (p.backdrop && p.layer !== layer && map.hasLayer(p.backdrop)) map.removeLayer(p.backdrop);
             });
-            var picker = pickers.find(function (p) { return p.layer === e.layer; });
+            var picker = pickers.find(function (p) { return p.layer === layer; });
             // Com a lista já carregada e vazia (falhou no prefetch), sem fundo.
             var semImagens = picker && picker.options && !picker.options.length;
             if (picker && picker.backdrop && !semImagens) picker.backdrop.addTo(map);
-            showBase(e.layer);
-        });
+            showBase(layer);
+        }
 
         map.on('moveend', refreshInfo);
         showBase(activeBase);
+
+        return {
+            activate: activate,
+            destroy: function () {
+                clearTimeout(infoTimer);
+                infoSeq++;
+                map.off('moveend', refreshInfo);
+                pickers.forEach(function (p) {
+                    if (p.backdrop && map.hasLayer(p.backdrop)) map.removeLayer(p.backdrop);
+                });
+                control.remove();
+            }
+        };
+    }
+
+    /**
+     * Comparação lado a lado: o mapa principal (mapa base + camadas
+     * temáticas) fica à esquerda e uma segunda imagem, escolhida no painel
+     * da direita, à direita de uma barra arrastável. Cada lado é um "pane"
+     * do Leaflet recortado com `clip` (CSS) nas coordenadas das camadas.
+     */
+    var COMPARE_PANE = 'compareRight';
+    var THEMATIC_PANE = 'thematic';
+
+    function setupCompare(map, imagery) {
+        var state = null;
+        var button = L.control({ position: 'topleft' });
+        button.onAdd = function () {
+            var bar = L.DomUtil.create('div', 'leaflet-bar compare-toggle');
+            var link = L.DomUtil.create('a', '', bar);
+            link.href = '#';
+            link.title = 'Comparar duas imagens lado a lado';
+            link.setAttribute('role', 'button');
+            link.textContent = '⇆';
+            L.DomEvent.on(link, 'click', function (e) {
+                L.DomEvent.preventDefault(e);
+                if (state) { stop(); } else { start(); }
+                L.DomUtil[state ? 'addClass' : 'removeClass'](bar, 'active');
+            });
+            L.DomEvent.disableClickPropagation(bar);
+            return bar;
+        };
+        button.addTo(map);
+
+        function clipRect(pane, side, x) {
+            var nw = map.containerPointToLayerPoint([0, 0]);
+            var se = map.containerPointToLayerPoint(map.getSize());
+            var cx = nw.x + x;
+            var rect = side === 'right'
+                ? [nw.y, se.x, se.y, cx]
+                : [nw.y, cx, se.y, nw.x];
+            map.getPane(pane).style.clip = 'rect(' + rect.join('px, ') + 'px)';
+        }
+
+        // Camadas temáticas são do lado esquerdo (o mapa principal).
+        function leftPanes() {
+            return [THEMATIC_PANE, global.THEMATIC_RELIEF_PANE].filter(function (p) { return p && map.getPane(p); });
+        }
+
+        function updateClip() {
+            if (!state) return;
+            var x = state.ratio * map.getSize().x;
+            state.divider.style.left = x + 'px';
+            clipRect(COMPARE_PANE, 'right', x);
+            leftPanes().forEach(function (p) { clipRect(p, 'left', x); });
+        }
+
+        function choose(layer) {
+            if (state.layer) map.removeLayer(state.layer);
+            state.layer = layer;
+            map.addLayer(layer);
+            state.panel.activate(layer);
+            updateClip();
+        }
+
+        function start() {
+            if (!map.getPane(COMPARE_PANE)) {
+                // Acima do mapa base (tilePane, 200), abaixo das temáticas (350).
+                map.createPane(COMPARE_PANE).style.zIndex = 300;
+            }
+            var base = getBaseLayers(imagery, { pane: COMPARE_PANE, noBackdrop: true, withMapbiomas: true });
+            var initialName = base.layers['Histórico (Esri Wayback)'] ? 'Histórico (Esri Wayback)' : Object.keys(base.layers)[0];
+
+            var divider = L.DomUtil.create('div', 'compare-divider', map.getContainer());
+            var handle = L.DomUtil.create('div', 'compare-handle', divider);
+            handle.textContent = '⇆';
+            handle.title = 'Arraste para comparar';
+            L.DomEvent.disableClickPropagation(divider);
+            L.DomEvent.disableScrollPropagation(divider);
+
+            state = { ratio: 0.5, divider: divider, layer: null, base: base };
+            state.panel = setupImageryPanel(map, base, {
+                position: 'bottomright',
+                idSuffix: '-direita',
+                initial: base.layers[initialName],
+                chooser: base.layers,
+                chooserLabel: 'Lado direito',
+                onChoose: choose
+            });
+            document.getElementById('imagery-picker-chooser-direita').value = initialName;
+            choose(base.layers[initialName]);
+
+            var dragging = false;
+            function move(e) {
+                if (!dragging) return;
+                var rect = map.getContainer().getBoundingClientRect();
+                var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                state.ratio = Math.min(0.98, Math.max(0.02, (clientX - rect.left) / rect.width));
+                updateClip();
+                L.DomEvent.preventDefault(e);
+            }
+            function end() {
+                if (!dragging) return;
+                dragging = false;
+                map.dragging.enable();
+            }
+            L.DomEvent.on(handle, 'mousedown touchstart', function (e) {
+                dragging = true;
+                map.dragging.disable();
+                L.DomEvent.preventDefault(e);
+            });
+            L.DomEvent.on(document, 'mousemove touchmove', move);
+            L.DomEvent.on(document, 'mouseup touchend', end);
+            state.unbind = function () {
+                L.DomEvent.off(document, 'mousemove touchmove', move);
+                L.DomEvent.off(document, 'mouseup touchend', end);
+            };
+
+            map.on('move zoomend resize', updateClip);
+            updateClip();
+        }
+
+        function stop() {
+            map.off('move zoomend resize', updateClip);
+            state.unbind();
+            if (state.layer) map.removeLayer(state.layer);
+            state.panel.destroy();
+            L.DomUtil.remove(state.divider);
+            map.getPane(COMPARE_PANE).style.clip = '';
+            leftPanes().forEach(function (p) { map.getPane(p).style.clip = ''; });
+            state = null;
+        }
     }
 
     /**
@@ -929,8 +1202,15 @@
 
             // Only add layer controls and legend if NOT static
             L.control.layers(baseLayersInfo.layers, data.overlays, { collapsed: false }).addTo(map);
-            setupImageryPanel(map, baseLayersInfo);
-            
+            var imageryPanel = setupImageryPanel(map, baseLayersInfo);
+            map.on('baselayerchange', function (e) { imageryPanel.activate(e.layer); });
+
+            // Camadas temáticas (MapBiomas, DETER, focos, relevo) num pane
+            // entre o mapa base (200) e os polígonos da análise (400).
+            map.createPane(THEMATIC_PANE).style.zIndex = 350;
+            if (global.setupThematicLayers) global.setupThematicLayers(map, options.imagery || {}, THEMATIC_PANE);
+            setupCompare(map, options.imagery || {});
+
             var legendEl = document.getElementById('legend-imoveis');
             setupLegend(legendEl, data.legend, data.layersByFonte, map);
             

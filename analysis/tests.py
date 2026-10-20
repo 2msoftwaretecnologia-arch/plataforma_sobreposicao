@@ -1,10 +1,15 @@
+import io
 from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlsplit
 
 from django.core.cache import cache
 from django.test import SimpleTestCase, override_settings
 
+import numpy as np
+from PIL import Image
+
 from analysis.services.view_services import imagery_service as svc
+from analysis.services.view_services import raster_tiles as rt
 
 WMS_CAPABILITIES = b"""<?xml version="1.0"?>
 <WMS_Capabilities version="1.3.0" xmlns="http://www.opengis.net/wms">
@@ -175,10 +180,10 @@ class ImageryServiceTests(SimpleTestCase):
         ])
 
     @override_settings(PLANET_WMS_URL='', PLANET_API_KEY='', COPERNICUS_WMS_URL='', GOOGLE_MAPS_API_KEY='')
-    def test_config_without_keys_only_offers_wayback(self):
+    def test_config_without_keys_only_offers_public_sources(self):
         config = svc.imagery_config()
         self.assertEqual(config['providers'], [])
-        self.assertEqual(set(config), {'wayback_tile_url', 'wayback_releases_url', 'providers'})
+        self.assertEqual(set(config), {'wayback_tile_url', 'wayback_releases_url', 'providers', 'mapbiomas', 'cbers'})
 
     @override_settings(PLANET_WMS_URL='https://x/wms?key=SEGREDO', COPERNICUS_WMS_URL='https://c/ogc/wms/CSEGREDO',
                        GOOGLE_MAPS_API_KEY='GSEGREDO')
@@ -203,3 +208,88 @@ class ImageryServiceTests(SimpleTestCase):
         # Capabilities da Copernicus não servem para a Planet (sem link: erro).
         with self.assertRaises(svc.ImageryError):
             svc.provider_layers('planet')
+
+
+class RasterTilesTests(SimpleTestCase):
+    """Tiles gerados no servidor (raster_tiles.py), sem rede: o GDAL é
+    trocado por arrays prontos."""
+
+    def setUp(self):
+        cache.clear()
+
+    def test_mapbiomas_rejects_low_zoom_unknown_product_and_year(self):
+        self.assertIsNone(rt.mapbiomas_tile('cobertura', 2008, rt.MAPBIOMAS_MIN_ZOOM - 1, 0, 0))
+        self.assertIsNone(rt.mapbiomas_tile('outro', 2008, 13, 0, 0))
+        self.assertIsNone(rt.mapbiomas_tile('cobertura', 1970, 13, 0, 0))
+
+    @patch.object(rt, '_warp_tile')
+    def test_mapbiomas_paints_classes_and_caches(self, warp):
+        codes = np.zeros((256, 256), dtype=np.uint8)
+        codes[0, 0], codes[0, 1], codes[0, 2] = 3, 15, 99  # floresta, pastagem, classe desconhecida
+        warp.return_value = [codes]
+        png, ctype = rt.mapbiomas_tile('cobertura', 2008, 13, 3005, 4321)
+        self.assertEqual(ctype, 'image/png')
+        self.assertIn('collection11', warp.call_args.args[0])
+        self.assertIn('2008', warp.call_args.args[0])
+        image = Image.open(io.BytesIO(png)).convert('RGBA')
+        self.assertEqual(image.getpixel((0, 0)), (0x1f, 0x8d, 0x49, 255))
+        self.assertEqual(image.getpixel((1, 0)), (0xed, 0xde, 0x8e, 255))
+        self.assertEqual(image.getpixel((2, 0)), (0x9e, 0x9e, 0x9e, 255))
+        self.assertEqual(image.getpixel((3, 0))[3], 0)  # 0 = sem dado
+        rt.mapbiomas_tile('cobertura', 2008, 13, 3005, 4321)
+        self.assertEqual(warp.call_count, 1)  # 2ª vez veio do cache
+
+    @patch.object(rt, '_warp_tile')
+    def test_fogo_only_paints_burned(self, warp):
+        codes = np.zeros((256, 256), dtype=np.uint8)
+        codes[5, 5] = 1
+        warp.return_value = [codes]
+        png, _ = rt.mapbiomas_tile('fogo', 2024, 11, 0, 0)
+        image = Image.open(io.BytesIO(png)).convert('RGBA')
+        self.assertEqual(image.getpixel((5, 5))[:3], rt._hex_rgb(rt.BURNED_COLOR))
+        self.assertEqual(image.getpixel((6, 5))[3], 0)
+
+    def test_cbers_scene_url_only_accepts_inpe_ids(self):
+        self.assertEqual(
+            rt.cbers_scene_url('CBERS4A_WPM_PCA_RGB321_20240831_208_126'),
+            'https://data.inpe.br/bdc/data/CB4A-WPM-PCA-FUSED/v001/208/126/2024/8/CBERS4A_WPM_PCA_RGB321_20240831_208_126.tif')
+        for bad in ('../../etc/passwd', 'CBERS4A_WPM_PCA_RGB321_20240831_208_126/../x', 'http://evil/x.tif', '', None):
+            self.assertIsNone(rt.cbers_scene_url(bad))
+            self.assertIsNone(rt.cbers_tile(bad, 14, 0, 0))
+
+    @patch.object(rt, '_scene_covers', side_effect=lambda scene, lon, lat: not scene.endswith('_207_126'))
+    @patch.object(rt.requests, 'post')
+    def test_cbers_scenes_sorted_filtered_and_cached(self, post, covers):
+        post.return_value = http_response(json={'features': [
+            {'id': 'CBERS4A_WPM_PCA_RGB321_20240731_208_126', 'properties': {'datetime': '2024-07-31T00:00:00Z'}},
+            {'id': 'CBERS4A_WPM_PCA_RGB321_20260819_207_126', 'properties': {'datetime': '2026-08-19T00:00:00Z'}},
+            {'id': 'CBERS4A_WPM_PCA_RGB321_20250907_208_126', 'properties': {'datetime': '2025-09-07T00:00:00Z'}},
+            {'id': 'outro-produto', 'properties': {'datetime': '2026-01-01T00:00:00Z'}},
+        ]})
+        scenes = rt.cbers_scenes(-47.95, -10.44)
+        self.assertEqual([s['date'] for s in scenes], ['2025-09-07', '2024-07-31'])
+        self.assertEqual(post.call_args.kwargs['json']['intersects']['coordinates'], [-47.95, -10.44])
+        rt.cbers_scenes(-47.95, -10.44)
+        self.assertEqual(post.call_count, 1)
+
+    @patch.object(rt, '_cbers_stretch', return_value=[(10.0, 110.0)] * 3)
+    @patch.object(rt, '_warp_tile')
+    def test_cbers_tile_stretches_and_makes_outside_transparent(self, warp, stretch):
+        band = np.full((256, 256), 60, dtype=np.uint8)
+        band[0, 0] = 0
+        warp.return_value = [band, band.copy(), band.copy()]
+        webp, ctype = rt.cbers_tile('CBERS4A_WPM_PCA_RGB321_20240831_208_126', 14, 0, 0)
+        self.assertEqual(ctype, 'image/webp')
+        image = Image.open(io.BytesIO(webp)).convert('RGBA')
+        self.assertEqual(image.getpixel((0, 0))[3], 0)
+        r, g, b, a = image.getpixel((100, 100))
+        self.assertEqual(a, 255)
+        self.assertAlmostEqual(r, 128, delta=6)  # (60-10)*255/100 ≈ 127
+        self.assertIsNone(rt.cbers_tile('CBERS4A_WPM_PCA_RGB321_20240831_208_126', rt.CBERS_MIN_ZOOM - 1, 0, 0))
+
+    def test_config_lists_server_rendered_layers(self):
+        config = svc.imagery_config()
+        self.assertTrue(config['mapbiomas']['tile_url'].endswith('/imagens/mapbiomas/{product}/{year}/{z}/{x}/{y}.png'))
+        self.assertEqual(config['mapbiomas']['products']['cobertura']['years'][0], 2025)
+        self.assertIn(2008, config['mapbiomas']['products']['cobertura']['years'])
+        self.assertTrue(config['cbers']['tile_url'].endswith('/imagens/cbers/{scene}/{z}/{x}/{y}.webp'))

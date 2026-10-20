@@ -126,6 +126,14 @@ Variáveis esperadas:
 - `PLANET_WMS_URL`: link WMS/WMTS opcional da Planet (com a chave), como o usado no QGIS.
 - `PLANET_API_KEY`: alternativa ao link; usa os mosaicos de basemap da conta Planet.
 - `COPERNICUS_WMS_URL`: link WMS opcional do Copernicus Data Space (conta gratuita), com Sentinel-1/2.
+
+Imagens do mapa de resultados geradas no próprio servidor
+(`analysis/services/view_services/raster_tiles.py`): o uso do solo e a área
+queimada do MapBiomas e as cenas CBERS-4A (2 m) do INPE são lidos por HTTP,
+direto dos GeoTIFFs públicos, só no trecho de cada tile. Cada tile novo custa
+de 0,3 a 3 s; depois fica no cache do Django (Redis) por 7 dias. Os GeoTIFFs
+do MapBiomas não têm pirâmide de zoom, por isso só aparecem a partir do zoom
+10 (CBERS, do zoom 12).
 - `GOOGLE_MAPS_API_KEY`: chave opcional do Google com a Map Tiles API ativada (imagem de satélite do Google).
 - `STATIC_VERSION`: versão/cache-busting de arquivos estáticos.
 

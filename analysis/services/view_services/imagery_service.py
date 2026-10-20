@@ -119,6 +119,26 @@ def imagery_config():
     if getattr(settings, 'GOOGLE_MAPS_API_KEY', ''):
         config['google_tile_url'] = reverse('imagery_google_tile', args=(0, 0, 0)).replace(
             '/0/0/0', '/{z}/{x}/{y}')
+
+    # Tiles gerados no servidor (raster_tiles importa este módulo).
+    from analysis.services.view_services import raster_tiles
+    config['mapbiomas'] = {
+        'tile_url': reverse('imagery_mapbiomas_tile', args=('PRODUTO', 2000, 0, 0, 0)).replace(
+            '/PRODUTO/2000/0/0/0.png', '/{product}/{year}/{z}/{x}/{y}.png'),
+        'min_zoom': raster_tiles.MAPBIOMAS_MIN_ZOOM,
+        'legend': raster_tiles.mapbiomas_legend(),
+        'burned_color': raster_tiles.BURNED_COLOR,
+        'products': {
+            product: {'name': info['name'], 'years': raster_tiles.mapbiomas_years(product)}
+            for product, info in raster_tiles.MAPBIOMAS_PRODUCTS.items()
+        },
+    }
+    config['cbers'] = {
+        'scenes_url': reverse('imagery_cbers_scenes'),
+        'tile_url': reverse('imagery_cbers_tile', args=('CENA', 0, 0, 0)).replace(
+            '/CENA/0/0/0.webp', '/{scene}/{z}/{x}/{y}.webp'),
+        'min_zoom': raster_tiles.CBERS_MIN_ZOOM,
+    }
     return config
 
 
