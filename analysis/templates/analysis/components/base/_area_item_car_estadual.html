@@ -1,0 +1,33 @@
+<div class="area-item area-item--imoveis area-item--{{ severity }}" data-area="{{ area.area|stringformat:'f' }}" title="{{ area.item_info|default:'' }}">
+    <div class="area-item__icon" role="img" aria-label="{% if severity == 'critical' %}Alerta crítico{% elif severity == 'warning' %}Área de atenção{% else %}Informativo{% endif %}">🏠</div>
+    <div class="area-item__content">
+        <p class="area-item__label">Área sobreposta</p>
+        <p class="area-item__value">{{ area.area|floatformat:4 }} ha</p>
+        {% include "analysis/components/base/_area_item_pct.html" %}
+        {% if area.status %}
+        <span class="badge badge-soft">Status: {{ area.status }}</span>
+        {% endif %}
+
+        <div style="margin-top: 8px; border-top: 1px solid #eee; padding-top: 6px;">
+            <p class="area-item__meta"><strong>Nº CAR Estadual:</strong> {{ area.numero_car|default:"-" }}</p>
+            <p class="area-item__meta"><strong>Imóvel:</strong> {{ area.nome_imovel|default:"-" }}</p>
+            <p class="area-item__meta"><strong>CAR Federal:</strong> {{ area.car_federal|default:"-" }}</p>
+            <p class="area-item__meta"><strong>Município:</strong> {{ area.municipio|default:"-" }}{% if area.cod_ibge %} (IBGE {{ area.cod_ibge|stringformat:"d" }}){% endif %}</p>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <p class="area-item__meta" style="margin: 0;"><strong>Área declarada:</strong> {% if area.area_declarada_ha is not None %}{{ area.area_declarada_ha|floatformat:4 }} ha{% else %}-{% endif %}</p>
+                <p class="area-item__meta" style="margin: 0;"><strong>Módulos fiscais:</strong> {% if area.modulos_fiscais is not None %}{{ area.modulos_fiscais|floatformat:3 }}{% else %}-{% endif %}</p>
+            </div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <p class="area-item__meta" style="margin: 0;"><strong>Cadastro:</strong> {{ area.data_cadastro|default:"-" }}</p>
+                <p class="area-item__meta" style="margin: 0;"><strong>Tipo de área:</strong> {{ area.tipo_area|default:"-" }}</p>
+            </div>
+            <p class="area-item__meta"><strong>Cadastrante:</strong> {{ area.cadastrante|default:"-" }}</p>
+            <p class="area-item__meta"><strong>Telefone:</strong> {{ area.telefone_contato|default:"-" }} · <strong>E-mail:</strong> {{ area.email_contato|default:"-" }}</p>
+            <div style="margin-top: 6px; font-size: 0.85em; background: #f9f9f9; padding: 4px; border-radius: 4px;">
+                <p class="area-item__meta" style="margin: 0;"><strong>Proprietário(s):</strong> {{ area.proprietario|default:"-" }}</p>
+            </div>
+        </div>
+
+        {% include "analysis/components/base/_area_item_map_link.html" %}
+    </div>
+</div>

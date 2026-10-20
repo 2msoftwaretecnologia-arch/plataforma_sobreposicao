@@ -280,6 +280,8 @@
                         {% include "analysis/components/tables/quilombolas_table.html" with items=base.areas_encontradas %}
                     {% elif "Assentamentos" in base.nome_base %}
                         {% include "analysis/components/tables/rural_settlement_table.html" with items=base.areas_encontradas %}
+                    {% elif "CAR Estadual" in base.nome_base %}
+                        {% include "analysis/components/tables/car_estadual_table.html" with items=base.areas_encontradas %}
                     {% elif "Sicar" in base.nome_base or "CAR" in base.nome_base %}
                         {% include "analysis/components/tables/sicar_table.html" with items=base.areas_encontradas %}
                     {% elif "Fitoecologias" in base.nome_base %}

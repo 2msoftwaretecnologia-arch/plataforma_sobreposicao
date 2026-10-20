@@ -1,6 +1,7 @@
-from car_system.models import SicarRecord, DeclaredHydrography
+from car_system.models import SicarRecord, DeclaredHydrography, CarEstadual2023
 from car_system.services.formatter.sicar_formatter import SicarFormatter
 from car_system.services.formatter.hydrography_formatter import HydrographyFormatter
+from car_system.services.formatter.car_estadual_2023_formatter import CarEstadual2023Formatter
 from environmental_layers.models import (
     ZoningArea,
     PhytoecologyArea,
@@ -69,6 +70,7 @@ class FormatterRegister:
             IndigenousArea: IndigenousFormatter(),
             SicarRecord: SicarFormatter(),
             DeclaredHydrography: HydrographyFormatter(),
+            CarEstadual2023: CarEstadual2023Formatter(),
             Quilombolas: QuilombolasFormatter(),
             Paths: PathsFormatter(),
             ConservationUnits: ConservationUnitsFormatter(),

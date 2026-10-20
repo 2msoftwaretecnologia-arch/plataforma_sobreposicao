@@ -83,6 +83,10 @@
                         {% if area.unidade or area.dominios or area.classe or area.fundo_legal %}
                             {% include "analysis/components/base/_area_item_apas.html" %}
 
+                        {# --- CAR Estadual 13/02/2023 (antes do SICAR: também tem status) #}
+                        {% elif "car estadual" in base.nome_base|lower %}
+                            {% include "analysis/components/base/_area_item_car_estadual.html" %}
+
                         {# --- Imóveis SICAR #}
                         {% elif area.status %}
                             {% include "analysis/components/base/_area_item_imoveis.html" %}

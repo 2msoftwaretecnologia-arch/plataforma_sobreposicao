@@ -7,9 +7,10 @@ Usado pelas views de upload/processar/excluir do painel "Bases de Dados",
 para não repetir em cada view qual Importer/Model pertence a qual camada.
 """
 
-from car_system.models import SicarRecord, DeclaredHydrography
+from car_system.models import SicarRecord, DeclaredHydrography, CarEstadual2023
 from car_system.tasks.sicar_importer import SicarImporter
 from car_system.tasks.hydrography_importer import HydrographyImporter
+from car_system.tasks.car_estadual_2023_importer import CarEstadual2023Importer
 
 from environmental_layers.models import (
     ZoningArea,
@@ -50,6 +51,7 @@ LAYER_REGISTRY = {
     "IndigenousArea": {"model": IndigenousArea, "importer": IndigenousAreaImporter},
     "SicarRecord": {"model": SicarRecord, "importer": SicarImporter},
     "DeclaredHydrography": {"model": DeclaredHydrography, "importer": HydrographyImporter},
+    "CarEstadual2023": {"model": CarEstadual2023, "importer": CarEstadual2023Importer},
     "Quilombolas": {"model": Quilombolas, "importer": QuilombolasImporter},
     "Paths": {"model": Paths, "importer": PathsImporter},
     "ConservationUnits": {"model": ConservationUnits, "importer": ConservationUnitsImporter},

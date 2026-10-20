@@ -1,5 +1,5 @@
 from django.contrib import admin
-from car_system.models import SicarRecord, DeclaredHydrography
+from car_system.models import SicarRecord, DeclaredHydrography, CarEstadual2023
 from leaflet.admin import LeafletGeoAdmin
 
 @admin.register(SicarRecord)
@@ -88,3 +88,12 @@ class DeclaredHydrographyAdmin(LeafletGeoAdmin):
         c = obj.usable_geometry.centroid
         return f"{c.y:.5f}, {c.x:.5f}"
     centroid_display.short_description = "Centro (Lat, Lng)"
+
+
+@admin.register(CarEstadual2023)
+class CarEstadual2023Admin(LeafletGeoAdmin):
+    list_display = ('id', 'car_number', 'federal_car_number', 'property_name', 'status', 'city', 'area_ha')
+    search_fields = ('car_number', 'federal_car_number', 'property_name', 'information')
+    list_filter = ('status', 'city')
+    readonly_fields = ('created_at', 'updated_at', 'area_m2', 'area_ha')
+    list_per_page = 200

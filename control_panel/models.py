@@ -155,6 +155,14 @@ class FileManagement(models.Model):
         blank = True
     )
 
+    car_estadual_2023_zip_file = models.FileField(
+        upload_to='documents/',
+        verbose_name="Documentos CAR Estadual (13/02/2023)",
+        help_text="Arquivo ZIP contendo o shapefile do CAR Estadual (área do imóvel) de 13/02/2023.",
+        null = True,
+        blank = True
+    )
+
     class Meta:
         db_table = 'tb_gerenciamento_arquivos'
         verbose_name = "Gerenciamento de Arquivos"

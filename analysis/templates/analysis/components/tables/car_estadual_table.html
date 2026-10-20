@@ -1,0 +1,34 @@
+<table class="report-table">
+    <thead>
+        <tr>
+            <th>Área (ha)</th>
+            <th>Nº CAR / CAR Federal</th>
+            <th>Imóvel</th>
+            <th>Status</th>
+            <th>Município</th>
+            <th>Área decl. (ha) / MF</th>
+            <th>Cadastro</th>
+            <th>Cadastrante / Contato</th>
+            <th>Proprietário(s)</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in items %}
+        <tr>
+            <td>{{ item.area|floatformat:4 }}</td>
+            <td>{{ item.numero_car|default:"-" }}<br><small>{{ item.car_federal|default:"-" }}</small></td>
+            <td>{{ item.nome_imovel|default:"-" }}<br><small>{{ item.tipo_area|default:"" }}</small></td>
+            <td>{{ item.status|default:"-" }}</td>
+            <td>{{ item.municipio|default:"-" }}{% if item.cod_ibge %}<br><small>IBGE {{ item.cod_ibge|stringformat:"d" }}</small>{% endif %}</td>
+            <td>{% if item.area_declarada_ha is not None %}{{ item.area_declarada_ha|floatformat:4 }}{% else %}-{% endif %} / {% if item.modulos_fiscais is not None %}{{ item.modulos_fiscais|floatformat:3 }}{% else %}-{% endif %}</td>
+            <td>{{ item.data_cadastro|default:"-" }}</td>
+            <td>{{ item.cadastrante|default:"-" }}<br><small>{{ item.telefone_contato|default:"" }} {{ item.email_contato|default:"" }}</small></td>
+            <td>{{ item.proprietario|default:"-" }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="9">Nenhum registro encontrado.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>

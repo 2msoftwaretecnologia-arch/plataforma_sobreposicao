@@ -181,6 +181,7 @@ class FinalResultBuilder:
         mapping = {
             "SicarRecord": "Base de Dados Sicar",
             "DeclaredHydrography": "Base de Dados de Hidrografia Declarada",
+            "CarEstadual2023": "Base de Dados CAR Estadual (13/02/2023)",
             "ZoningArea": "Base de Dados de Zoneamento",
             "PhytoecologyArea": "Base de Dados de Fitoecologias",
             "EnvironmentalProtectionArea": "Base de Dados de APAs",
@@ -204,6 +205,7 @@ class FinalResultBuilder:
         mapping = {
             "SicarRecord": "#efff00",
             "DeclaredHydrography": "#0288D1",
+            "CarEstadual2023": "#AFB42B",
             "ZoningArea": "#F57C00",
             "PhytoecologyArea": "#6A1B9A",
             "EnvironmentalProtectionArea": "#C62828",
