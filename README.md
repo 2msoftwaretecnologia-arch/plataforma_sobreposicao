@@ -125,6 +125,7 @@ Variáveis esperadas:
 - `CELERY_RESULT_BACKEND`: backend de resultado Celery.
 - `PLANET_WMS_URL`: link WMS/WMTS opcional da Planet (com a chave), como o usado no QGIS.
 - `PLANET_API_KEY`: alternativa ao link; usa os mosaicos de basemap da conta Planet.
+- `COPERNICUS_WMS_URL`: link WMS opcional do Copernicus Data Space (conta gratuita), com Sentinel-1/2.
 - `GOOGLE_MAPS_API_KEY`: chave opcional do Google com a Map Tiles API ativada (imagem de satélite do Google).
 - `STATIC_VERSION`: versão/cache-busting de arquivos estáticos.
 

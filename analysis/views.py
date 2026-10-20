@@ -27,11 +27,13 @@ from analysis.services.analyze_coordinates.search_all import SearchAll
 from analysis.services.analyze_coordinates.search_for_car import SearchForCar
 from analysis.services.analyze_coordinates.search_for_sigef import SearchForSigef
 from analysis.services.view_services.imagery_service import (
+    OGC_PROVIDERS,
     ImageryError,
     google_tile,
     imagery_config,
-    planet_layers,
-    planet_tile,
+    provider_layers,
+    provider_source_url,
+    provider_tile,
     wayback_releases,
 )
 from analysis.services.view_services.result_map_formatter import format_data_map
@@ -1053,19 +1055,27 @@ def _image_tile_response(fetch):
     return response
 
 
-class PlanetLayersView(View):
-    """Camadas/mosaicos da Planet disponíveis para o seletor do mapa."""
+def _require_provider(provider):
+    if provider not in OGC_PROVIDERS or not provider_source_url(provider):
+        raise Http404
 
-    def get(self, request):
+
+class ProviderLayersView(View):
+    """Camadas/mosaicos de um provedor OGC (Planet, Copernicus) para o
+    seletor do mapa."""
+
+    def get(self, request, provider):
+        _require_provider(provider)
         try:
-            return JsonResponse({'layers': planet_layers()})
+            return JsonResponse({'layers': provider_layers(provider)})
         except ImageryError as e:
             return JsonResponse({'erro': str(e), 'layers': []}, status=502)
 
 
-class PlanetTileView(View):
-    def get(self, request, layer, z, x, y):
-        return _image_tile_response(lambda: planet_tile(layer, z, x, y))
+class ProviderTileView(View):
+    def get(self, request, provider, layer, z, x, y):
+        _require_provider(provider)
+        return _image_tile_response(lambda: provider_tile(provider, layer, z, x, y))
 
 
 class GoogleTileView(View):

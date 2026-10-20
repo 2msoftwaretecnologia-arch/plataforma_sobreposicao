@@ -98,7 +98,7 @@ class ImageryServiceTests(SimpleTestCase):
     @patch.object(svc, '_http')
     def test_wmts_layers_report_max_zoom(self, http):
         http.get.return_value = http_response(content=WMTS_CAPABILITIES, content_type='text/xml')
-        self.assertEqual(svc.planet_layers(), [
+        self.assertEqual(svc.provider_layers('planet'), [
             {'id': 'global_monthly_2026_09_mosaic', 'title': 'Global Monthly 2026-09', 'max_zoom': 2}])
 
     @override_settings(PLANET_WMS_URL='https://x/ogc/wms/abc?api_key=K', PLANET_API_KEY='')
@@ -106,7 +106,7 @@ class ImageryServiceTests(SimpleTestCase):
     def test_wms_tile_builds_getmap_with_key(self, http):
         http.get.side_effect = [http_response(content=WMS_CAPABILITIES, content_type='text/xml'),
                                 http_response(content=b'PNG')]
-        self.assertEqual(svc.planet_tile('TRUE_COLOR', 1, 1, 1), (b'PNG', 'image/png'))
+        self.assertEqual(svc.provider_tile('planet', 'TRUE_COLOR', 1, 1, 1), (b'PNG', 'image/png'))
         params = dict(http.get.call_args.kwargs['params'])
         self.assertEqual(params['api_key'], 'K')
         self.assertEqual(params['REQUEST'], 'GetMap')
@@ -119,7 +119,7 @@ class ImageryServiceTests(SimpleTestCase):
     def test_wmts_tile_fills_template(self, http):
         http.get.side_effect = [http_response(content=WMTS_CAPABILITIES, content_type='text/xml'),
                                 http_response(content=b'PNG')]
-        svc.planet_tile('global_monthly_2026_09_mosaic', 2, 3, 1)
+        svc.provider_tile('planet', 'global_monthly_2026_09_mosaic', 2, 3, 1)
         url = http.get.call_args.args[0]
         self.assertTrue(url.startswith('https://tiles.planet.com/basemaps/v1/planet-tiles/global_monthly_2026_09_mosaic/gmap/2/3/1.png'))
         self.assertEqual(parse_qs(urlsplit(url).query)['api_key'], ['SEGREDO'])
@@ -130,8 +130,8 @@ class ImageryServiceTests(SimpleTestCase):
     @patch.object(svc, '_http')
     def test_zoom_beyond_matrix_set_and_unknown_layer_have_no_tile(self, http):
         http.get.return_value = http_response(content=WMTS_CAPABILITIES, content_type='text/xml')
-        self.assertIsNone(svc.planet_tile('global_monthly_2026_09_mosaic', 5, 0, 0))
-        self.assertIsNone(svc.planet_tile('nao_existe', 1, 0, 0))
+        self.assertIsNone(svc.provider_tile('planet', 'global_monthly_2026_09_mosaic', 5, 0, 0))
+        self.assertIsNone(svc.provider_tile('planet', 'nao_existe', 1, 0, 0))
 
     @override_settings(PLANET_WMS_URL='https://x/ogc/wms/abc?api_key=K', PLANET_API_KEY='')
     @patch.object(svc, '_http')
@@ -139,7 +139,7 @@ class ImageryServiceTests(SimpleTestCase):
         http.get.side_effect = [http_response(content=WMS_CAPABILITIES, content_type='text/xml'),
                                 http_response(content=b'<ServiceException/>', content_type='text/xml')]
         with self.assertRaises(svc.ImageryError):
-            svc.planet_tile('TRUE_COLOR', 1, 0, 0)
+            svc.provider_tile('planet', 'TRUE_COLOR', 1, 0, 0)
 
     @override_settings(PLANET_WMS_URL='https://x/ogc/wms/abc?api_key=K', PLANET_API_KEY='')
     @patch.object(svc, '_http')
@@ -147,7 +147,7 @@ class ImageryServiceTests(SimpleTestCase):
         import requests
         http.get.side_effect = requests.ConnectionError('https://x/ogc/wms/abc?api_key=K')
         with self.assertRaises(svc.ImageryError) as ctx:
-            svc.planet_layers()
+            svc.provider_layers('planet')
         self.assertNotIn('api_key', str(ctx.exception))
         self.assertIsNone(ctx.exception.__cause__)
 
@@ -174,14 +174,32 @@ class ImageryServiceTests(SimpleTestCase):
             {'id': 1, 'date': '2014-02-20', 'metadata_url': 'https://m/2014'},
         ])
 
-    @override_settings(PLANET_WMS_URL='', PLANET_API_KEY='', GOOGLE_MAPS_API_KEY='')
+    @override_settings(PLANET_WMS_URL='', PLANET_API_KEY='', COPERNICUS_WMS_URL='', GOOGLE_MAPS_API_KEY='')
     def test_config_without_keys_only_offers_wayback(self):
         config = svc.imagery_config()
-        self.assertEqual(set(config), {'wayback_tile_url', 'wayback_releases_url'})
+        self.assertEqual(config['providers'], [])
+        self.assertEqual(set(config), {'wayback_tile_url', 'wayback_releases_url', 'providers'})
 
-    @override_settings(PLANET_WMS_URL='https://x/wms?key=SEGREDO', GOOGLE_MAPS_API_KEY='GSEGREDO')
+    @override_settings(PLANET_WMS_URL='https://x/wms?key=SEGREDO', COPERNICUS_WMS_URL='https://c/ogc/wms/CSEGREDO',
+                       GOOGLE_MAPS_API_KEY='GSEGREDO')
     def test_config_uses_proxy_urls_and_never_the_keys(self):
         config = svc.imagery_config()
-        self.assertTrue(config['planet_tile_url'].endswith('/imagens/planet/{layer}/{z}/{x}/{y}'))
+        providers = {p['key']: p for p in config['providers']}
+        self.assertEqual(set(providers), {'planet', 'copernicus'})
+        self.assertTrue(providers['planet']['tile_url'].endswith('/imagens/planet/{layer}/{z}/{x}/{y}'))
+        self.assertTrue(providers['copernicus']['tile_url'].endswith('/imagens/copernicus/{layer}/{z}/{x}/{y}'))
+        self.assertTrue(providers['copernicus']['layers_url'].endswith('/imagens/copernicus/camadas/'))
         self.assertTrue(config['google_tile_url'].endswith('/imagens/google/{z}/{x}/{y}'))
         self.assertNotIn('SEGREDO', str(config))
+
+    @override_settings(PLANET_WMS_URL='', PLANET_API_KEY='', COPERNICUS_WMS_URL='https://c/ogc/wms/INST?MAXCC=20')
+    @patch.object(svc, '_http')
+    def test_copernicus_link_params_pass_to_tiles_and_cache_is_per_provider(self, http):
+        http.get.side_effect = [http_response(content=WMS_CAPABILITIES, content_type='text/xml'),
+                                http_response(content=b'PNG')]
+        self.assertEqual(svc.provider_tile('copernicus', 'NDVI', 3, 2, 1), (b'PNG', 'image/png'))
+        self.assertEqual(http.get.call_args.args[0], 'https://c/ogc/wms/INST')
+        self.assertEqual(dict(http.get.call_args.kwargs['params'])['MAXCC'], '20')
+        # Capabilities da Copernicus não servem para a Planet (sem link: erro).
+        with self.assertRaises(svc.ImageryError):
+            svc.provider_layers('planet')

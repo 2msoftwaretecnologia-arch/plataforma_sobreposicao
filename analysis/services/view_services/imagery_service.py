@@ -1,8 +1,9 @@
-"""Imagens de satélite do mapa de resultados: Planet, Google e Esri Wayback.
+"""Imagens de satélite do mapa de resultados: provedores OGC configurados
+por link (Planet, Copernicus), Google e Esri Wayback.
 
-As chaves da Planet e do Google ficam só no servidor: o navegador pede os
-tiles às views de `analysis/urls.py`, que repassam a requisição ao provedor.
-A Esri Wayback é pública, então o navegador busca os tiles direto na Esri.
+As chaves ficam só no servidor: o navegador pede os tiles às views de
+`analysis/urls.py`, que repassam a requisição ao provedor. A Esri Wayback é
+pública, então o navegador busca os tiles direto na Esri.
 """
 import logging
 import math
@@ -32,7 +33,7 @@ WAYBACK_TILE_URL = (
 PLANET_WMTS_URL = 'https://api.planet.com/basemaps/v1/mosaics/wmts'
 GOOGLE_TILES_URL = 'https://tile.googleapis.com/v1'
 
-CAPABILITIES_CACHE_KEY = 'imagery:planet:capabilities'
+CAPABILITIES_CACHE_KEY = 'imagery:{provider}:capabilities'
 CAPABILITIES_TTL = 60 * 60
 # v2: entradas passaram a ter metadata_url (a v1 em cache não tem).
 WAYBACK_CACHE_KEY = 'imagery:wayback:releases:v2'
@@ -60,31 +61,61 @@ class ImageryError(Exception):
 # Configuração para o maps.js
 # ---------------------------------------------------------------------------
 
-def planet_source_url():
-    """Link OGC (WMS ou WMTS) da Planet. Sem `PLANET_WMS_URL`, usa o WMTS de
-    basemaps da conta de `PLANET_API_KEY`."""
-    url = getattr(settings, 'PLANET_WMS_URL', '')
-    if url:
-        return url
-    key = getattr(settings, 'PLANET_API_KEY', '')
-    if key:
-        return f'{PLANET_WMTS_URL}?api_key={key}'
+# Provedores com link OGC (WMS ou WMTS) e a chave no próprio link. `name`
+# vai nas mensagens de erro; o resto é o que o seletor do maps.js mostra.
+OGC_PROVIDERS = {
+    'planet': {
+        'name': 'Planet',
+        'base_name': 'Satélite (Planet)',
+        'label': 'Mosaico Planet',
+        'attribution': 'Imagens &copy; Planet Labs PBC',
+    },
+    'copernicus': {
+        'name': 'Copernicus',
+        'base_name': 'Copernicus (Sentinel)',
+        'label': 'Camada Copernicus',
+        'attribution': 'Contém dados Copernicus Sentinel modificados',
+        # O WMS do Copernicus Data Space não informa resolução; depende do
+        # satélite da camada configurada lá.
+        'resolution_hint': 'Resolução: 10 m (Sentinel-1 e Sentinel-2)',
+    },
+}
+
+
+def provider_source_url(provider):
+    """Link OGC configurado do provedor, ou '' quando não está configurado.
+    Planet sem `PLANET_WMS_URL` usa o WMTS de basemaps de `PLANET_API_KEY`."""
+    if provider == 'planet':
+        url = getattr(settings, 'PLANET_WMS_URL', '')
+        if url:
+            return url
+        key = getattr(settings, 'PLANET_API_KEY', '')
+        return f'{PLANET_WMTS_URL}?api_key={key}' if key else ''
+    if provider == 'copernicus':
+        return getattr(settings, 'COPERNICUS_WMS_URL', '')
     return ''
 
 
 def imagery_config():
-    """Fontes de imagem que o maps.js oferece no seletor de mapa base. Planet
-    e Google só entram quando a chave está configurada."""
+    """Fontes de imagem que o maps.js oferece no seletor de mapa base. Os
+    provedores OGC e o Google só entram quando a chave está configurada."""
     # Os placeholders do Leaflet ({layer}/{z}/{x}/{y}) não passam pelo
     # `reverse`, então trocamos um tile fictício por eles.
     config = {
         'wayback_tile_url': WAYBACK_TILE_URL,
         'wayback_releases_url': reverse('imagery_wayback_releases'),
+        'providers': [],
     }
-    if planet_source_url():
-        config['planet_layers_url'] = reverse('imagery_planet_layers')
-        config['planet_tile_url'] = reverse('imagery_planet_tile', args=('LAYER', 0, 0, 0)).replace(
-            '/LAYER/0/0/0', '/{layer}/{z}/{x}/{y}')
+    for provider, meta in OGC_PROVIDERS.items():
+        if not provider_source_url(provider):
+            continue
+        config['providers'].append({
+            'key': provider,
+            **{k: v for k, v in meta.items() if k != 'name'},
+            'layers_url': reverse('imagery_provider_layers', args=(provider,)),
+            'tile_url': reverse('imagery_provider_tile', args=(provider, 'LAYER', 0, 0, 0)).replace(
+                '/LAYER/0/0/0', '/{layer}/{z}/{x}/{y}'),
+        })
     if getattr(settings, 'GOOGLE_MAPS_API_KEY', ''):
         config['google_tile_url'] = reverse('imagery_google_tile', args=(0, 0, 0)).replace(
             '/0/0/0', '/{z}/{x}/{y}')
@@ -92,7 +123,7 @@ def imagery_config():
 
 
 # ---------------------------------------------------------------------------
-# Planet (WMS ou WMTS)
+# Provedores OGC (WMS ou WMTS)
 # ---------------------------------------------------------------------------
 
 def _local(tag):
@@ -152,7 +183,7 @@ def parse_capabilities(xml_bytes, base_url, extra_params):
         return _parse_wms(root, base_url, extra_params)
     if name == 'Capabilities':
         return _parse_wmts(root, base_url, extra_params)
-    raise ImageryError('O link da Planet não é um serviço WMS ou WMTS.')
+    raise ImageryError('O link configurado não é um serviço WMS ou WMTS.')
 
 
 def _parse_wms(root, base_url, extra_params):
@@ -235,31 +266,33 @@ def _parse_wmts(root, base_url, extra_params):
     }
 
 
-def planet_capabilities():
-    capabilities = cache.get(CAPABILITIES_CACHE_KEY)
+def provider_capabilities(provider):
+    cache_key = CAPABILITIES_CACHE_KEY.format(provider=provider)
+    capabilities = cache.get(cache_key)
     if capabilities:
         return capabilities
 
-    source = planet_source_url()
+    source = provider_source_url(provider)
     if not source:
-        raise ImageryError('Planet não configurada.')
+        raise ImageryError('Provedor de imagens não configurado.')
+    name = OGC_PROVIDERS[provider]['name']
     base_url, extra, service = _split_url(source)
     response = _get(base_url, _capabilities_params(base_url, extra, service), CAPABILITIES_TIMEOUT)
     if response.status_code in (401, 403):
-        raise ImageryError('A Planet recusou a chave configurada.')
+        raise ImageryError(f'{name} recusou a chave configurada.')
     if response.status_code != 200:
-        raise ImageryError(f'A Planet respondeu com erro {response.status_code}.')
+        raise ImageryError(f'{name} respondeu com erro {response.status_code}.')
     try:
         capabilities = parse_capabilities(response.content, base_url, extra)
     except ET.ParseError:
-        raise ImageryError('Resposta inválida da Planet.') from None
-    cache.set(CAPABILITIES_CACHE_KEY, capabilities, CAPABILITIES_TTL)
+        raise ImageryError(f'Resposta inválida de {name}.') from None
+    cache.set(cache_key, capabilities, CAPABILITIES_TTL)
     return capabilities
 
 
-def planet_layers():
-    """Lista de camadas/mosaicos da Planet para o seletor do mapa."""
-    capabilities = planet_capabilities()
+def provider_layers(provider):
+    """Lista de camadas/mosaicos do provedor para o seletor do mapa."""
+    capabilities = provider_capabilities(provider)
     layers = []
     for layer_id, info in capabilities['layers'].items():
         layer = {'id': layer_id, 'title': info['title']}
@@ -325,9 +358,9 @@ def _wmts_tile_request(capabilities, layer, layer_id, z, x, y):
     return capabilities['base_url'], params
 
 
-def planet_tile(layer_id, z, x, y):
+def provider_tile(provider, layer_id, z, x, y):
     """(bytes, content-type) do tile, ou None quando não há imagem ali."""
-    capabilities = planet_capabilities()
+    capabilities = provider_capabilities(provider)
     layer = capabilities['layers'].get(layer_id)
     if layer is None:
         return None
@@ -337,7 +370,7 @@ def planet_tile(layer_id, z, x, y):
         url, params = _wmts_tile_request(capabilities, layer, layer_id, z, x, y)
         if url is None:
             return None
-    return _image_response(_get(url, params), 'Planet')
+    return _image_response(_get(url, params), OGC_PROVIDERS[provider]['name'])
 
 
 def _image_response(response, provider):

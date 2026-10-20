@@ -25,6 +25,83 @@
         { value: 'Natural Color with DRA', text: 'Cor natural', res: 10 }
     ];
 
+    // Landsat (USGS/NASA) no Living Atlas da Esri: Landsat 8/9 de 2013 em
+    // diante e, antes disso, só as épocas do Global Land Survey (~1990, 2000,
+    // 2005, 2010). Os anos do seletor vêm do catálogo no centro do mapa.
+    var LANDSAT_URL = 'https://landsat2.arcgis.com/arcgis/rest/services/Landsat/MS/ImageServer';
+    var LANDSAT_THERMAL = 'Band 10 Surface Temperature in Celsius';
+    var LANDSAT_RENDERINGS = [
+        { value: 'Natural Color with DRA', text: 'Cor natural', res: 30 },
+        { value: 'Color Infrared with DRA', text: 'Infravermelho falsa-cor (vegetação em vermelho)', res: 30 },
+        { value: 'NDVI Colorized', text: 'NDVI (vigor da vegetação)', res: 30 },
+        { value: 'Agriculture with DRA', text: 'Agricultura (SWIR · NIR · azul)', res: 30 },
+        { value: 'Short-wave Infrared with DRA', text: 'Infravermelho de ondas curtas (SWIR)', res: 30 },
+        // Banda térmica só existe no Landsat 8/9; o sensor tem 100 m.
+        { value: LANDSAT_THERMAL, text: 'Temperatura da superfície em °C (2013+)', res: 100 }
+    ];
+
+    // A banda térmica vem em °C brutos (≈ 20–50), que viram quase preto numa
+    // imagem 0–255: estica 20–50 °C e pinta de azul (frio) a vermelho (quente).
+    var THERMAL_MIN = 20, THERMAL_MAX = 50;
+
+    function thermalRampSegment(from, to) {
+        return { type: 'algorithmic', fromColor: from.concat(255), toColor: to.concat(255), algorithm: 'esriCIELabAlgorithm' };
+    }
+
+    function landsatRenderingRule(value) {
+        if (value !== LANDSAT_THERMAL) return { rasterFunction: value };
+        var stops = [[49, 54, 149], [116, 173, 209], [255, 255, 191], [244, 109, 67], [165, 0, 38]];
+        return {
+            rasterFunction: 'Colormap',
+            rasterFunctionArguments: {
+                Colorramp: {
+                    type: 'multipart',
+                    colorRamps: stops.slice(1).map(function (to, i) { return thermalRampSegment(stops[i], to); })
+                },
+                Raster: {
+                    rasterFunction: 'Stretch',
+                    rasterFunctionArguments: {
+                        StretchType: 5,
+                        Statistics: [[THERMAL_MIN, THERMAL_MAX, (THERMAL_MIN + THERMAL_MAX) / 2, 5]],
+                        Raster: { rasterFunction: LANDSAT_THERMAL }
+                    }
+                }
+            }
+        };
+    }
+
+    /**
+     * Parâmetros de consulta por ponto nos serviços ArcGIS. A geometria vai
+     * em JSON com o sistema de coordenadas: no formato curto "x,y" alguns
+     * serviços (ex.: Landsat) ignoram o filtro e devolvem cenas de qualquer
+     * lugar do mundo.
+     */
+    function pointQuery(latlng, extra) {
+        var params = {
+            f: 'json',
+            geometry: JSON.stringify({ x: latlng.lng, y: latlng.lat, spatialReference: { wkid: 4326 } }),
+            geometryType: 'esriGeometryPoint',
+            spatialRel: 'esriSpatialRelIntersects',
+            returnGeometry: 'false'
+        };
+        Object.keys(extra).forEach(function (k) { params[k] = extra[k]; });
+        return new URLSearchParams(params);
+    }
+
+    // ImageServer da Esri que gera a imagem na hora (~3 s por pedido): em vez
+    // de tiles, o esri-leaflet pede uma imagem do tamanho da tela a cada
+    // movimento.
+    function imageServerLayer(url, rasterFunction, attribution) {
+        return L.esri.imageMapLayer({
+            url: url,
+            renderingRule: { rasterFunction: rasterFunction },
+            format: 'jpgpng',
+            f: 'image',
+            pane: 'tilePane',
+            attribution: attribution
+        });
+    }
+
     function formatDateBR(isoDate) {
         var p = (isoDate || '').split('-');
         return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : isoDate;
@@ -60,23 +137,25 @@
             layers['Satélite (Google)'] = baseGoogle;
         }
 
-        if (imagery.planet_tile_url && imagery.planet_layers_url) {
-            var basePlanet = L.tileLayer(BLANK_TILE, { maxZoom: 19, layer: '', attribution: 'Imagens &copy; Planet Labs PBC' });
-            basePlanet.imageryInfo = { kind: 'planet' };
-            layers['Satélite (Planet)'] = basePlanet;
+        // Provedores com link WMS/WMTS configurado no servidor (Planet,
+        // Copernicus): tiles pelo proxy de `imagery_service.py`.
+        (imagery.providers || []).forEach(function (provider) {
+            var baseProvider = L.tileLayer(BLANK_TILE, { maxZoom: 19, layer: '', attribution: provider.attribution });
+            baseProvider.imageryInfo = { kind: 'provider', resolutionHint: provider.resolution_hint };
+            layers[provider.base_name] = baseProvider;
             pickers.push({
-                layer: basePlanet,
-                template: imagery.planet_tile_url,
+                layer: baseProvider,
+                template: provider.tile_url,
                 param: 'layer',
-                label: 'Mosaico Planet',
-                listUrl: imagery.planet_layers_url,
+                label: provider.label,
+                listUrl: provider.layers_url,
                 parse: function (json) {
                     return (json.layers || []).map(function (l) {
                         return { value: encodeURIComponent(l.id), text: l.title, maxZoom: l.max_zoom };
                     });
                 }
             });
-        }
+        });
 
         if (imagery.wayback_tile_url && imagery.wayback_releases_url) {
             var baseWayback = L.tileLayer(BLANK_TILE, { maxZoom: 19, release: '', attribution: 'Imagens &copy; Esri (World Imagery Wayback)' });
@@ -103,17 +182,8 @@
             });
         }
 
-        // O servidor gera a imagem na hora (~3 s por pedido): em vez de tiles,
-        // o esri-leaflet pede uma imagem do tamanho da tela a cada movimento.
         if (global.L.esri && L.esri.imageMapLayer) {
-            var baseInfrared = L.esri.imageMapLayer({
-                url: SENTINEL2_URL,
-                renderingRule: { rasterFunction: SENTINEL2_RENDERINGS[0].value },
-                format: 'jpgpng',
-                f: 'image',
-                pane: 'tilePane',
-                attribution: 'Sentinel-2 (Copernicus) &copy; Esri'
-            });
+            var baseInfrared = imageServerLayer(SENTINEL2_URL, SENTINEL2_RENDERINGS[0].value, 'Sentinel-2 (Copernicus) &copy; Esri');
             baseInfrared.imageryInfo = { kind: 'sentinel2' };
             layers['Infravermelho (Sentinel-2)'] = baseInfrared;
             pickers.push({
@@ -125,6 +195,34 @@
                 slow: true,
                 onSelect: function (value) {
                     baseInfrared.setRenderingRule({ rasterFunction: value });
+                }
+            });
+
+            var baseLandsat = imageServerLayer(LANDSAT_URL, LANDSAT_RENDERINGS[0].value, 'Landsat (USGS/NASA) &copy; Esri');
+            baseLandsat.imageryInfo = { kind: 'landsat' };
+            layers['Landsat (histórico)'] = baseLandsat;
+            pickers.push({
+                layer: baseLandsat,
+                label: 'Composição',
+                options: LANDSAT_RENDERINGS,
+                selected: LANDSAT_RENDERINGS[0].value,
+                slow: true,
+                onSelect: function (value) {
+                    baseLandsat.setRenderingRule(landsatRenderingRule(value));
+                },
+                // Ano da imagem; as opções vêm do catálogo no centro do mapa
+                // (renderInfo, tipo 'landsat'). Sem ano: a melhor cena recente.
+                secondary: {
+                    label: 'Ano',
+                    options: [{ value: '', text: 'Melhor cena recente' }],
+                    selected: '',
+                    onSelect: function (year) {
+                        if (year) {
+                            baseLandsat.setTimeRange(new Date(Date.UTC(+year, 0, 1)), new Date(Date.UTC(+year + 1, 0, 1)));
+                        } else {
+                            baseLandsat.setTimeRange(null, null);
+                        }
+                    }
                 }
             });
         }
@@ -159,15 +257,7 @@
         var first = Math.max(0, Math.min(13, 23 - Math.round(zoom)));
         function attempt(layerId) {
             if (layerId > Math.min(13, first + 2)) return Promise.resolve(null);
-            var params = new URLSearchParams({
-                f: 'json',
-                geometry: latlng.lng + ',' + latlng.lat,
-                geometryType: 'esriGeometryPoint',
-                inSR: '4326',
-                spatialRel: 'esriSpatialRelIntersects',
-                outFields: 'SRC_DATE2,SRC_RES,SRC_ACC,SRC_DESC,NICE_DESC',
-                returnGeometry: 'false'
-            });
+            var params = pointQuery(latlng, { outFields: 'SRC_DATE2,SRC_RES,SRC_ACC,SRC_DESC,NICE_DESC' });
             return fetch(metadataUrl + '/' + layerId + '/query?' + params)
                 .then(function (r) { return r.json(); })
                 .then(function (json) {
@@ -183,17 +273,11 @@
      * campo `best` (menor primeiro), então a primeira por `best` é a visível.
      */
     function querySentinel2Scene(latlng) {
-        var params = new URLSearchParams({
-            f: 'json',
+        var params = pointQuery(latlng, {
             where: 'category = 1',
-            geometry: latlng.lng + ',' + latlng.lat,
-            geometryType: 'esriGeometryPoint',
-            inSR: '4326',
-            spatialRel: 'esriSpatialRelIntersects',
             outFields: 'acquisitiondate,cloudcover',
             orderByFields: 'best',
-            resultRecordCount: '1',
-            returnGeometry: 'false'
+            resultRecordCount: '1'
         });
         return fetch(SENTINEL2_URL + '/query?' + params)
             .then(function (r) { return r.json(); })
@@ -201,6 +285,28 @@
                 var f = json.features && json.features[0];
                 return f ? f.attributes : null;
             });
+    }
+
+    /**
+     * Cenas Landsat no ponto (todas as datas; algumas centenas). Servem para
+     * os anos do seletor e para achar a cena visível: o mosaico usa a de
+     * menor `Best` dentro do ano escolhido (ou de todas, sem ano).
+     */
+    function queryLandsatScenes(latlng) {
+        var params = pointQuery(latlng, {
+            where: 'Category = 1',
+            outFields: 'AcquisitionDate,CloudCover,SensorName,Best',
+            resultRecordCount: '2000'
+        });
+        return fetch(LANDSAT_URL + '/query?' + params)
+            .then(function (r) { return r.json(); })
+            .then(function (json) {
+                return (json.features || []).map(function (f) { return f.attributes; });
+            });
+    }
+
+    function sceneYear(scene) {
+        return String(new Date(scene.AcquisitionDate).getUTCFullYear());
     }
 
     function esriInfoLines(a) {
@@ -226,21 +332,32 @@
         var infoSeq = 0, infoTimer = null;
 
         var control = L.control({ position: 'bottomleft' });
-        var container, labelEl, selectEl, statusEl, infoEl, current = null;
+        var container, labelEl, selectEl, subLabelEl, subSelectEl, statusEl, infoEl, current = null;
 
         control.onAdd = function () {
             container = L.DomUtil.create('div', 'imagery-picker leaflet-bar');
             labelEl = L.DomUtil.create('label', 'imagery-picker-label', container);
             selectEl = L.DomUtil.create('select', 'imagery-picker-select', container);
+            // Segundo seletor (ex.: ano do Landsat), só nas fontes com `secondary`.
+            subLabelEl = L.DomUtil.create('label', 'imagery-picker-label', container);
+            subSelectEl = L.DomUtil.create('select', 'imagery-picker-select', container);
             statusEl = L.DomUtil.create('div', 'imagery-picker-status', container);
             infoEl = L.DomUtil.create('div', 'imagery-picker-info', container);
             labelEl.setAttribute('for', 'imagery-picker-select');
             selectEl.id = 'imagery-picker-select';
+            subLabelEl.setAttribute('for', 'imagery-picker-sub');
+            subSelectEl.id = 'imagery-picker-sub';
             container.style.display = 'none';
             L.DomEvent.disableClickPropagation(container);
             L.DomEvent.disableScrollPropagation(container);
             selectEl.addEventListener('change', function () {
                 if (current) apply(current, selectEl.value);
+            });
+            subSelectEl.addEventListener('change', function () {
+                if (!current || !current.secondary) return;
+                current.secondary.selected = subSelectEl.value;
+                current.secondary.onSelect(subSelectEl.value);
+                refreshInfo();
             });
             return container;
         };
@@ -301,11 +418,11 @@
                 return;
             }
 
-            if (info.kind === 'planet') {
+            if (info.kind === 'provider') {
                 var mosaic = selectedOption(current);
                 if (!mosaic) { setInfo([]); return; }
                 if (mosaic.maxZoom === undefined || mosaic.maxZoom === null) {
-                    setInfo(['Resolução não informada pelo serviço.', zoomLine()]);
+                    setInfo([info.resolutionHint || 'Resolução não informada pelo serviço.', zoomLine()]);
                     return;
                 }
                 var res = metersPerPixel(mosaic.maxZoom, map.getCenter().lat);
@@ -338,6 +455,43 @@
                 return;
             }
 
+            if (info.kind === 'landsat') {
+                var landsat = current;
+                var comp = selectedOption(landsat) || {};
+                var year = landsat.secondary.selected;
+                var thermal = comp.value === LANDSAT_THERMAL;
+                var resText = 'Resolução: ' + formatMeters(comp.res) + (thermal ? ' (banda térmica)' : '');
+                setInfo([resText, 'Consultando cena…', zoomLine(comp.res)]);
+                queryLandsatScenes(map.getCenter())
+                    .then(function (scenes) {
+                        if (seq !== infoSeq) return;
+                        updateLandsatYears(landsat, scenes);
+                        var pool = year ? scenes.filter(function (s) { return sceneYear(s) === year; }) : scenes;
+                        var scene = pool.reduce(function (best, s) { return (!best || s.Best < best.Best) ? s : best; }, null);
+                        var lines = [resText];
+                        if (scene) {
+                            var sensor = (scene.SensorName || '').replace(/-/g, ' ');
+                            lines.push('Cena: ' + new Date(scene.AcquisitionDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }));
+                            lines.push('Satélite: ' + sensor);
+                            // GLS antigo traz -0,01 quando a cobertura não foi medida.
+                            if (scene.CloudCover >= 0) lines.push('Nuvens na cena: ' + Math.round(scene.CloudCover * 100) + '%');
+                            if (thermal && !/landsat [89]/i.test(sensor)) {
+                                lines.push('Temperatura só existe no Landsat 8/9 (2013+).');
+                            } else if (thermal) {
+                                lines.push('Escala: ' + THERMAL_MIN + ' °C (azul) → ' + THERMAL_MAX + ' °C (vermelho)');
+                            }
+                        } else {
+                            lines.push(year ? 'Sem cena de ' + year + ' neste ponto.' : 'Sem cena para este ponto.');
+                        }
+                        lines.push('Fonte: Landsat (USGS/NASA)');
+                        setInfo(lines.concat(zoomLine(comp.res)));
+                    })
+                    .catch(function () {
+                        if (seq === infoSeq) setInfo([resText, 'Catálogo do Landsat indisponível.', zoomLine(comp.res)]);
+                    });
+                return;
+            }
+
             // Esri: a imagem atual é a da versão mais recente da Wayback.
             var release = activeBase === baseLayersInfo.defaultLayer
                 ? (wayback && wayback.options && wayback.options[0])
@@ -358,6 +512,37 @@
                 });
         }
 
+        // Anos com cena no centro do mapa, do mais recente ao mais antigo. O
+        // ano escolhido continua na lista mesmo se não houver cena aqui.
+        function updateLandsatYears(picker, scenes) {
+            var counts = {};
+            scenes.forEach(function (s) { var y = sceneYear(s); counts[y] = (counts[y] || 0) + 1; });
+            var selected = picker.secondary.selected;
+            if (selected && !counts[selected]) counts[selected] = 0;
+            picker.secondary.options = [{ value: '', text: 'Melhor cena recente' }].concat(
+                Object.keys(counts).sort().reverse().map(function (y) {
+                    return { value: y, text: y + ' (' + counts[y] + (counts[y] === 1 ? ' cena)' : ' cenas)') };
+                })
+            );
+            if (current === picker) fillSecondary(picker);
+        }
+
+        function fillSecondary(picker) {
+            var sec = picker && picker.secondary;
+            subLabelEl.style.display = sec ? '' : 'none';
+            subSelectEl.style.display = sec ? '' : 'none';
+            if (!sec) return;
+            subLabelEl.textContent = sec.label;
+            subSelectEl.innerHTML = '';
+            sec.options.forEach(function (opt) {
+                var o = document.createElement('option');
+                o.value = opt.value;
+                o.textContent = opt.text;
+                subSelectEl.appendChild(o);
+            });
+            subSelectEl.value = sec.selected;
+        }
+
         function showBase(layer) {
             activeBase = layer;
             var picker = pickers.find(function (p) { return p.layer === layer; }) || null;
@@ -372,6 +557,7 @@
             } else {
                 labelEl.textContent = layer.imageryInfo.name;
                 selectEl.style.display = 'none';
+                fillSecondary(null);
                 setStatus('');
             }
             refreshInfo();
@@ -398,6 +584,7 @@
             current = picker;
             container.style.display = '';
             labelEl.textContent = picker.label;
+            fillSecondary(picker);
 
             if (picker.options) {
                 fillSelect(picker);

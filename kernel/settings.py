@@ -198,6 +198,7 @@ GEOS_LIBRARY_PATH = config('GEOS_LIBRARY_PATH')
 # no servidor; o navegador recebe os tiles por proxy.
 PLANET_WMS_URL = config('PLANET_WMS_URL', default='')
 PLANET_API_KEY = config('PLANET_API_KEY', default='')
+COPERNICUS_WMS_URL = config('COPERNICUS_WMS_URL', default='')
 GOOGLE_MAPS_API_KEY = config('GOOGLE_MAPS_API_KEY', default='')
 
 
