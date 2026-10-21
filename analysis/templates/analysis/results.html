@@ -89,7 +89,7 @@
                 {% if not is_historico %}
                 {% if resultado or demonstrativo or recibo %}
                 <div class="hero-actions reveal reveal-delay-2">
-                    {% if demonstrativo or recibo %}
+                    {% if resultado or demonstrativo or recibo %}
                     <button type="button" onclick="printReport()" class="btn btn-gold">
                         <svg class="ico" style="width:18px;height:18px"><use href="#i-doc"/></svg>
                         Gerar Relatório

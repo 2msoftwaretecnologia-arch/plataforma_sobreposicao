@@ -165,10 +165,15 @@
                 <strong>Tem Déficit de Reserva legal?</strong>
                 <span class="badge badge--negative">⚠️ Sim · {{ deficit_rl_value|cut:"-" }}</span>
             </div>
-        {% else %}
+        {% elif demonstrativo %}
             <div>
                 <strong>Tem Déficit de Reserva legal?</strong>
                 <span class="badge badge--positive">✔ Não</span>
+            </div>
+        {% else %}
+            <div>
+                <strong>Tem Déficit de Reserva legal?</strong>
+                <span class="badge badge--neutral">Não informado</span>
             </div>
         {% endif %}
 
@@ -192,8 +197,10 @@
                 <span class="badge badge--warning">{{ recibo.area_antropizada }}</span>
             {% elif demonstrativo and demonstrativo.area_antropizada and demonstrativo.app_to_restore %}
                 <span class="badge badge--warning">{{ demonstrativo.area_antropizada }}</span>
-            {% else %}
+            {% elif recibo or demonstrativo %}
                 <span class="badge badge--positive">✔ Não</span>
+            {% else %}
+                <span class="badge badge--neutral">Não informado</span>
             {% endif %}
         </div>
 
