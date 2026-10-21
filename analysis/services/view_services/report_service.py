@@ -12,6 +12,7 @@ from functools import lru_cache
 from shapely.geometry import shape
 
 from analysis.services.view_services.bases_3d import MUNICIPIOS_JSON, TOCANTINS_GEOJSON
+from analysis.services.view_services.land_use_service import comparar_uso_solo
 
 # Níveis usados no relatório. A ordem define a ordem das seções.
 ALERTA = 'alerta'        # problema sério, exige ação
@@ -328,7 +329,32 @@ def _reserva_legal(resultado, demonstrativo, recibo):
     }
 
 
-def build_checklist(bases, rl, demonstrativo, recibo):
+def _uso_solo_check(uso_solo, limite):
+    """Item do semáforo do comparativo MapBiomas 2008 × ano atual."""
+    pergunta = 'Houve retirada de vegetação nativa depois de 2008?'
+    if not uso_solo or uso_solo.get('erro'):
+        return _check(pergunta, 'sem_dado', 'Não verificado',
+                      (uso_solo or {}).get('erro') or 'Não foi possível comparar os mapas do MapBiomas.')
+    suprimida = uso_solo['suprimida']
+    if suprimida < limite:
+        return _check(
+            pergunta, 'ok', 'Não',
+            f"Pelos mapas do MapBiomas, a vegetação nativa de {uso_solo['ano_antes']} continua nativa "
+            f"em {uso_solo['ano_depois']}.",
+        )
+    return _check(
+        pergunta, ATENCAO, f'Sim — {_ha_br(suprimida)}',
+        'Pelos mapas do MapBiomas, parte da vegetação nativa que existia em 2008 virou outro uso. '
+        'Abertura depois de 22/07/2008 só é regular com autorização do órgão ambiental; sem ela, '
+        'a área pode precisar ser recuperada. Veja a seção "Uso do solo: antes e agora".',
+    )
+
+
+def _ha_br(valor):
+    return f'{valor:,.2f} ha'.replace(',', 'X').replace('.', ',').replace('X', '.')
+
+
+def build_checklist(bases, rl, demonstrativo, recibo, uso_solo=None, limite=TOLERANCIA_HA):
     """Perguntas diretas do topo do relatório, cada uma com status de semáforo."""
     checks = [
         _overlap_check(
@@ -354,6 +380,7 @@ def build_checklist(bases, rl, demonstrativo, recibo):
             'O mapeamento oficial do governo (PRODES) não registrou desmatamento na área.',
             nomes='ano',
         ),
+        _uso_solo_check(uso_solo, limite),
         _overlap_check(
             _find_bases(bases, 'Indígenas', 'Indigenas', 'Quilombolas'),
             'A área invade terra indígena ou quilombola?', ALERTA, 'Sim',
@@ -411,6 +438,20 @@ def build_checklist(bases, rl, demonstrativo, recibo):
     return checks
 
 
+def _mapas_uso_solo(propriedade_gj, uso_solo):
+    """Dados dos três mapas do comparativo (antes, depois e mudanças) no
+    formato de `initReportMap`, com a imagem recortada por cima do satélite."""
+    if not uso_solo or uso_solo.get('erro'):
+        return None
+    return {
+        chave: {
+            'propriedade': propriedade_gj, 'itens': [], 'cor': None,
+            'imagem': {'url': url, 'bounds': uso_solo['bounds']},
+        }
+        for chave, url in uso_solo['imagens'].items()
+    }
+
+
 def build_report_context(data):
     """Enriquece `data` (resultado da análise) com tudo que o relatório precisa."""
     resultado = data.get('resultado') or {}
@@ -456,7 +497,8 @@ def build_report_context(data):
     sem_ocorrencia = [b for b in bases if not b.get('areas_encontradas')]
 
     rl = _reserva_legal(resultado, demonstrativo, recibo)
-    checks = build_checklist(bases, rl, demonstrativo, recibo)
+    uso_solo = comparar_uso_solo(propriedade_gj, tamanho)
+    checks = build_checklist(bases, rl, demonstrativo, recibo, uso_solo, limite)
     n_alertas = sum(1 for c in checks if c['status'] == ALERTA)
     n_atencao = sum(1 for c in checks if c['status'] == ATENCAO)
     if n_alertas:
@@ -491,6 +533,8 @@ def build_report_context(data):
         'n_atencao': n_atencao,
         'veredito': veredito,
         'reserva_legal': rl,
+        'uso_solo': uso_solo,
+        'mapa_uso_solo': _mapas_uso_solo(propriedade_gj, uso_solo),
         'biomas': biomas,
         'municipios_encontrados': municipios,
         'nome_imovel': (recibo or {}).get('nome_imovel_rural') or '',

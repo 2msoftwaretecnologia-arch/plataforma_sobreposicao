@@ -215,29 +215,39 @@ def _warp_tile(url, z, x, y, resampling):
 
 
 def _warp_tile_gdal(url, z, x, y, resampling):
-    """Bandas (arrays numpy) do tile XYZ em EPSG:3857, lidas do GeoTIFF.
+    """Bandas (arrays numpy) do tile XYZ em EPSG:3857, lidas do GeoTIFF."""
+    minx, miny, maxx, maxy = tile_bbox(z, x, y)
+    pixel = (maxx - minx) / TILE_SIZE
+    return _warp_window_gdal(url, (minx, maxy), pixel, TILE_SIZE, TILE_SIZE, resampling)
+
+
+def _warp_window(url, origin, pixel, width, height, resampling):
+    return _in_gdal_thread(_warp_window_gdal, url, origin, pixel, width, height, resampling)
+
+
+def _warp_window_gdal(url, origin, pixel, width, height, resampling):
+    """Bandas (arrays numpy) de uma janela em EPSG:3857 (`origin` = canto
+    superior esquerdo, `pixel` em metros do Mercator), lidas do GeoTIFF.
 
     Uma leitura por HTTP que falha (conexão caída no meio) deixa o dataset
     com o bloco marcado como ruim: reabre o arquivo e tenta uma vez mais."""
-    minx, miny, maxx, maxy = tile_bbox(z, x, y)
-    pixel = (maxx - minx) / TILE_SIZE
     for attempt in (1, 2):
         raster, lock = _open(url)
         with lock:
             try:
-                tile = raster.warp({
+                window = raster.warp({
                     'driver': 'MEM',
-                    'name': 'tile',
+                    'name': 'window',
                     'srid': 3857,
-                    'width': TILE_SIZE,
-                    'height': TILE_SIZE,
-                    'origin': [minx, maxy],
+                    'width': width,
+                    'height': height,
+                    'origin': list(origin),
                     'scale': [pixel, -pixel],
                     'resampling': resampling,
                 })
-                return [band.data() for band in tile.bands]
+                return [band.data() for band in window.bands]
             except GDALException:
-                logger.warning('Falha ao ler o tile %s/%s/%s de %s (tentativa %s)', z, x, y, url, attempt)
+                logger.warning('Falha ao ler a janela %s (%sx%s) de %s (tentativa %s)', origin, width, height, url, attempt)
         _forget(url)
     raise ImageryError('Falha ao ler a imagem.')
 

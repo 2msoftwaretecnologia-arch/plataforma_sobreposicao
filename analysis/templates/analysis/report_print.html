@@ -14,9 +14,9 @@
 
   <!-- Leaflet & Maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="{% static 'analysis/css/report.css' %}?v={{ static_version|default:'20261021b' }}" />
+  <link rel="stylesheet" href="{% static 'analysis/css/report.css' %}?v={{ static_version|default:'20261021c' }}" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="{% static 'analysis/js/report_maps.js' %}?v={{ static_version|default:'20261021b' }}"></script>
+  <script src="{% static 'analysis/js/report_maps.js' %}?v={{ static_version|default:'20261021c' }}"></script>
 </head>
 <body>
 
@@ -236,6 +236,133 @@
       <p class="map-source">Imagens de satélite: Esri World Imagery. A data da foto varia conforme a região e pode não refletir a situação atual da propriedade.</p>
     {% endif %}
   </section>
+
+  <!-- USO DO SOLO: 2008 × ANO ATUAL -->
+  {% if uso_solo %}
+  <section class="block landuse">
+    <div class="block__head">
+      <h2>Uso do solo: antes e agora{% if not uso_solo.erro %} ({{ uso_solo.ano_antes|unlocalize }} × {{ uso_solo.ano_depois|unlocalize }}){% endif %}</h2>
+    </div>
+    <p class="block__intro">
+      O Código Florestal usa 22/07/2008 como marco: o que já estava aberto antes dessa data é
+      <strong>área consolidada</strong>. Já a vegetação nativa retirada depois dela precisa de autorização
+      do órgão ambiental ou terá de ser recuperada. Comparamos o mapa de uso do solo do MapBiomas
+      de 2008 com o mais recente para mostrar o que mudou dentro da propriedade.
+    </p>
+
+    {% if uso_solo.erro %}
+      <p class="map-note">{{ uso_solo.erro }}</p>
+    {% else %}
+      <div class="facts">
+        <div class="fact">
+          <span class="fact__label">Vegetação nativa em {{ uso_solo.ano_antes|unlocalize }}</span>
+          <span class="fact__value">{{ uso_solo.nativa_antes|ha }}</span>
+          <span class="fact__note">{{ uso_solo.nativa_antes_pct|pct }} da propriedade</span>
+        </div>
+        <div class="fact">
+          <span class="fact__label">Vegetação nativa em {{ uso_solo.ano_depois|unlocalize }}</span>
+          <span class="fact__value">{{ uso_solo.nativa_depois|ha }}</span>
+          <span class="fact__note">{{ uso_solo.nativa_depois_pct|pct }} da propriedade</span>
+        </div>
+        <div class="fact {% if uso_solo.suprimida >= limite_residual %}fact--alerta{% endif %}">
+          <span class="fact__label">Nativa que virou outro uso</span>
+          <span class="fact__value">{% if uso_solo.suprimida >= limite_residual %}{{ uso_solo.suprimida|ha }}{% else %}Nenhuma{% endif %}</span>
+          <span class="fact__note">
+            {% if uso_solo.suprimida >= limite_residual %}
+              {{ uso_solo.suprimida_pct|pct }} da propriedade{% if uso_solo.destino_suprimida %} — virou {% for d in uso_solo.destino_suprimida %}{{ d.nome|lower }} ({{ d.area|ha }}){% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}
+            {% else %}
+              Nada de vegetação nativa de {{ uso_solo.ano_antes|unlocalize }} foi aberto
+            {% endif %}
+          </span>
+        </div>
+        <div class="fact">
+          <span class="fact__label">Área que voltou a ser nativa</span>
+          <span class="fact__value">{% if uso_solo.regenerada >= limite_residual %}{{ uso_solo.regenerada|ha }}{% else %}Nenhuma{% endif %}</span>
+          <span class="fact__note">Regeneração: era uso em {{ uso_solo.ano_antes|unlocalize }} e hoje é vegetação nativa</span>
+        </div>
+      </div>
+
+      {% if mapa_uso_solo %}
+        <div class="landuse__maps">
+          <figure class="map-figure">
+            <figcaption class="landuse__title">{{ uso_solo.ano_antes|unlocalize }}</figcaption>
+            <div id="map-uso-antes" class="report-map"></div>
+          </figure>
+          <figure class="map-figure">
+            <figcaption class="landuse__title">{{ uso_solo.ano_depois|unlocalize }}</figcaption>
+            <div id="map-uso-depois" class="report-map"></div>
+          </figure>
+        </div>
+        <div class="map-legend">
+          <span class="map-legend__item"><span class="map-legend__line"></span>Contorno da propriedade</span>
+          {% for c in uso_solo.classes %}
+            <span class="map-legend__item"><span class="map-legend__fill" style="--swatch: {{ c.cor }}"></span>{{ c.nome }}</span>
+          {% endfor %}
+        </div>
+
+        <figure class="map-figure landuse__changes">
+          <figcaption class="landuse__title">O que mudou de {{ uso_solo.ano_antes|unlocalize }} para {{ uso_solo.ano_depois|unlocalize }}</figcaption>
+          <div id="map-uso-mudancas" class="report-map report-map--tall"></div>
+          <div class="map-legend">
+            <span class="map-legend__item"><span class="map-legend__line"></span>Contorno da propriedade</span>
+            <span class="map-legend__item"><span class="map-legend__fill" style="--swatch: #e11d48"></span>Vegetação nativa que virou outro uso</span>
+            <span class="map-legend__item"><span class="map-legend__fill" style="--swatch: #06b6d4"></span>Voltou a ser vegetação nativa</span>
+            <span class="map-legend__item"><span class="map-legend__fill map-legend__fill--soft" style="--swatch: #1f8d49"></span>Nativa nos dois anos</span>
+            <span class="map-legend__item"><span class="map-legend__fill map-legend__fill--soft" style="--swatch: #e8c96a"></span>Já era uso em {{ uso_solo.ano_antes|unlocalize }} (consolidada)</span>
+          </div>
+        </figure>
+
+        {{ mapa_uso_solo.antes|json_script:"map-uso-antes-data" }}
+        {{ mapa_uso_solo.depois|json_script:"map-uso-depois-data" }}
+        {{ mapa_uso_solo.mudancas|json_script:"map-uso-mudancas-data" }}
+        <script>
+          ['antes', 'depois', 'mudancas'].forEach(function (k) {
+            initReportMap('map-uso-' + k, JSON.parse(document.getElementById('map-uso-' + k + '-data').textContent));
+          });
+        </script>
+      {% endif %}
+
+      <table class="report-table landuse__table">
+        <thead>
+          <tr>
+            <th>Uso do solo</th>
+            <th class="num">{{ uso_solo.ano_antes|unlocalize }}</th>
+            <th class="num">{{ uso_solo.ano_depois|unlocalize }}</th>
+            <th class="num">Diferença</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for g in uso_solo.grupos %}
+            <tr class="landuse__group">
+              <td><span class="map-legend__fill" style="--swatch: {{ g.cor }}"></span>{{ g.nome }}</td>
+              <td class="num">{{ g.antes|ha }} <span class="muted">({{ g.antes_pct|pct }})</span></td>
+              <td class="num">{{ g.depois|ha }} <span class="muted">({{ g.depois_pct|pct }})</span></td>
+              <td class="num">{% if g.variacao > 0.005 %}+{{ g.variacao|ha }}{% elif g.variacao < -0.005 %}{{ g.variacao|ha }}{% else %}sem mudança{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+        <tbody class="landuse__detail">
+          <tr><th colspan="4">Detalhe por classe do MapBiomas</th></tr>
+          {% for c in uso_solo.classes %}
+            <tr>
+              <td><span class="map-legend__fill" style="--swatch: {{ c.cor }}"></span>{{ c.nome }}</td>
+              <td class="num">{{ c.antes|ha }}</td>
+              <td class="num">{{ c.depois|ha }}</td>
+              <td class="num">{% if c.variacao > 0.005 %}+{{ c.variacao|ha }}{% elif c.variacao < -0.005 %}{{ c.variacao|ha }}{% else %}sem mudança{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <p class="map-source">
+        Fonte: MapBiomas Coleção 11, mapas anuais com pixels de 30 m × 30 m. O mapa de {{ uso_solo.ano_antes|unlocalize }}
+        representa o ano inteiro, não exatamente o dia 22/07/2008. Por ser feito por satélite, áreas pequenas
+        e bordas podem ter erros de classificação: confirme mudanças relevantes com imagens da época
+        e com as autorizações de supressão.
+      </p>
+    {% endif %}
+  </section>
+  {% endif %}
 
   <!-- DETALHE POR BASE -->
   <section class="block">

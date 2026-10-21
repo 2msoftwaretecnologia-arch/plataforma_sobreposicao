@@ -1,8 +1,10 @@
 import io
+import json
 from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlsplit
 
 from django.core.cache import cache
+from django.template.loader import render_to_string
 from django.test import SimpleTestCase, override_settings
 
 import numpy as np
@@ -10,6 +12,8 @@ from PIL import Image
 
 from analysis.services.view_services import imagery_service as svc
 from analysis.services.view_services import raster_tiles as rt
+from analysis.services.view_services import land_use_service as lu
+from analysis.services.view_services import report_service
 
 WMS_CAPABILITIES = b"""<?xml version="1.0"?>
 <WMS_Capabilities version="1.3.0" xmlns="http://www.opengis.net/wms">
@@ -326,3 +330,64 @@ class RasterTilesTests(SimpleTestCase):
         self.assertEqual(config['mapbiomas']['products']['cobertura']['years'][0], 2025)
         self.assertIn(2008, config['mapbiomas']['products']['cobertura']['years'])
         self.assertTrue(config['cbers']['tile_url'].endswith('/imagens/cbers/{scene}/{z}/{x}/{y}.webp'))
+
+
+class LandUseComparisonTests(SimpleTestCase):
+    """Comparativo MapBiomas 2008 × ano atual (land_use_service.py), sem
+    rede: a leitura do GeoTIFF é trocada por arrays prontos."""
+
+    # Quadrado de ~1 km no Tocantins.
+    GJ = {'type': 'Polygon', 'coordinates': [[[-48.55, -10.75], [-48.541, -10.75], [-48.541, -10.741], [-48.55, -10.741], [-48.55, -10.75]]]}
+
+    def setUp(self):
+        cache.clear()
+
+    def _fake_years(self, antes, depois):
+        """Metade esquerda e direita da janela com as classes dadas."""
+        def warp(url, origin, pixel, width, height, resampling):
+            pair = antes if '2008' in url else depois
+            codes = np.empty((height, width), dtype=np.uint8)
+            codes[:, :width // 2] = pair[0]
+            codes[:, width // 2:] = pair[1]
+            return [codes]
+        return warp
+
+    def test_native_turned_into_pasture_is_counted_and_cached(self):
+        # Esquerda: floresta → floresta. Direita: savana → pastagem.
+        with patch.object(rt, '_warp_window', side_effect=self._fake_years((3, 4), (3, 15))) as warp:
+            r = lu.comparar_uso_solo(self.GJ, 100.0)
+            self.assertAlmostEqual(r['total'], 100.0)
+            self.assertAlmostEqual(r['nativa_antes'], 100.0)
+            self.assertAlmostEqual(r['suprimida'], 50.0, delta=2)
+            self.assertAlmostEqual(r['nativa_depois'] + r['suprimida'], 100.0)
+            self.assertEqual(r['regenerada'], 0)
+            self.assertEqual(r['destino_suprimida'][0]['nome'], 'Pastagem')
+            self.assertEqual([c['nome'] for c in r['grupos']], ['Vegetação nativa', 'Agropecuária e silvicultura'])
+            self.assertTrue(r['imagens']['mudancas'].startswith('data:image/png;base64,'))
+            self.assertEqual({str(lu.ANO_MARCO), str(lu.ano_atual())}, {u.args[0][-8:-4] for u in warp.call_args_list})
+            lu.comparar_uso_solo(self.GJ, 100.0)
+            self.assertEqual(warp.call_count, 2)  # 2ª vez veio do cache
+
+    def test_regeneration_and_check_without_suppression(self):
+        with patch.object(rt, '_warp_window', side_effect=self._fake_years((15, 3), (3, 3))):
+            r = lu.comparar_uso_solo(self.GJ, 100.0)
+        self.assertEqual(r['suprimida'], 0)
+        self.assertAlmostEqual(r['regenerada'], 50.0, delta=2)
+        self.assertEqual(report_service._uso_solo_check(r, 0.1)['status'], 'ok')
+
+    def test_unavailable_source_becomes_message_not_error(self):
+        with patch.object(rt, '_warp_window', side_effect=svc.ImageryError('x')):
+            r = lu.comparar_uso_solo(self.GJ, 100.0)
+        self.assertIn('erro', r)
+        self.assertEqual(report_service._uso_solo_check(r, 0.1)['status'], 'sem_dado')
+
+    def test_report_renders_comparison_section(self):
+        data = {'resultado': {'alvo_geojson': json.dumps(self.GJ), 'tamanho_area': 100.0, 'resultados_por_base': []}}
+        with patch.object(rt, '_warp_window', side_effect=self._fake_years((3, 4), (3, 15))):
+            ctx = report_service.build_report_context(data)
+        check = next(c for c in ctx['checklist'] if '2008' in c['pergunta'])
+        self.assertEqual(check['status'], 'atencao')
+        html = render_to_string('analysis/report_print.html', ctx)
+        self.assertIn('map-uso-mudancas', html)
+        self.assertIn('Nativa que virou outro uso', html)
+        self.assertIn('Pastagem', html)

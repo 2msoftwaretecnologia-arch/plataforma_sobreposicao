@@ -32,7 +32,9 @@
 
     /**
      * @param {string} elementId  div do mapa
-     * @param {object} data       { propriedade: GeoJSON, itens: [GeoJSON], cor: '#hex' }
+     * @param {object} data       { propriedade: GeoJSON, itens: [GeoJSON], cor: '#hex',
+     *                            imagem: { url, bounds } (opcional: raster já recortado
+     *                            pela propriedade, ex.: MapBiomas do comparativo) }
      */
     global.initReportMap = function (elementId, data) {
         var el = document.getElementById(elementId);
@@ -50,6 +52,10 @@
             zoomSnap: 0.25
         });
         L.tileLayer(ESRI_SAT, { maxZoom: 19, maxNativeZoom: 17 }).addTo(map);
+
+        if (data.imagem) {
+            L.imageOverlay(data.imagem.url, data.imagem.bounds, { className: 'report-map__raster' }).addTo(map);
+        }
 
         var itens = (data.itens || []).map(function (gj) {
             return L.geoJSON(gj, {

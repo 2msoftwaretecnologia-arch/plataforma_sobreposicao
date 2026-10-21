@@ -601,6 +601,69 @@ a {
   border-radius: 10px;
 }
 
+/* USO DO SOLO: ANTES E AGORA */
+.fact--alerta {
+  background: var(--alerta-bg);
+  border-color: var(--alerta-line);
+}
+
+.fact--alerta .fact__value { color: var(--alerta); }
+
+.landuse__maps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.landuse__maps .report-map {
+  margin-top: 6px;
+}
+
+.landuse__changes {
+  margin-top: 18px;
+}
+
+.landuse__changes .report-map {
+  margin-top: 6px;
+}
+
+.landuse__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--green-900);
+}
+
+/* Pixels de 30 m nítidos, sem o borrado da ampliação. */
+.report-map__raster {
+  image-rendering: pixelated;
+}
+
+.map-legend__fill {
+  display: inline-block;
+  flex: none;
+  width: 14px;
+  height: 12px;
+  margin-right: 6px;
+  vertical-align: -1px;
+  border-radius: 3px;
+  background: var(--swatch);
+}
+
+.map-legend__fill--soft {
+  opacity: 0.5;
+}
+
+.landuse__group td {
+  font-weight: 700;
+}
+
+.landuse__detail th {
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 /* ONDE FICA */
 .where {
   display: grid;
@@ -1095,6 +1158,7 @@ a {
   .cover h1 { font-size: 26px; }
   .cover__top { flex-wrap: wrap; }
   .where,
+  .landuse__maps,
   .cover__ident,
   .rl__numbers,
   .clear-list ul,
