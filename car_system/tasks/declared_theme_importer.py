@@ -1,5 +1,6 @@
 import geopandas as gpd
 import pandas as pd
+import pyogrio
 
 from car_system.models import (
     DeclaredApp,
@@ -28,7 +29,12 @@ class DeclaredThemeImporter(BulkShapefileImporter):
         return f"Nenhum arquivo de {self.theme_label} foi configurado."
 
     def read_dataframe(self, path):
-        return gpd.read_file(path, encoding="utf-8")
+        # O SICAR divide temas grandes em vários shapefiles no mesmo ZIP
+        # (APPS_1, APPS_2, APPS_3...), e o GeoPackage traz também a tabela
+        # DICIONARIO, sem geometria: lê todas as camadas espaciais.
+        layers = [name for name, geometry_type in pyogrio.list_layers(path) if geometry_type]
+        frames = [gpd.read_file(path, layer=name, encoding="utf-8") for name in layers]
+        return pd.concat(frames, ignore_index=True) if len(frames) > 1 else frames[0]
 
     def format_fields(self, row):
         num_area = _clean(row.get("num_area"))
