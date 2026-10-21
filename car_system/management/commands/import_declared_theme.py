@@ -3,7 +3,7 @@ import time
 import pyogrio
 from django.core.cache import cache
 from django.core.management.base import BaseCommand, CommandError
-from django.db import connection, transaction
+from django.db import connection, reset_queries, transaction
 
 from control_panel.layer_registry import LAYER_REGISTRY
 from kernel.service.bulk_shapefile_importer import SRID
@@ -68,6 +68,10 @@ class Command(BaseCommand):
             with transaction.atomic():
                 model.objects.bulk_create(instances, batch_size=importer.batch_size)
             done += len(instances)
+            # Com DEBUG=True o Django guarda o texto de todo SQL executado
+            # (aqui, INSERTs com as geometrias em WKT): sem limpar, o processo
+            # passa de 10 GB antes da metade da APP.
+            reset_queries()
 
             elapsed = time.time() - started
             remaining = elapsed / (done - done_before) * (total_features - done)
