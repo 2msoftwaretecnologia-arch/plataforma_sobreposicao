@@ -1223,6 +1223,9 @@
             });
         } else {
             return L.map(elementId, {
+                // Canvas em vez de um <path> SVG por polígono: bem mais leve
+                // com bases de muitos vértices (MapBiomas, PRODES...).
+                preferCanvas: true,
                 fullscreenControl: options.fullscreenControl || true,
                 scrollWheelZoom: (options.scrollWheelZoom !== undefined) ? options.scrollWheelZoom : true
             });
@@ -1268,8 +1271,10 @@
             var lbl = item.label || '';
             var area = item.area || '';
 
+            // Os grupos só entram no mapa em initImoveisMap: desenhar todas as
+            // bases para depois esconder quase todas travava a abertura.
             if (!layersByFonte[f]) {
-                layersByFonte[f] = L.featureGroup().addTo(map);
+                layersByFonte[f] = L.featureGroup();
                 overlays[f] = layersByFonte[f];
             }
 
@@ -1317,7 +1322,8 @@
     function processItems(items, map) {
         var overlays = {};
         var layersByFonte = {};
-        var allGroup = L.featureGroup().addTo(map);
+        // Fora do mapa: serve só para os limites do fitBounds.
+        var allGroup = L.featureGroup();
         var legend = {};
 
         for (var i = 0; i < items.length; i++) {
@@ -1458,7 +1464,15 @@
 
         // 3. Process & Add Items (Overlays)
         var data = processItems(items, map);
-        
+
+        // Por padrão, só o contorno da propriedade fica marcado; as demais
+        // bases começam desmarcadas para reduzir poluição visual no mapa.
+        // (Mapas estáticos do relatório impresso continuam mostrando tudo,
+        // já que lá não há como reativar uma camada escondida.)
+        Object.keys(data.layersByFonte).forEach(function (f) {
+            if (isStatic || f === PROPERTY_FONTE) data.layersByFonte[f].addTo(map);
+        });
+
         // 4. Fit Bounds
         if (data.allGroup.getLayers().length) {
             map.fitBounds(data.allGroup.getBounds(), { padding: [12, 12] });
@@ -1466,16 +1480,6 @@
 
         // 5. Controls & Legend
         if (!isStatic) {
-            // Por padrão, só o contorno da propriedade fica marcado; as demais
-            // bases começam desmarcadas para reduzir poluição visual no mapa.
-            // (Mapas estáticos do relatório impresso continuam mostrando tudo,
-            // já que lá não há como reativar uma camada escondida.)
-            Object.keys(data.layersByFonte).forEach(function (f) {
-                if (f === PROPERTY_FONTE) return;
-                var grp = data.layersByFonte[f];
-                if (map.hasLayer(grp)) { map.removeLayer(grp); }
-            });
-
             // Only add the panel and legend if NOT static
             var panel = setupMapPanel(map);
 
@@ -1531,15 +1535,20 @@
     };
 
     /**
-     * Adiciona uma classe de destaque temporária a um layer (path SVG do Leaflet).
+     * Pisca um polígono alternando o estilo (o mapa desenha em canvas, então
+     * não há elemento SVG para animar por CSS).
      */
     function flashPath(fl) {
-        var el = fl.getElement ? fl.getElement() : (fl._path || null);
-        if (!el) return;
-        el.classList.add('leaflet-flash-highlight');
-        setTimeout(function () {
-            el.classList.remove('leaflet-flash-highlight');
-        }, 2800);
+        if (!fl.setStyle) return;
+        var original = { weight: fl.options.weight, fillOpacity: fl.options.fillOpacity };
+        var blinks = 0;
+        var timer = setInterval(function () {
+            fl.setStyle(blinks % 2 ? original : { weight: 5, fillOpacity: 0.7 });
+            if (++blinks >= 4) {
+                clearInterval(timer);
+                fl.setStyle(original);
+            }
+        }, 350);
     }
 
     /**
