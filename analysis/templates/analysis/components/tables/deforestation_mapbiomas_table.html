@@ -1,32 +1,27 @@
+{% load report_extras %}
 <table class="report-table">
     <thead>
         <tr>
-            <th>Área (ha)</th>
-            <th>Alerta</th>
-            <th>Ano</th>
-            <th>MapBiomas</th>
+            <th>Código do alerta</th>
+            <th>Ano em que foi detectado</th>
+            <th>Mais detalhes</th>
+            <th class="num">Área desmatada</th>
         </tr>
     </thead>
     <tbody>
         {% for item in items %}
         <tr>
-            <td>{{ item.area|floatformat:4 }}</td>
             <td>{{ item.alert_code|default:"-" }}</td>
             <td>{{ item.detection_year|default:"-" }}</td>
             <td>
                 {% if item.mapbiomas_url %}
-                    <a href="{{ item.mapbiomas_url }}" target="_blank" rel="noopener noreferrer">
-                        Ver no MapBiomas
-                    </a>
-                {% else %}
-                    -
-                {% endif %}
+                    <a href="{{ item.mapbiomas_url }}" target="_blank" rel="noopener noreferrer">Ver no site do MapBiomas</a>
+                {% else %}-{% endif %}
             </td>
+            <td class="num">{{ item.area|ha }}</td>
         </tr>
         {% empty %}
-        <tr>
-            <td colspan="4">Nenhum registro encontrado.</td>
-        </tr>
+        <tr><td colspan="4">Nenhum registro encontrado.</td></tr>
         {% endfor %}
     </tbody>
 </table>

@@ -1,29 +1,30 @@
+{% load report_extras %}
 <div class="record-list">
     {% for item in items %}
     <div class="record-card">
         <div class="record-card__header">
             <div>
-                <span class="record-card__title">CAR {{ item.numero_car|default:"-" }} · {{ item.nome_imovel|default:"Imóvel sem nome" }}</span>
-                <span class="record-card__subtitle">CAR Federal: {{ item.car_federal|default:"-" }}</span>
+                <span class="record-card__title">{{ item.nome_imovel|default:"Imóvel sem nome" }}</span>
+                <span class="record-card__subtitle">{% if item.numero_car %}CAR estadual nº {{ item.numero_car }}{% if item.car_federal %} · {% endif %}{% endif %}{% if item.car_federal %}CAR federal {{ item.car_federal }}{% endif %}</span>
             </div>
             <div class="record-card__tags">
-                <span class="badge badge--warning">{{ item.area|floatformat:4 }} ha sobrepostos</span>
-                {% if item.status %}<span class="badge badge--neutral">{{ item.status }}</span>{% endif %}
+                <span class="badge badge--neutral">{{ item.area|ha }} em comum</span>
+                {% if item.status %}<span class="badge {% if item.status == 'Ativo' %}badge--positive{% else %}badge--warning{% endif %}">{{ item.status }}</span>{% endif %}
             </div>
         </div>
         <dl class="record-card__fields">
-            <div><dt>Município</dt><dd>{{ item.municipio|default:"-" }}{% if item.cod_ibge %} (IBGE {{ item.cod_ibge|stringformat:"d" }}){% endif %}</dd></div>
-            <div><dt>Área declarada</dt><dd>{% if item.area_declarada_ha is not None %}{{ item.area_declarada_ha|floatformat:4 }} ha{% else %}-{% endif %}</dd></div>
-            <div><dt>Módulos fiscais</dt><dd>{% if item.modulos_fiscais is not None %}{{ item.modulos_fiscais|floatformat:3 }}{% else %}-{% endif %}</dd></div>
-            <div><dt>Tipo de área</dt><dd>{{ item.tipo_area|default:"-" }}</dd></div>
-            <div><dt>Cadastro</dt><dd>{{ item.data_cadastro|default:"-" }}</dd></div>
-            <div><dt>Cadastrante</dt><dd>{{ item.cadastrante|default:"-" }}</dd></div>
-            <div><dt>Telefone</dt><dd>{{ item.telefone_contato|default:"-" }}</dd></div>
-            <div class="record-card__wide"><dt>E-mail</dt><dd>{{ item.email_contato|default:"-" }}</dd></div>
             <div class="record-card__full"><dt>Proprietário(s)</dt><dd>{{ item.proprietario|default:"-" }}</dd></div>
+            <div><dt>Município</dt><dd>{{ item.municipio|default:"-" }}</dd></div>
+            <div><dt>Área declarada</dt><dd>{% if item.area_declarada_ha is not None %}{{ item.area_declarada_ha|ha }}{% else %}-{% endif %}</dd></div>
+            <div><dt>Módulos fiscais</dt><dd>{% if item.modulos_fiscais is not None %}{{ item.modulos_fiscais|floatformat:2 }}{% else %}-{% endif %}</dd></div>
+            <div><dt>Data do cadastro</dt><dd>{{ item.data_cadastro|default:"-" }}</dd></div>
+            <div class="record-card__wide"><dt>Quem fez o cadastro</dt><dd>{{ item.cadastrante|default:"-" }}</dd></div>
+            {% if item.telefone_contato or item.email_contato %}
+            <div class="record-card__full"><dt>Contato</dt><dd>{{ item.telefone_contato|default:"" }}{% if item.telefone_contato and item.email_contato %} · {% endif %}{{ item.email_contato|default:"" }}</dd></div>
+            {% endif %}
         </dl>
     </div>
     {% empty %}
-    <p class="text-muted">Nenhum registro encontrado.</p>
+    <p class="muted">Nenhum registro encontrado.</p>
     {% endfor %}
 </div>

@@ -1,83 +1,38 @@
-<div class="table-container">
-    <h4>Informações Declaradas do Demonstrativo</h4>
-    <table class="report-table">
-        <tbody>
-            <tr>
-                <td>CAR</td>
-                <td>{{ statement.car|default:"-" }}</td>
-            </tr>
-            <tr>
-                <td>Data Retificação</td>
-                <td>{{ statement.data_retificacao|default:"-" }}</td>
-            </tr>
-            <tr>
-                <td>Condição Externa</td>
-                <td>{{ statement.external_condicion|default:"-" }}</td>
-            </tr>
-            <tr>
-                <td>Módulos Fiscais</td>
-                <td>{{ statement.tax_modules|default:"-" }}</td>
-            </tr>
-            <tr>
-                <td>Status do Registro</td>
-                <td>{{ statement.registration_status|default:"-" }}</td>
-            </tr>
-            <tr>
-                <td>Área Remanescente de Vegetação Nativa</td>
-                <td>{{ statement.native_vegetation_remmant_area|default:"-" }}</td>
-            </tr>
-            <tr>
-                <td>Área Rural Consolidada</td>
-                <td>{{ statement.area_rural_consolidada|default:"-" }}</td>
-            </tr>
-            <tr>
-                <td>Área de Servidão Administrativa</td>
-                <td>{{ statement.area_servidao_admistrativa|default:"-" }}</td>
-            </tr>
-            <tr>
-                <td>RL Averbada (Art. 30)</td>
-                <td>{{ statement.area_Reserva_Legal_Averbada_referente_Art_30_codigo_florestal|default:"-" }}</td>
-            </tr>
-            <tr>
-                <td>RL Aprovada não Averbada</td>
-                <td>{{ statement.area_Reserva_Legal_Aprovada_nao_Averbada|default:"-" }}</td>
-            </tr>
-            <tr>
-                <td>RL Proposta</td>
-                <td>{{ statement.area_reserva_legal_proposta|default:"-" }}</td>
-            </tr>
-            <tr>
-                <td>Total RL Declarada</td>
-                <td>{{ statement.total_reserva_legal_declarada_pelo_proprietario_possuidor|default:"-" }}</td>
-            </tr>
-            <tr>
-                <td>Área APP</td>
-                <td>{{ statement.area_app|default:"-" }}</td>
-            </tr>
-            <tr>
-                <td>APP em Área Rural Consolidada</td>
-                <td>{{ statement.app_em_area_rural_consolidada|default:"-" }}</td>
-            </tr>
-            <tr>
-                <td>APP em Remanescente de Veg. Nativa</td>
-                <td>{{ statement.app_em_area_remanescente_vegetacao_nativa|default:"-" }}</td>
-            </tr>
-            <tr>
-                <td>Passivo/Excedente RL</td>
-                <td>{{ statement.passivo_ou_excedente_de_reserva_legal|default:"-" }}</td>
-            </tr>
-            <tr>
-                <td>RL a Recompor</td>
-                <td>{{ statement.area_reserva_legal_a_recompor|default:"-" }}</td>
-            </tr>
-            <tr>
-                <td>APP a Recompor</td>
-                <td>{{ statement.area_de_preservacao_permanente_a_recompor|default:"-" }}</td>
-            </tr>
-            <tr>
-                <td>Área Antropizada</td>
-                <td>{{ statement.area_antropizada|default:"-" }}</td>
-            </tr>
-        </tbody>
-    </table>
+<div class="declared">
+    <h3>Demonstrativo do CAR</h3>
+
+    <h4>Situação do cadastro</h4>
+    <dl class="declared__list">
+        <div><dt>Número do CAR</dt><dd>{{ statement.car|default:"-" }}</dd></div>
+        <div><dt>Situação do cadastro</dt><dd>{{ statement.registration_status|default:"-" }}</dd></div>
+        <div><dt>Análise pelo órgão ambiental<small>Se o cadastro já foi conferido pelo Estado.</small></dt><dd>{{ statement.external_condicion|default:"-" }}</dd></div>
+        <div><dt>Última atualização</dt><dd>{{ statement.data_retificacao|default:"-" }}</dd></div>
+        <div><dt>Tamanho em módulos fiscais<small>Até 4 módulos é pequena propriedade.</small></dt><dd>{{ statement.tax_modules|default:"-" }}</dd></div>
+    </dl>
+
+    <h4>Uso da terra</h4>
+    <dl class="declared__list">
+        <div><dt>Vegetação nativa existente</dt><dd>{{ statement.native_vegetation_remmant_area|default:"-" }}</dd></div>
+        <div><dt>Área consolidada<small>Já aberta antes de 22/07/2008.</small></dt><dd>{{ statement.area_rural_consolidada|default:"-" }}</dd></div>
+        <div><dt>Área de uso público (servidão)<small>Ex.: linhas de energia, estradas.</small></dt><dd>{{ statement.area_servidao_admistrativa|default:"-" }}</dd></div>
+    </dl>
+
+    <h4>Reserva Legal</h4>
+    <dl class="declared__list">
+        <div><dt>Registrada em cartório (averbada)</dt><dd>{{ statement.area_Reserva_Legal_Averbada_referente_Art_30_codigo_florestal|default:"-" }}</dd></div>
+        <div><dt>Aprovada, ainda não registrada</dt><dd>{{ statement.area_Reserva_Legal_Aprovada_nao_Averbada|default:"-" }}</dd></div>
+        <div><dt>Proposta pelo proprietário</dt><dd>{{ statement.area_reserva_legal_proposta|default:"-" }}</dd></div>
+        <div><dt>Total declarado</dt><dd>{{ statement.total_reserva_legal_declarada_pelo_proprietario_possuidor|default:"-" }}</dd></div>
+        <div><dt>Saldo (falta ou sobra)<small>Negativo = falta; positivo = sobra.</small></dt><dd>{{ statement.passivo_ou_excedente_de_reserva_legal|default:"-" }}</dd></div>
+        <div><dt>A recuperar</dt><dd>{{ statement.area_reserva_legal_a_recompor|default:"-" }}</dd></div>
+    </dl>
+
+    <h4>Áreas de Preservação Permanente (APP)</h4>
+    <dl class="declared__list">
+        <div><dt>Total de APP<small>Margens de rios, nascentes, veredas.</small></dt><dd>{{ statement.area_app|default:"-" }}</dd></div>
+        <div><dt>APP com vegetação nativa</dt><dd>{{ statement.app_em_area_remanescente_vegetacao_nativa|default:"-" }}</dd></div>
+        <div><dt>APP aberta antes de 22/07/2008</dt><dd>{{ statement.app_em_area_rural_consolidada|default:"-" }}</dd></div>
+        <div><dt>APP aberta após 22/07/2008<small>Precisa ser recuperada.</small></dt><dd>{{ statement.area_antropizada|default:"-" }}</dd></div>
+        <div><dt>APP a recuperar (declarado)</dt><dd>{{ statement.area_de_preservacao_permanente_a_recompor|default:"-" }}</dd></div>
+    </dl>
 </div>

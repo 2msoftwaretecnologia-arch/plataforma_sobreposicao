@@ -1,26 +1,25 @@
+{% load report_extras %}
 <table class="report-table">
     <thead>
         <tr>
-            <th>Área (ha)</th>
-            <th>Identificação</th>
+            <th>Classificação</th>
             <th>Ano</th>
             <th>Satélite</th>
-            <th>Data da Imagem</th>
+            <th>Data da imagem</th>
+            <th class="num">Área desmatada</th>
         </tr>
     </thead>
     <tbody>
         {% for item in items %}
         <tr>
-            <td>{{ item.area|floatformat:4 }}</td>
-            <td>{{ item.identificacao|default:"-" }}</td>
+            <td>{{ item.identificacao|default:"-"|lower|capfirst }}</td>
             <td>{{ item.ano|default:"-" }}</td>
             <td>{{ item.satelite|default:"-" }}</td>
             <td>{{ item.data_da_imagem|default:"-" }}</td>
+            <td class="num">{{ item.area|ha }}</td>
         </tr>
         {% empty %}
-        <tr>
-            <td colspan="5">Nenhum registro encontrado.</td>
-        </tr>
+        <tr><td colspan="5">Nenhum registro encontrado.</td></tr>
         {% endfor %}
     </tbody>
 </table>

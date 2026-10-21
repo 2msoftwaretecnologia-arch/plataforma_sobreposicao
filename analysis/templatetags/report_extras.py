@@ -1,4 +1,5 @@
 from django import template
+from django.utils.formats import number_format
 
 register = template.Library()
 
@@ -100,3 +101,71 @@ def bases_overview(bases):
         "criticas": criticas,
         "atencao": atencao,
     }
+
+
+@register.filter
+def ha(value):
+    """Área em hectares no formato brasileiro, com 2 casas (ex.: '1.234,57 ha')."""
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return "-"
+    if 0 < value < 0.01:
+        return "menos de 0,01 ha"
+    return f"{number_format(value, 2, use_l10n=True, force_grouping=True)} ha"
+
+
+# Alqueire goiano, a medida usada no Tocantins.
+_HA_POR_ALQUEIRE = 4.84
+
+
+@register.filter
+def alqueires(value):
+    """Converte hectares para alqueires goianos (ex.: '22,2 alqueires')."""
+    try:
+        value = float(value) / _HA_POR_ALQUEIRE
+    except (TypeError, ValueError):
+        return ""
+    return f"{number_format(value, 1, use_l10n=True, force_grouping=True)} alqueires"
+
+
+@register.filter
+def pct(value):
+    """Porcentagem no formato brasileiro, com 1 casa (ex.: '35,2%')."""
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return ""
+    if 0 < value < 0.1:
+        return "menos de 0,1%"
+    casas = 0 if round(value, 1).is_integer() else 1
+    return f"{number_format(value, casas, use_l10n=True)}%"
+
+
+_ZONING_MEANINGS = (
+    ("ZDI", "Desenvolvimento intensivo: indicada para produção em larga escala, com restrições ambientais moderadas."),
+    ("ZDE", "Desenvolvimento extensivo: indicada para pecuária, silvicultura ou agricultura de baixo impacto."),
+    ("ZCE", "Conservação ecológica: prioriza a natureza; atividades humanas muito restritas."),
+    ("ZAU", "Agropecuária e uso sustentável."),
+    ("ZPA", "Proteção ambiental, semelhante a uma APA."),
+    ("ZRE", "Recuperação ecológica: áreas degradadas que devem ser recuperadas."),
+    ("ZMC", "Mineração, com licenciamento específico."),
+    ("ZIT", "Interesse turístico: recreação e ecoturismo."),
+    ("ZEUS", "Expansão urbana sustentável."),
+    ("ZER", "Expansão restrita, com limitações legais."),
+    ("ZR", "Zona rural, com uso agropecuário variado."),
+    ("ZU", "Zona urbana."),
+    ("ZP", "Preservação permanente."),
+)
+
+
+@register.filter
+def zoning_meaning(sigla):
+    """Explicação em linguagem simples para a sigla de zoneamento."""
+    sigla = (sigla or "").strip().upper()
+    if not sigla:
+        return "-"
+    for chave, texto in _ZONING_MEANINGS:
+        if sigla == chave or sigla.startswith(chave + "-"):
+            return texto
+    return "Zona definida pelo zoneamento do Estado."

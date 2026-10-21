@@ -1,14 +1,2 @@
-<table class="report-table">
-    <thead>
-        <tr>
-            <th>Área (ha)</th>
-        </tr>
-    </thead>
-    {% if items %}
-    <tfoot>
-        <tr>
-            <td style="font-weight: bold;">Total: {{ total_area|floatformat:4 }}</td>
-        </tr>
-    </tfoot>
-    {% endif %}
-</table>
+{% load report_extras %}
+<p class="total-line">Área total de ipucas dentro da propriedade: <strong>{{ total_area|ha }}</strong></p>

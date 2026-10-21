@@ -86,16 +86,14 @@
                 </div>
                 {% endif %}
 
-                {% if not is_historico %}
                 {% if resultado or demonstrativo or recibo %}
                 <div class="hero-actions reveal reveal-delay-2">
-                    {% if resultado or demonstrativo or recibo %}
                     <button type="button" onclick="printReport()" class="btn btn-gold">
                         <svg class="ico" style="width:18px;height:18px"><use href="#i-doc"/></svg>
                         Gerar Relatório
                     </button>
-                    {% endif %}
-                    {% if resultado %}
+                    {# SHP/KML ainda saem da última análise da sessão, então ficam fora do histórico. #}
+                    {% if resultado and not is_historico %}
                     <a href="{% url 'download_property_shp' %}" class="btn btn-outline-light">
                         <svg class="ico" style="width:18px;height:18px"><use href="#i-download"/></svg>
                         Baixar SHP
@@ -109,7 +107,9 @@
 
                 <script>
                     function printReport() {
-                        const url = "{% url 'report_print' %}";
+                        // O relatório é aberto pelo id da análise, para não pegar outra
+                        // análise que tenha sido feita em outra aba depois desta.
+                        const url = "{% url 'report_print' %}{% if historico %}?historico={{ historico.pk|stringformat:"d" }}{% elif historico_id %}?historico={{ historico_id|stringformat:"d" }}{% endif %}";
                         const win = window.open(url, '_blank');
                         if (win) {
                             win.focus();
@@ -118,7 +118,6 @@
                         }
                     }
                 </script>
-                {% endif %}
                 {% endif %}
             </div>
         </div>

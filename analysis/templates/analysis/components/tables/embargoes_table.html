@@ -1,58 +1,33 @@
-<table class="report-table">
-    <thead>
-        <tr>
-            <th>Área (ha)</th>
-            <th>Infração / Processo</th>
-            <th>Imóvel / Unidade Controladora</th>
-            <th>Embargado</th>
-            <th>Descrições</th>
-            <th>Datas</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for item in items %}
-        <tr>
-            <td>{{ item.area|floatformat:4 }}</td>
-            <td>
-                <strong>Número do Auto:</strong> {{ item.number_infraction_act|default:"-" }}<br>
-                <strong>Número do Processo:</strong> {{ item.process_number|default:"-" }}
-            </td>
-            <td>
-                <strong>Nome do Imóvel:</strong> {{ item.property_name|default:"-" }}<br>
-                {% if item.type_area %}
-                <small class="text-muted"><strong>Tipo de Área:</strong> {{ item.type_area }}</small><br>
-                {% endif %}
-                {% if item.control_unity %}
-                <small class="text-muted"><strong>Unidade Controladora:</strong> {{ item.control_unity }}</small>
-                {% endif %}
-            </td>
-            <td>
-                <strong>Nome do Embargado:</strong> {{ item.nome_embargado|default:"-" }}<br>
-                <small class="text-muted"><strong>CPF/CNPJ:</strong> {{ item.cpf_cnpj_embargado|default:"-" }}</small>
-            </td>
-            <td>
-                <div style="max-width: 250px; font-size: 0.85em;">
-                    {% if item.infraction_description %}
-                        <div><strong>Infração:</strong> {{ item.infraction_description }}</div>
-                    {% endif %}
-                    {% if item.act_description %}
-                        <div style="margin-top: 4px;"><strong>Ato:</strong> {{ item.act_description }}</div>
-                    {% endif %}
-                </div>
-            </td>
-            <td>
-                <div style="font-size: 0.85em;">
-                    <div><strong>Data do Embargo:</strong> {{ item.embargoe_date|default:"-" }}</div>
-                    {% if item.priting_date %}
-                    <div><strong>Data da Impressão:</strong> {{ item.priting_date }}</div>
-                    {% endif %}
-                </div>
-            </td>
-        </tr>
-        {% empty %}
-        <tr>
-            <td colspan="6">Nenhum registro encontrado.</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+{% load report_extras %}
+<div class="record-list">
+    {% for item in items %}
+    <div class="record-card">
+        <div class="record-card__header">
+            <div>
+                <span class="record-card__title">Auto de infração nº {{ item.number_infraction_act|default:"-" }}</span>
+                <span class="record-card__subtitle">Processo {{ item.process_number|default:"-" }}</span>
+            </div>
+            <div class="record-card__tags">
+                <span class="badge badge--negative">{{ item.area|ha }} embargados</span>
+            </div>
+        </div>
+        <dl class="record-card__fields">
+            <div><dt>Data do embargo</dt><dd>{{ item.embargoe_date|default:"-" }}</dd></div>
+            <div class="record-card__wide"><dt>Imóvel informado no embargo</dt><dd>{{ item.property_name|default:"-" }}</dd></div>
+            <div class="record-card__wide"><dt>Pessoa ou empresa embargada</dt><dd>{{ item.nome_embargado|default:"-" }}</dd></div>
+            <div><dt>CPF/CNPJ</dt><dd>{{ item.cpf_cnpj_embargado|default:"-" }}</dd></div>
+            {% if item.infraction_description %}
+            <div class="record-card__full"><dt>Motivo (infração)</dt><dd>{{ item.infraction_description }}</dd></div>
+            {% endif %}
+            {% if item.act_description %}
+            <div class="record-card__full"><dt>Descrição do ato</dt><dd>{{ item.act_description }}</dd></div>
+            {% endif %}
+            {% if item.control_unity %}
+            <div class="record-card__wide"><dt>Unidade do IBAMA responsável</dt><dd>{{ item.control_unity }}</dd></div>
+            {% endif %}
+        </dl>
+    </div>
+    {% empty %}
+    <p class="muted">Nenhum registro encontrado.</p>
+    {% endfor %}
+</div>

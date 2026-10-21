@@ -1,53 +1,23 @@
-<div class="table-container">
-    <h4>Informações Declaradas do Recibo</h4>
-    <table class="report-table">
-        <tbody>
-            <tr>
-                <td>CAR</td>
-                <td>{{ receipt.car|default:"-" }}</td>
-            </tr>
-            <tr>
-                <td>Nome do Imóvel Rural</td>
-                <td>{{ receipt.nome_imovel_rural|default:"-" }}</td>
-            </tr>
-            <tr>
-                <td>Módulos Fiscais</td>
-                <td>{{ receipt.modulos_fiscais|default:"-" }}</td>
-            </tr>
-            <tr>
-                <td>Área Rural Consolidada</td>
-                <td>{{ receipt.area_rural_consolidada|default:"-" }}</td>
-            </tr>
-            <tr>
-                <td>Área de Servidão Administrativa</td>
-                <td>{{ receipt.area_servidao_administrativa|default:"-" }}</td>
-            </tr>
-            <tr>
-                <td>Remanescente de Vegetação Nativa</td>
-                <td>{{ receipt.remanescente_vegetacao_nativa|default:"-" }}</td>
-            </tr>
-            <tr>
-                <td>Área Líquida do Imóvel</td>
-                <td>{{ receipt.area_liquida_do_imovel|default:"-" }}</td>
-            </tr>
-            <tr>
-                <td>Área de Reserva Legal</td>
-                <td>{{ receipt.area_reserva_legal|default:"-" }}</td>
-            </tr>
-            <tr>
-                <td>Área de Preservação Permanente</td>
-                <td>{{ receipt.area_preservacao_permanente|default:"-" }}</td>
-            </tr>
-            <tr>
-                <td>Área Antropizada</td>
-                <td>{{ receipt.area_antropizada|default:"-" }}</td>
-            </tr>
-        </tbody>
-    </table>
+<div class="declared">
+    <h3>Recibo de inscrição no CAR</h3>
+    <dl class="declared__list">
+        <div><dt>Número do CAR</dt><dd>{{ receipt.car|default:"-" }}</dd></div>
+        <div><dt>Nome da propriedade</dt><dd>{{ receipt.nome_imovel_rural|default:"-" }}</dd></div>
+        <div>
+            <dt>Tamanho em módulos fiscais<small>Até 4 módulos é pequena propriedade.</small></dt>
+            <dd>{{ receipt.modulos_fiscais|default:"-" }}</dd>
+        </div>
+        <div><dt>Área líquida<small>Área total menos as áreas de uso público.</small></dt><dd>{{ receipt.area_liquida_do_imovel|default:"-" }}</dd></div>
+        <div><dt>Vegetação nativa existente</dt><dd>{{ receipt.remanescente_vegetacao_nativa|default:"-" }}</dd></div>
+        <div><dt>Área consolidada<small>Já aberta antes de 22/07/2008.</small></dt><dd>{{ receipt.area_rural_consolidada|default:"-" }}</dd></div>
+        <div><dt>Área de uso público (servidão)<small>Ex.: linhas de energia, estradas.</small></dt><dd>{{ receipt.area_servidao_administrativa|default:"-" }}</dd></div>
+        <div><dt>Reserva Legal declarada</dt><dd>{{ receipt.area_reserva_legal|default:"-" }}</dd></div>
+        <div><dt>Áreas de Preservação Permanente (APP)</dt><dd>{{ receipt.area_preservacao_permanente|default:"-" }}</dd></div>
+        <div><dt>APP aberta após 22/07/2008<small>Precisa ser recuperada.</small></dt><dd>{{ receipt.area_antropizada|default:"-" }}</dd></div>
+    </dl>
 
     {% if receipt.proprietarios %}
-    <br/>
-    <h4>Proprietários</h4>
+    <h4>Proprietários ou possuidores</h4>
     <table class="report-table">
         <thead>
             <tr>

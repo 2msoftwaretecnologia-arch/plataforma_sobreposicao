@@ -1,24 +1,23 @@
+{% load report_extras %}
 <table class="report-table">
     <thead>
         <tr>
-            <th>Área (ha)</th>
-            <th>Nome</th>
-            <th>Tipo</th>
-            <th>Área à Preservar (ha)</th>
+            <th>Uso / vegetação</th>
+            <th>Bioma (% de Reserva Legal)</th>
+            <th class="num">Área</th>
+            <th class="num">Reserva Legal exigida</th>
         </tr>
     </thead>
     <tbody>
         {% for item in items %}
         <tr>
-            <td>{{ item.area|floatformat:4 }}</td>
             <td>{{ item.nome|default:"-" }}</td>
             <td>{{ item.tipo|default:"-" }}</td>
-            <td>{{ item.preserved_area|floatformat:4|default:"-" }}</td>
+            <td class="num">{{ item.area|ha }}</td>
+            <td class="num">{{ item.preserved_area|ha }}</td>
         </tr>
         {% empty %}
-        <tr>
-            <td colspan="4">Nenhum registro encontrado.</td>
-        </tr>
+        <tr><td colspan="4">Nenhum registro encontrado.</td></tr>
         {% endfor %}
     </tbody>
 </table>

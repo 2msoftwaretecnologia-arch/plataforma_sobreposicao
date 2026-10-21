@@ -26,6 +26,7 @@ from analysis.models import CrossBatch, CrossBatchItem, SearchHistory
 from analysis.services.analyze_coordinates.search_all import SearchAll
 from analysis.services.analyze_coordinates.search_for_car import SearchForCar
 from analysis.services.analyze_coordinates.search_for_sigef import SearchForSigef
+from analysis.services.view_services.report_service import build_report_context
 from analysis.services.view_services.imagery_service import (
     OGC_PROVIDERS,
     ImageryError,
@@ -81,7 +82,7 @@ def _save_search_history(request, data, search_type):
     pesquisaram. Não deve nunca quebrar o fluxo de busca do usuário."""
     try:
         resultado = data.get('resultado') or {}
-        SearchHistory.objects.create(
+        historico = SearchHistory.objects.create(
             user=request.user if request.user.is_authenticated else None,
             search_type=search_type,
             car_input=data.get('car_input') or '',
@@ -93,8 +94,20 @@ def _save_search_history(request, data, search_type):
             erro=data.get('erro') or '',
             result_data=data,
         )
+        # Vai junto para a sessão: o relatório é aberto por este id, e não pela
+        # "última análise", para não trocar de análise se houver duas abas abertas.
+        data['historico_id'] = historico.pk
     except Exception:
         pass
+
+
+def _historico_data(request, pk):
+    """Resultado salvo de uma busca do próprio usuário, já filtrado pelas permissões atuais."""
+    historico = get_object_or_404(SearchHistory, pk=pk, user=request.user)
+    stored = dict(historico.result_data or {})
+    if historico.search_type == SearchHistory.SearchType.SIGEF:
+        stored['source_model'] = 'Sigef'
+    return historico, filter_result(stored, request.user)
 
 
 class HomePageView(View):
@@ -215,12 +228,7 @@ class HistoricoDetalheView(View):
     """Reabre o resultado de uma busca do próprio usuário logado."""
 
     def get(self, request, pk):
-        historico = get_object_or_404(SearchHistory, pk=pk, user=request.user)
-
-        stored = dict(historico.result_data or {})
-        if historico.search_type == SearchHistory.SearchType.SIGEF:
-            stored['source_model'] = 'Sigef'
-        data = filter_result(stored, request.user)
+        historico, data = _historico_data(request, pk)
         data['imagery'] = imagery_config()
         data = format_data_map(data)
         data['is_historico'] = True
@@ -236,54 +244,16 @@ class ReportPrintView(View):
     template_name = 'analysis/report_print.html'
 
     def get(self, request):
-        data = filter_result(request.session.get('last_analysis') or {}, request.user)
-        data = self.format_data(data)
+        pk = request.GET.get('historico', '')
+        if pk:
+            if not pk.isdigit():
+                raise Http404
+            _, data = _historico_data(request, int(pk))
+        else:
+            # Links antigos (sem id) continuam abrindo a última análise da sessão.
+            data = filter_result(request.session.get('last_analysis') or {}, request.user)
+        data = build_report_context(data)
         return render(request, self.template_name, data)
-
-    def format_data(self, data: dict) -> dict:
-        resultado = data.get('resultado') or {}
-        data['has_mapbiomas_alerts'] = False
-        
-        # Calcular área total por base
-        if resultado and 'resultados_por_base' in resultado:
-            for base in resultado['resultados_por_base']:
-                # Filter out water bodies from Fitoecologias
-                if "Fitoecologias" in base.get('nome_base', ''):
-                    base['areas_encontradas'] = [
-                        item for item in base.get('areas_encontradas', [])
-                        if not ("água" in item.get('item_info', '').lower() or "agua" in item.get('item_info', '').lower())
-                    ]
-
-                areas = base.get('areas_encontradas', [])
-                total = 0.0
-                for item in areas:
-                    try:
-                        total += float(item.get('area', 0))
-                    except (ValueError, TypeError):
-                        pass
-                base['total_area'] = total
-
-                nome_base = base.get('nome_base', '')
-                if (
-                    ("Mapbiomas" in nome_base or "MapBiomas" in nome_base)
-                    and base.get('areas_encontradas')
-                ):
-                    data['has_mapbiomas_alerts'] = True
-
-        demonstrativo = data.get('demonstrativo')
-
-        if not demonstrativo:
-            return data
-
-        area_rl_proposta = demonstrativo.get('area_reserva_legal_proposta_num', 0)
-        area_preservada_calculada = resultado.get('area_preservada_total', 0)
-
-        deficit_rl = area_rl_proposta - area_preservada_calculada
-
-        data['has_deficit_rl'] = deficit_rl < 0
-        data['deficit_rl_value'] = f"{(deficit_rl):.4f} ha"
-
-        return data
 
 
 class DownloadPropertyShapefileView(View):

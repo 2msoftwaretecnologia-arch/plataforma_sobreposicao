@@ -5,415 +5,448 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <title>Relatório de Análise | TerraView Tocantins</title>
-  <icon type="image/x-icon" href="{% static 'analysis/images/icon_page.svg' %}">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Relatório da Propriedade | TerraView Tocantins</title>
+  <link rel="icon" type="image/svg+xml" href="{% static 'analysis/images/icon_page.svg' %}">
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 
   <!-- Leaflet & Maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link href='https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/leaflet.fullscreen.css' rel='stylesheet' />
-  <link rel="stylesheet" href="{% static 'analysis/css/report.css' %}?v={{ static_version|default:'20260715' }}" />
+  <link rel="stylesheet" href="{% static 'analysis/css/report.css' %}?v={{ static_version|default:'20261021b' }}" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src='https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/Leaflet.fullscreen.min.js'></script>
-  <script src="{% static 'analysis/js/maps.js' %}"></script>
-  <style>
-      .report-map {
-          width: 100%;
-          height: 350px;
-          margin-top: 15px;
-          border-radius: 4px;
-          border: 1px solid #e2e8f0;
-          z-index: 0;
-      }
-  </style>
+  <script src="{% static 'analysis/js/report_maps.js' %}?v={{ static_version|default:'20261021b' }}"></script>
 </head>
 <body>
 
-<div class="container">
+<div class="sheet">
 
-  <!-- INFORMAÇÕES GERAIS -->
-  <section class="card reveal">
-    <div class="report-header">
-        <div class="report-header__brand">
-            <span class="report-header__logo">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 21V9"/><path d="M12 9c-2.8 0-4.5-1.8-4.5-4.5C10.2 4.5 12 6.2 12 9zM12 9c2.8 0 4.5-1.8 4.5-4.5C13.8 4.5 12 6.2 12 9zM12 14c-2.8 0-4.5-1.8-4.5-4.5 2.7 0 4.5 1.7 4.5 4.5zM12 14c2.8 0 4.5-1.8 4.5-4.5-2.7 0-4.5 1.7-4.5 4.5zM12 19c-2.8 0-4.5-1.8-4.5-4.5 2.7 0 4.5 1.7 4.5 4.5zM12 19c2.8 0 4.5-1.8 4.5-4.5-2.7 0-4.5 1.7-4.5 4.5z"/>
+  <!-- CABEÇALHO -->
+  <header class="cover">
+    <div class="cover__top">
+      <div class="cover__brand">
+        <span class="cover__logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 21V9"/><path d="M12 9c-2.8 0-4.5-1.8-4.5-4.5C10.2 4.5 12 6.2 12 9zM12 9c2.8 0 4.5-1.8 4.5-4.5C13.8 4.5 12 6.2 12 9zM12 14c-2.8 0-4.5-1.8-4.5-4.5 2.7 0 4.5 1.7 4.5 4.5zM12 14c2.8 0 4.5-1.8 4.5-4.5-2.7 0-4.5 1.7-4.5 4.5zM12 19c-2.8 0-4.5-1.8-4.5-4.5 2.7 0 4.5 1.7 4.5 4.5zM12 19c2.8 0 4.5-1.8 4.5-4.5-2.7 0-4.5 1.7-4.5 4.5z"/></svg>
+        </span>
+        <span class="cover__eyebrow">TerraView Tocantins</span>
+      </div>
+      <button type="button" class="print-btn" onclick="window.print()">Salvar em PDF / Imprimir</button>
+    </div>
+
+    <h1>Relatório da Propriedade Rural</h1>
+    <p class="cover__lead">
+      Cruzamos o desenho da propriedade com as bases oficiais do governo para mostrar,
+      em linguagem simples, se existe algum problema ambiental ou de limites com vizinhos e áreas protegidas.
+    </p>
+
+    <dl class="cover__ident">
+      <div>
+        <dt>Proprietário ou solicitante</dt>
+        <dd><span contenteditable="true" class="editable-field" data-placeholder="Clique para preencher">{% for p in proprietarios %}{{ p.nome }}{% if not forloop.last %}, {% endif %}{% endfor %}</span></dd>
+      </div>
+      <div>
+        <dt>Nome da propriedade</dt>
+        <dd><span contenteditable="true" class="editable-field" data-placeholder="Clique para preencher">{{ nome_imovel }}</span></dd>
+      </div>
+      {% if numero_car %}
+        <div>
+          <dt>Número do CAR</dt>
+          <dd>{{ numero_car }}</dd>
+        </div>
+      {% endif %}
+      <div>
+        <dt>Data do relatório</dt>
+        <dd>{% now "d/m/Y \à\s H:i" %}</dd>
+      </div>
+    </dl>
+  </header>
+
+  {% if resultado %}
+
+  <!-- VEREDITO -->
+  <section class="verdict verdict--{{ veredito }}">
+    <span class="verdict__icon" aria-hidden="true">
+      {% if veredito == 'alerta' %}!{% elif veredito == 'atencao' %}?{% else %}✓{% endif %}
+    </span>
+    <div>
+      <p class="verdict__eyebrow">Resultado em uma frase</p>
+      {% if veredito == 'alerta' %}
+        <h2>Encontramos {{ n_alertas }} problema{{ n_alertas|pluralize }} sério{{ n_alertas|pluralize }}</h2>
+        <p>
+          Há pontos que podem impedir o uso, a venda ou o financiamento da propriedade.
+          {% if n_atencao %}Também há {{ n_atencao }} ponto{{ n_atencao|pluralize }} para conferir.{% endif %}
+          Antes de fechar qualquer negócio, recomendamos levar este relatório a um profissional
+          (engenheiro agrônomo, engenheiro florestal ou advogado da área ambiental).
+        </p>
+      {% elif veredito == 'atencao' %}
+        <h2>Encontramos {{ n_atencao }} ponto{{ n_atencao|pluralize }} que merece{{ n_atencao|pluralize:"m" }} ser conferido{{ n_atencao|pluralize }}</h2>
+        <p>
+          Nada indica um impedimento imediato para usar a propriedade, mas existem situações
+          que devem ser verificadas com calma. Veja abaixo o que cada uma significa.
+        </p>
+      {% else %}
+        <h2>Nenhum problema encontrado</h2>
+        <p>
+          Nas bases consultadas não encontramos embargos, desmatamentos nem invasão de terras
+          indígenas, quilombolas ou áreas protegidas.
+        </p>
+      {% endif %}
+    </div>
+  </section>
+
+  <!-- PERGUNTAS PRINCIPAIS -->
+  <section class="block">
+    <div class="block__head">
+      <h2>As perguntas mais importantes</h2>
+      <ul class="legend" aria-label="Legenda das cores">
+        <li><span class="dot dot--alerta"></span>Problema sério</li>
+        <li><span class="dot dot--atencao"></span>Conferir</li>
+        <li><span class="dot dot--ok"></span>Tudo certo</li>
+        <li><span class="dot dot--sem_dado"></span>Sem dados</li>
+      </ul>
+    </div>
+
+    <ol class="checklist">
+      {% for c in checklist %}
+        <li class="check check--{{ c.status }}">
+          <span class="dot dot--{{ c.status }}" aria-hidden="true"></span>
+          <div class="check__body">
+            <p class="check__question">{{ c.pergunta }}</p>
+            <p class="check__explain">{{ c.explicacao }}</p>
+          </div>
+          <span class="check__answer">{{ c.resposta }}</span>
+        </li>
+      {% endfor %}
+    </ol>
+  </section>
+
+  <!-- NÚMEROS -->
+  <section class="block">
+    <div class="block__head">
+      <h2>A propriedade em números</h2>
+    </div>
+
+    <div class="facts">
+      <div class="fact">
+        <span class="fact__label">Tamanho</span>
+        <span class="fact__value">{{ resultado.tamanho_area|ha }}</span>
+        <span class="fact__note">aproximadamente {{ resultado.tamanho_area|alqueires }} (1 alqueire goiano = 4,84 ha)</span>
+      </div>
+
+      {% if municipios_encontrados %}
+        <div class="fact">
+          <span class="fact__label">Município{{ municipios_encontrados|length|pluralize }}</span>
+          <span class="fact__value fact__value--text">{{ municipios_encontrados|join:", " }}{% if uf %} – {{ uf }}{% endif %}</span>
+        </div>
+      {% elif municipio %}
+        <div class="fact">
+          <span class="fact__label">Município</span>
+          <span class="fact__value fact__value--text">{{ municipio }}{% if uf %} – {{ uf }}{% endif %}</span>
+        </div>
+      {% endif %}
+
+      {% if biomas %}
+        <div class="fact">
+          <span class="fact__label">Vegetação natural</span>
+          <span class="fact__value fact__value--text">
+            {% for b in biomas %}{{ b.nome }}{% if not forloop.last %}, {% endif %}{% endfor %}
+          </span>
+          <span class="fact__note">O percentual entre parênteses é quanto da área precisa ser mantido como Reserva Legal.</span>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="rl">
+      <div class="rl__text">
+        <h3>Reserva Legal</h3>
+        <p>
+          É a parte da propriedade que, por lei, precisa continuar com vegetação nativa.
+          No Tocantins, em geral, são 35% da área em regiões de Cerrado e 80% em regiões de floresta
+          (Lei 12.651/2012, o Código Florestal).
+        </p>
+      </div>
+      <dl class="rl__numbers">
+        <div>
+          <dt>Exigida por lei</dt>
+          <dd>{{ reserva_legal.exigida|ha }}</dd>
+        </div>
+        <div>
+          <dt>Declarada no CAR</dt>
+          <dd>{% if reserva_legal.declarada_txt %}{{ reserva_legal.declarada_txt }}{% else %}<span class="muted">Não informado</span>{% endif %}</dd>
+        </div>
+        <div class="{% if reserva_legal.tem_deficit %}rl__status--bad{% elif reserva_legal.avaliada %}rl__status--good{% endif %}">
+          <dt>Situação</dt>
+          <dd>
+            {% if reserva_legal.tem_deficit %}
+              Faltam {{ reserva_legal.deficit|ha }}
+            {% elif reserva_legal.avaliada %}
+              Suficiente
+            {% else %}
+              <span class="muted">Envie o Demonstrativo do CAR para conferir</span>
+            {% endif %}
+          </dd>
+        </div>
+      </dl>
+      {% if demonstrativo and demonstrativo.issue_rl_quote %}
+        <p class="rl__extra">
+          A propriedade tem Reserva Legal sobrando ({{ demonstrativo.passivo_ou_excedente_de_reserva_legal|cut:"-" }} ha)
+          e pode emitir Cotas de Reserva Ambiental, que podem ser vendidas a quem precisa compensar falta de Reserva Legal.
+        </p>
+      {% endif %}
+    </div>
+
+    {% if mapa_propriedade %}
+      <div class="where">
+        {% if localizacao %}
+          <div class="where__locator">
+            <h3>Onde fica</h3>
+            {% with svg=localizacao.svg %}
+              {% if svg %}
+                <svg class="locator" viewBox="-6 -6 {{ svg.largura|add:12 }} {{ svg.altura|add:12 }}" role="img" aria-label="Localização da propriedade no mapa do Tocantins">
+                  <path class="locator__state" d="{{ svg.path }}"/>
+                  {% if svg.capital %}
+                    <circle class="locator__capital" cx="{{ svg.capital.x|unlocalize }}" cy="{{ svg.capital.y|unlocalize }}" r="3"/>
+                    <text class="locator__label" x="{{ svg.capital.x|unlocalize }}" y="{{ svg.capital.y|unlocalize }}" dx="6" dy="4">{{ svg.capital.nome }}</text>
+                  {% endif %}
+                  <circle class="locator__halo" cx="{{ svg.x|unlocalize }}" cy="{{ svg.y|unlocalize }}" r="9"/>
+                  <circle class="locator__point" cx="{{ svg.x|unlocalize }}" cy="{{ svg.y|unlocalize }}" r="4.5"/>
                 </svg>
-            </span>
-            <div>
-                <p class="report-header__eyebrow">TerraView Tocantins</p>
-                <h1>Relatório de Análise de Imóvel Rural</h1>
-                <p class="report-header__meta">
-                    Gerado em {% now "d/m/Y H:i" %}
-                    {% if municipio or uf %}
-                        &nbsp;·&nbsp;
-                        {% if municipio %}{{ municipio }}{% endif %}{% if municipio and uf %} - {% endif %}{% if uf %}{{ uf }}{% endif %}
-                    {% endif %}
-                </p>
-            </div>
-        </div>
-        <button type="button" class="print-btn" onclick="printReport()">
-            🖨️ Imprimir PDF
-        </button>
-    </div>
-
-    {% if resultado %}
-    <div class="stat-grid">
-        <div class="stat-card">
-            <span class="stat-card__label">Área total</span>
-            <span class="stat-card__value">{{ resultado.tamanho_area|floatformat:4|default:"-" }} ha</span>
-        </div>
-        <div class="stat-card">
-            <span class="stat-card__label">Sobreposições encontradas</span>
-            <span class="stat-card__value">{{ resultado.total_areas_com_sobreposicao|default:"0" }}</span>
-        </div>
-        <div class="stat-card {% if has_deficit_rl %}stat-card--danger{% else %}stat-card--ok{% endif %}">
-            <span class="stat-card__label">Déficit de Reserva Legal</span>
-            <span class="stat-card__value">{% if has_deficit_rl %}Sim{% else %}Não{% endif %}</span>
-        </div>
-        <div class="stat-card {% if has_mapbiomas_alerts %}stat-card--danger{% else %}stat-card--ok{% endif %}">
-            <span class="stat-card__label">Alertas de desmatamento</span>
-            <span class="stat-card__value">{% if has_mapbiomas_alerts %}Sim{% else %}Não{% endif %}</span>
-        </div>
-    </div>
-    {% endif %}
-
-    <h2>Detalhes</h2>
-    <div class="info-list" style="margin-bottom: 1rem;">
-        <div>
-            <strong>propietário/solicitante</strong>
-            <span contenteditable="true" class="editable-field" data-placeholder="Clique para editar"></span>
-        </div>
-        <div>
-            <strong>Nome da Fazenda</strong>
-            <span contenteditable="true" class="editable-field" data-placeholder="Clique para editar"></span>
-        </div>
-
-        {% if resultado.tamanho_area %}
-            <div>
-                <strong>Área total (ha)</strong>
-                <span>
-                    {{ resultado.tamanho_area|floatformat:4 }}
-                </span>
-            </div>
+                <p class="where__caption">O ponto vermelho é a propriedade, no mapa do Tocantins.</p>
+              {% endif %}
+            {% endwith %}
+            <dl class="where__coords">
+              <dt>Coordenada central</dt>
+              <dd>Latitude {{ localizacao.lat }}<br>Longitude {{ localizacao.lon }}</dd>
+            </dl>
+            <a class="where__link" href="{{ localizacao.maps_url }}" target="_blank" rel="noopener noreferrer">Abrir no Google Maps</a>
+          </div>
         {% endif %}
-
-        {% if municipio and uf %}
-            <div>
-                <strong>Município / UF</strong>
-                <span>
-                    {{ municipio }} - {{ uf }}
-                </span>
-            </div>
-        {% endif %}
-
-         {% if demonstrativo %}
-            <div>
-                <strong>Situação</strong>
-                <span>
-                    {{ demonstrativo.registration_status|default:"Não informado" }}
-                </span>
-            </div>
-
-            <div>
-                <strong>Condição</strong>
-                <span>
-                    {{ demonstrativo.external_condicion|default:"Não informado" }}
-                </span>
-            </div>
-        {% endif %}
-
-        {% if demonstrativo %}
-            <div>
-                <strong>Reserva Legal Declarada</strong>
-                <span>{{ demonstrativo.area_reserva_legal_proposta|default:"-" }} ha</span>
-            </div>
-        {% endif %}
-
-        <div>
-            <strong class="info-label-with-help">
-                Reserva Legal Necessaria
-                <span class="help-tooltip">
-                    <button
-                        type="button"
-                        class="help-tooltip__button"
-                        aria-label="Informações sobre Reserva Legal necessária"
-                        aria-describedby="reserva-legal-help"
-                    >!</button>
-                    <span id="reserva-legal-help" class="help-tooltip__content" role="tooltip">
-                        <span class="help-tooltip__title">Lei 12.651/2012 - Código Florestal Brasileiro</span>
-                        <span>Estabelece normas para proteção da vegetação nativa em imóveis rurais e urbanos. Exige a manutenção de:</span>
-                        <span><strong>Áreas de Preservação Permanente (APP):</strong> margens de rios, topos de morros, manguezais, etc., sem restrição de tamanho da propriedade.</span>
-                        <span><strong>Reserva Legal (RL):</strong> percentual mínimo de vegetação nativa por bioma: 80% na Amazônia, 35% no Cerrado (dentro da Amazônia Legal) e 20% nos demais biomas (Mata Atlântica, Pampa, etc.).</span>
-                        <span>Institui o Cadastro Ambiental Rural (CAR) como registro eletrônico obrigatório para todos os imóveis rurais, visando monitoramento e recuperação ambiental.</span>
-                    </span>
-                </span>
-            </strong>
-            <span>
-                {% if recibo and recibo.area_reserva_legal %}
-                    {{ recibo.area_reserva_legal }} ha
-                {% else %}
-                    {{ resultado.area_preservada_total|floatformat:4|default:"0,0000" }} ha
-                {% endif %}
-            </span>
-        </div>
-
-        {% if has_deficit_rl %}
-            <div>
-                <strong>Tem Déficit de Reserva legal?</strong>
-                <span class="badge badge--negative">⚠️ Sim · {{ deficit_rl_value|cut:"-" }}</span>
-            </div>
-        {% elif demonstrativo %}
-            <div>
-                <strong>Tem Déficit de Reserva legal?</strong>
-                <span class="badge badge--positive">✔ Não</span>
-            </div>
-        {% else %}
-            <div>
-                <strong>Tem Déficit de Reserva legal?</strong>
-                <span class="badge badge--neutral">Não informado</span>
-            </div>
-        {% endif %}
-
-        {% if demonstrativo %}
-            {% if demonstrativo.issue_rl_quote %}
-                <div>
-                    <strong>Pode Emitir de cota Reserva Legal?</strong>
-                    <span class="badge badge--positive">✔ Sim · {{ demonstrativo.passivo_ou_excedente_de_reserva_legal|cut:"-" }} ha</span>
-                </div>
-            {% else %}
-                <div>
-                    <strong>Pode Emitir de cota Reserva Legal?</strong>
-                    <span class="badge badge--neutral">Não</span>
-                </div>
-            {% endif %}
-        {% endif %}
-
-        <div>
-            <strong>Tem APP Antropizada aposta 22/07/2008?</strong>
-            {% if recibo and recibo.area_antropizada and recibo.app_to_restore %}
-                <span class="badge badge--warning">{{ recibo.area_antropizada }}</span>
-            {% elif demonstrativo and demonstrativo.area_antropizada and demonstrativo.app_to_restore %}
-                <span class="badge badge--warning">{{ demonstrativo.area_antropizada }}</span>
-            {% elif recibo or demonstrativo %}
-                <span class="badge badge--positive">✔ Não</span>
-            {% else %}
-                <span class="badge badge--neutral">Não informado</span>
-            {% endif %}
-        </div>
-
-        {% for base in resultado.resultados_por_base %}
-            {% if "Embargos" in base.nome_base or "Embargoes" in base.nome_base %}
-                <div class="info-list__wide">
-                    <strong>Há Embargos do IBAMA?</strong>
-                    <span>
-                        {% if base.areas_encontradas %}
-                            <span class="badge badge--negative">⚠️ Sim</span>
-                            {% for item in base.areas_encontradas %}
-                                <br>{{ item.area|floatformat:4 }} ha
-                            {% endfor %}
-                        {% else %}
-                            <span class="badge badge--positive">✔ Não</span>
-                        {% endif %}
-                    </span>
-                </div>
-            {% endif %}
-        {% endfor %}
-        <div>
-            <strong>Possui alertas de Desmatamento ?</strong>
-            <span>
-                {% if has_mapbiomas_alerts %}
-                    <span class="badge badge--negative">⚠️ Sim</span>
-                {% else %}
-                    <span class="badge badge--positive">✔ Não</span>
-                {% endif %}
-            </span>
-        </div>
-        {% for base in resultado.resultados_por_base %}
-            {% if "Fitoecologias" in base.nome_base and base.areas_encontradas %}
-                <div class="info-list__wide">
-                    <strong>Bioma(s)</strong>
-                    <span>
-                        {% regroup base.areas_encontradas|dictsort:"item_info" by item_info as fito_list %}
-                        {% for fito in fito_list %}
-                            {% if "Cerrado" in fito.grouper %}🌾{% elif "Floresta" in fito.grouper %}🌳{% endif %}
-                            {{ fito.grouper }} <strong>({{ fito.list.0.area|floatformat:4 }} ha)</strong>{% if not forloop.last %} &nbsp;|&nbsp; {% endif %}
-                        {% endfor %}
-                    </span>
-                </div>
-            {% endif %}
-        {% endfor %}
-    </div>
-
-    {% if recibo %}
-        {% include "analysis/components/tables/receipt_table.html" with receipt=recibo %}
-    {% endif %}
-
-    {% if demonstrativo %}
-        {% include "analysis/components/tables/statement_table.html" with statement=demonstrativo %}
+        <figure class="map-figure">
+          <div id="map-propriedade" class="report-map report-map--tall"></div>
+          <figcaption class="map-legend">
+            <span class="map-legend__item"><span class="map-legend__line"></span>Contorno da propriedade</span>
+          </figcaption>
+        </figure>
+      </div>
+      {{ mapa_propriedade|json_script:"map-propriedade-data" }}
+      <script>
+        initReportMap('map-propriedade', JSON.parse(document.getElementById('map-propriedade-data').textContent));
+      </script>
+      <p class="map-source">Imagens de satélite: Esri World Imagery. A data da foto varia conforme a região e pode não refletir a situação atual da propriedade.</p>
     {% endif %}
   </section>
 
-  <!-- SOBREPOSIÇÕES -->
-  <section class="card reveal reveal-delay-1">
-    <div class="section-heading">
-        <h2>Camadas Ativas</h2>
-        {% if resultado.total_areas_com_sobreposicao %}
-            <span class="section-heading__count">{{ resultado.total_areas_com_sobreposicao }} ocorrência(s) no total</span>
-        {% endif %}
+  <!-- DETALHE POR BASE -->
+  <section class="block">
+    <div class="block__head">
+      <h2>O que encontramos, item por item</h2>
     </div>
+    <p class="block__intro">
+      Cada item abaixo é uma base de dados oficial que cruza com a propriedade.
+      Os mais graves aparecem primeiro. Em cada mapa, a linha preta é o contorno da propriedade
+      e a área colorida é o que foi encontrado, na cor do nível de gravidade.
+    </p>
 
-    {% if resultado.total_areas_com_sobreposicao > 0 %}
+    {% for base in bases_com_ocorrencia %}
+      <article class="finding finding--{{ base.guia.nivel }}" id="base-{{ forloop.counter }}">
+        <header class="finding__head">
+          <span class="tag tag--{{ base.guia.nivel }}">
+            {% if base.guia.nivel == 'alerta' %}Problema sério{% elif base.guia.nivel == 'atencao' %}Conferir{% else %}Para saber{% endif %}
+          </span>
+          <h3>{{ base.guia.titulo }}</h3>
+          <p class="finding__summary">
+            {{ base.areas_relevantes|length }} registro{{ base.areas_relevantes|length|pluralize }} ·
+            {{ base.total_area|ha }}{% if base.pct is not None %} · {{ base.pct|pct }} da propriedade{% endif %}
+          </p>
+        </header>
 
-        {% for base in resultado.resultados_por_base %}
-            {% if base.areas_encontradas %}
-                <div class="base-section reveal" id="base-{{ forloop.counter }}">
-                    <h3><span class="base-section__icon">{{ base.nome_base|base_icon }}</span> {{ base.nome_base }}</h3>
-                    <span class="base-count">{{ base.areas_encontradas|length }} ocorrência(s)</span>
-
-                    {% if "Sigef" in base.nome_base %}
-                        {% include "analysis/components/tables/sigef_table.html" with items=base.areas_encontradas %}
-                    {% elif "Zoneamento" in base.nome_base %}
-                        {% include "analysis/components/tables/zoning_table.html" with items=base.areas_encontradas %}
-                    {% elif "Municípios" in base.nome_base or "Municipios" in base.nome_base or "Municpios" in base.nome_base %}
-                        {% include "analysis/components/tables/municipal_boundaries_table.html" with items=base.areas_encontradas %}
-                    {% elif "APAs" in base.nome_base %}
-                        {% include "analysis/components/tables/environmental_protection_table.html" with items=base.areas_encontradas %}
-                    {% elif "Indígenas" in base.nome_base or "Indigenas" in base.nome_base %}
-                        {% include "analysis/components/tables/indigenous_table.html" with items=base.areas_encontradas %}
-                    {% elif "Quilombolas" in base.nome_base %}
-                        {% include "analysis/components/tables/quilombolas_table.html" with items=base.areas_encontradas %}
-                    {% elif "Assentamentos" in base.nome_base %}
-                        {% include "analysis/components/tables/rural_settlement_table.html" with items=base.areas_encontradas %}
-                    {% elif "CAR Estadual" in base.nome_base %}
-                        {% include "analysis/components/tables/car_estadual_table.html" with items=base.areas_encontradas %}
-                    {% elif "Sicar" in base.nome_base or "CAR" in base.nome_base %}
-                        {% include "analysis/components/tables/sicar_table.html" with items=base.areas_encontradas %}
-                    {% elif "Fitoecologias" in base.nome_base %}
-                        {% include "analysis/components/tables/phytoecology_table.html" with items=base.areas_encontradas %}
-                    {% elif "Veredas" in base.nome_base %}
-                        {% include "analysis/components/tables/paths_table.html" with items=base.areas_encontradas total_area=base.total_area %}
-                    {% elif "IPUCA" in base.nome_base %}
-                        {% include "analysis/components/tables/ipuca_table.html" with items=base.areas_encontradas total_area=base.total_area %}
-                    {% elif "Unidades de Conservação" in base.nome_base %}
-                        {% include "analysis/components/tables/conservation_units_table.html" with items=base.areas_encontradas %}
-                    {% elif "SNIC" in base.nome_base %}
-                        {% include "analysis/components/tables/snic_total_table.html" with items=base.areas_encontradas %}
-                    {% elif "Deforestação" in base.nome_base or "Mapbiomas" in base.nome_base %}
-                        {% include "analysis/components/tables/deforestation_mapbiomas_table.html" with items=base.areas_encontradas %}
-                    {% elif "Embargos" in base.nome_base or "Embargoes" in base.nome_base %}
-                        {% include "analysis/components/tables/embargoes_table.html" with items=base.areas_encontradas %}
-                    {% elif "Prodes" in base.nome_base %}
-                        {% include "analysis/components/tables/prodes_table.html" with items=base.areas_encontradas %}
-                    {% else %}
-                        <table class="report-table">
-                            <thead>
-                                <tr>
-                                    <th>Detalhes</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for item in base.areas_encontradas %}
-                                <tr>
-                                    <td>{{ item.item_info|default:"-" }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    {% endif %}
-
-                    <div id="map-base-{{ forloop.counter }}" class="report-map"></div>
-                    <script>
-                        (function(){
-                            var overlapItems = [];
-
-                            // Sobreposições
-                            {% for item in base.areas_encontradas %}
-                                {% if item.polygon_geojson %}
-                                    overlapItems.push({
-                                        gj: {{ item.polygon_geojson|safe }},
-                                        label: "{{ item.item_info|escapejs }}",
-                                        area: "{{ item.area|default:'' }}",
-                                        color: "{{ item.color|default:'#ef4444' }}",
-                                        fonte: "{{ base.nome_base|escapejs }}"
-                                    });
-                                {% endif %}
-                            {% endfor %}
-
-                            // Inicializa mapa apenas se houver sobreposição para mostrar
-                            if(overlapItems.length > 0){
-                                var items = [];
-
-                                // Contorno da propriedade, para dar referência de onde ela está
-                                {% if resultado.alvo_geojson %}
-                                    items.push({
-                                        gj: {{ resultado.alvo_geojson|safe }},
-                                        label: "Área da Propriedade",
-                                        area: "{{ resultado.tamanho_area|floatformat:4|default:'' }} ha",
-                                        color: "#000000",
-                                        fonte: "Área da Propriedade"
-                                    });
-                                {% endif %}
-
-                                items = items.concat(overlapItems);
-
-                                initImoveisMap(items, {
-                                    elementId: 'map-base-{{ forloop.counter }}',
-                                    isStatic: true,
-                                    scrollWheelZoom: false,
-                                    fullscreenControl: false
-                                });
-                            } else {
-                                // Se não tiver geometria para mostrar, remove o container do mapa para não ficar espaço em branco
-                                var el = document.getElementById('map-base-{{ forloop.counter }}');
-                                if(el) el.style.display = 'none';
-                            }
-                        })();
-                    </script>
-                </div>
-            {% endif %}
-        {% endfor %}
-
-    {% else %}
-        <div class="alert" style="background: #dcfce7; color: #166534;">
-          ✔ Nenhuma sobreposição identificada nas bases consultadas
+        <div class="explain">
+          {% if base.guia.o_que_e %}
+            <div>
+              <span class="explain__label">O que é isso?</span>
+              <p>{{ base.guia.o_que_e }}</p>
+            </div>
+          {% endif %}
+          {% if base.guia.se_encontrado %}
+            <div>
+              <span class="explain__label">O que significa para a propriedade?</span>
+              <p>{{ base.guia.se_encontrado }}</p>
+            </div>
+          {% endif %}
         </div>
+
+        {% if "Sigef" in base.nome_base %}
+          {% include "analysis/components/tables/sigef_table.html" with items=base.areas_relevantes %}
+        {% elif "Zoneamento" in base.nome_base %}
+          {% include "analysis/components/tables/zoning_table.html" with items=base.areas_relevantes %}
+        {% elif "Municípios" in base.nome_base or "Municipios" in base.nome_base or "Municpios" in base.nome_base %}
+          {% include "analysis/components/tables/municipal_boundaries_table.html" with items=base.areas_relevantes %}
+        {% elif "APAs" in base.nome_base %}
+          {% include "analysis/components/tables/environmental_protection_table.html" with items=base.areas_relevantes %}
+        {% elif "Indígenas" in base.nome_base or "Indigenas" in base.nome_base %}
+          {% include "analysis/components/tables/indigenous_table.html" with items=base.areas_relevantes %}
+        {% elif "Quilombolas" in base.nome_base %}
+          {% include "analysis/components/tables/quilombolas_table.html" with items=base.areas_relevantes %}
+        {% elif "Assentamentos" in base.nome_base %}
+          {% include "analysis/components/tables/rural_settlement_table.html" with items=base.areas_relevantes %}
+        {% elif "CAR Estadual" in base.nome_base %}
+          {% include "analysis/components/tables/car_estadual_table.html" with items=base.areas_relevantes %}
+        {% elif "Sicar" in base.nome_base or "CAR" in base.nome_base %}
+          {% include "analysis/components/tables/sicar_table.html" with items=base.areas_relevantes %}
+        {% elif "Fitoecologias" in base.nome_base %}
+          {% include "analysis/components/tables/phytoecology_table.html" with items=base.areas_relevantes %}
+        {% elif "Veredas" in base.nome_base %}
+          {% include "analysis/components/tables/paths_table.html" with items=base.areas_relevantes total_area=base.total_area %}
+        {% elif "IPUCA" in base.nome_base %}
+          {% include "analysis/components/tables/ipuca_table.html" with items=base.areas_relevantes total_area=base.total_area %}
+        {% elif "Unidades de Conservação" in base.nome_base %}
+          {% include "analysis/components/tables/conservation_units_table.html" with items=base.areas_relevantes %}
+        {% elif "SNIC" in base.nome_base %}
+          {% include "analysis/components/tables/snic_total_table.html" with items=base.areas_relevantes %}
+        {% elif "Deforestação" in base.nome_base or "Mapbiomas" in base.nome_base %}
+          {% include "analysis/components/tables/deforestation_mapbiomas_table.html" with items=base.areas_relevantes %}
+        {% elif "Embargos" in base.nome_base or "Embargoes" in base.nome_base %}
+          {% include "analysis/components/tables/embargoes_table.html" with items=base.areas_relevantes %}
+        {% elif "Prodes" in base.nome_base %}
+          {% include "analysis/components/tables/prodes_table.html" with items=base.areas_relevantes %}
+        {% else %}
+          <table class="report-table">
+            <thead>
+              <tr><th>O que foi encontrado</th><th class="num">Área</th></tr>
+            </thead>
+            <tbody>
+              {% for item in base.areas_relevantes %}
+                <tr><td>{{ item.item_info|default:"-" }}</td><td class="num">{{ item.area|ha }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% endif %}
+
+        {% if base.mapa %}
+          <figure class="map-figure">
+            <div id="map-base-{{ forloop.counter }}" class="report-map"></div>
+            <figcaption class="map-legend">
+              <span class="map-legend__item"><span class="map-legend__line"></span>Contorno da propriedade</span>
+              <span class="map-legend__item"><span class="map-legend__swatch" style="--swatch: {{ base.cor_mapa }}"></span>{{ base.guia.titulo }}</span>
+              <span class="map-legend__item map-legend__ring"><span class="map-legend__circle" style="--swatch: {{ base.cor_mapa }}"></span>Área pequena demais para aparecer na escala do mapa</span>
+            </figcaption>
+          </figure>
+          {{ base.mapa|json_script:base.json_id }}
+          <script>
+            initReportMap('map-base-{{ forloop.counter }}', JSON.parse(document.getElementById('{{ base.json_id }}').textContent));
+          </script>
+        {% elif base.cobre_tudo %}
+          <p class="map-note">Este item cobre a propriedade inteira, por isso não repetimos o mapa aqui.</p>
+        {% endif %}
+
+        {% if base.areas_residuais %}
+          <p class="residual-note">
+            Além disso, {{ base.areas_residuais|length }} registro{{ base.areas_residuais|length|pluralize }}
+            encosta{{ base.areas_residuais|length|pluralize:"m" }} na propriedade em menos de {{ limite_residual|ha }}
+            ({{ base.total_residual|ha }} no total). Isso quase sempre é diferença de desenho entre os mapas, e não foi considerado acima.
+          </p>
+        {% endif %}
+      </article>
+    {% empty %}
+      <div class="empty-state">
+        Nenhuma das bases consultadas cruza com a propriedade.
+      </div>
+    {% endfor %}
+
+    {% if bases_so_residuais %}
+      <div class="residual-list">
+        <h3>Encostes mínimos na divisa — desconsiderados</h3>
+        <p>
+          Nestas bases, o único cruzamento tem menos de {{ limite_residual|ha }}.
+          Como cada mapa oficial foi desenhado de um jeito, é comum as divisas se encostarem
+          um pouquinho sem que exista problema real. Por isso, eles não contam no resultado acima.
+        </p>
+        <ul>
+          {% for base in bases_so_residuais %}
+            <li><strong>{{ base.guia.titulo }}</strong> — {{ base.areas_residuais|length }} registro{{ base.areas_residuais|length|pluralize }}, {{ base.total_residual|ha }}</li>
+          {% endfor %}
+        </ul>
+      </div>
     {% endif %}
+
+    {% if bases_sem_ocorrencia %}
+      <div class="clear-list">
+        <h3>Também verificamos — nada encontrado</h3>
+        <ul>
+          {% for base in bases_sem_ocorrencia %}
+            <li>{{ base.guia.titulo }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+  </section>
+
+  {% endif %}
+
+  <!-- DADOS DO CAR -->
+  {% if recibo or demonstrativo %}
+    <section class="block block--appendix">
+      <div class="block__head">
+        <h2>Anexo · Dados declarados no CAR</h2>
+      </div>
+      <p class="block__intro">
+        Informações que o próprio proprietário declarou no Cadastro Ambiental Rural,
+        lidas dos documentos enviados. Os valores estão como aparecem no documento original.
+      </p>
+      {% if recibo %}
+        {% include "analysis/components/tables/receipt_table.html" with receipt=recibo %}
+      {% endif %}
+      {% if demonstrativo %}
+        {% include "analysis/components/tables/statement_table.html" with statement=demonstrativo %}
+      {% endif %}
+    </section>
+  {% endif %}
+
+  <!-- GLOSSÁRIO -->
+  <section class="block block--appendix">
+    <div class="block__head">
+      <h2>Palavras que aparecem neste relatório</h2>
+    </div>
+    <dl class="glossary">
+      <div><dt>Hectare (ha)</dt><dd>Medida de área igual a 10.000 m², mais ou menos o tamanho de um campo de futebol.</dd></div>
+      <div><dt>CAR</dt><dd>Cadastro Ambiental Rural. Registro obrigatório de todo imóvel rural, onde o dono informa a área, a vegetação e os rios da propriedade.</dd></div>
+      <div><dt>Reserva Legal</dt><dd>Parte da propriedade que deve manter vegetação nativa. O tamanho depende do tipo de vegetação da região.</dd></div>
+      <div><dt>APP</dt><dd>Área de Preservação Permanente. Margens de rios, nascentes, veredas e encostas, que precisam manter a vegetação.</dd></div>
+      <div><dt>Área consolidada</dt><dd>Área que já estava aberta (com lavoura, pasto ou construções) antes de 22/07/2008. A lei dá regras mais brandas para ela.</dd></div>
+      <div><dt>Embargo</dt><dd>Proibição de usar uma área, aplicada por órgão ambiental depois de uma infração.</dd></div>
+      <div><dt>Sobreposição</dt><dd>Quando o desenho da propriedade ocupa o mesmo lugar de outra área cadastrada (outro imóvel, área protegida etc.).</dd></div>
+      <div><dt>Módulo fiscal</dt><dd>Unidade usada pela lei para classificar o tamanho do imóvel. Até 4 módulos fiscais é considerada pequena propriedade.</dd></div>
+    </dl>
   </section>
 
   <footer class="footer">
-    Documento gerado automaticamente pela TerraView Tocantins em {% now "d/m/Y H:i" %}
+    <p>
+      Este relatório foi gerado automaticamente pela TerraView Tocantins em {% now "d/m/Y \à\s H:i" %},
+      cruzando o desenho da propriedade com bases de dados públicas.
+      Ele serve como apoio à decisão e <strong>não substitui documentos oficiais nem a análise de um profissional habilitado</strong>.
+      As bases têm datas de atualização diferentes e podem conter imprecisões nos limites.
+    </p>
   </footer>
 
 </div>
 
 <script>
-
-    function printReport() {
-        window.print();
-    }
-
-    // Prevent newlines in editable fields
-    document.querySelectorAll('.editable-field').forEach(field => {
-        field.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                field.blur();
-            }
-        });
-
-        // Paste as plain text
-        field.addEventListener('paste', (e) => {
-            e.preventDefault();
-            const text = (e.clipboardData || window.clipboardData).getData('text');
-            document.execCommand('insertText', false, text);
-        });
+  // Campos editáveis: uma linha só e colagem como texto puro.
+  document.querySelectorAll('.editable-field').forEach(field => {
+    field.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        field.blur();
+      }
     });
-
+    field.addEventListener('paste', (e) => {
+      e.preventDefault();
+      const text = (e.clipboardData || window.clipboardData).getData('text');
+      document.execCommand('insertText', false, text);
+    });
+  });
 </script>
-<script src="{% static 'analysis/js/landing_page.js' %}"></script>
 
 </body>
 </html>
