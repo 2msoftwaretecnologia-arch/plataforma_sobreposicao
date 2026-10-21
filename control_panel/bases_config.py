@@ -126,6 +126,32 @@ BASES_CONFIG = [
         ],
         "campos_calculados": ["Área de interseção (ha)", "Texto descritivo", "Geometria da interseção"],
     },
+    *[
+        # Temas declarados no CAR (download por estado do SICAR): todos têm
+        # as mesmas colunas e o mesmo Formatter (`DeclaredThemeFormatter`).
+        {
+            "modelo": modelo,
+            "nome_base": nome_base,
+            "tabela": tabela,
+            "arquivo_upload": arquivo_upload,
+            "cor": cor,
+            "colunas_extraidas": [
+                {"campo": "category_source", "coluna_bd": "nom_tema", "rotulo": "Tema", "saida": "categoria"},
+                {"campo": "car_number", "coluna_bd": "cod_imovel", "rotulo": "Número do CAR", "saida": None},
+                {"campo": "pending", "coluna_bd": "des_condic", "rotulo": "Condição do Cadastro", "saida": "pendencia"},
+            ],
+            "campos_calculados": ["Área de interseção (ha)", "Texto descritivo", "Geometria da interseção"],
+        }
+        for modelo, nome_base, tabela, arquivo_upload, cor in (
+            ("DeclaredApp", "Base de Dados de APP Declarada", "tb_app_declarada", "declared_app_zip_file", "#00BFA5"),
+            ("DeclaredNativeVegetation", "Base de Dados de Vegetação Nativa Declarada", "tb_vegetacao_nativa_declarada", "declared_native_vegetation_zip_file", "#1B5E20"),
+            ("DeclaredLegalReserve", "Base de Dados de Reserva Legal Declarada", "tb_reserva_legal_declarada", "declared_legal_reserve_zip_file", "#7CB342"),
+            ("DeclaredConsolidatedArea", "Base de Dados de Área Consolidada Declarada", "tb_area_consolidada_declarada", "declared_consolidated_area_zip_file", "#A1887F"),
+            ("DeclaredRestrictedUse", "Base de Dados de Área de Uso Restrito Declarada", "tb_uso_restrito_declarado", "declared_restricted_use_zip_file", "#FBC02D"),
+            ("DeclaredFallowArea", "Base de Dados de Área de Pousio Declarada", "tb_area_pousio_declarada", "declared_fallow_area_zip_file", "#FFB74D"),
+            ("DeclaredAdministrativeEasement", "Base de Dados de Servidão Administrativa Declarada", "tb_servidao_administrativa_declarada", "declared_administrative_easement_zip_file", "#546E7A"),
+        )
+    ],
     {
         "modelo": "Quilombolas",
         "nome_base": "Base de Dados de Quilombolas",

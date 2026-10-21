@@ -1,7 +1,19 @@
-from car_system.models import SicarRecord, DeclaredHydrography, CarEstadual2023
+from car_system.models import (
+    SicarRecord,
+    DeclaredHydrography,
+    CarEstadual2023,
+    DeclaredApp,
+    DeclaredNativeVegetation,
+    DeclaredLegalReserve,
+    DeclaredConsolidatedArea,
+    DeclaredRestrictedUse,
+    DeclaredFallowArea,
+    DeclaredAdministrativeEasement,
+)
 from car_system.services.formatter.sicar_formatter import SicarFormatter
 from car_system.services.formatter.hydrography_formatter import HydrographyFormatter
 from car_system.services.formatter.car_estadual_2023_formatter import CarEstadual2023Formatter
+from car_system.services.formatter.declared_theme_formatter import DeclaredThemeFormatter
 from environmental_layers.models import (
     ZoningArea,
     PhytoecologyArea,
@@ -71,6 +83,13 @@ class FormatterRegister:
             SicarRecord: SicarFormatter(),
             DeclaredHydrography: HydrographyFormatter(),
             CarEstadual2023: CarEstadual2023Formatter(),
+            DeclaredApp: DeclaredThemeFormatter("APP Declarada"),
+            DeclaredNativeVegetation: DeclaredThemeFormatter("Vegetação Nativa Declarada"),
+            DeclaredLegalReserve: DeclaredThemeFormatter("Reserva Legal Declarada"),
+            DeclaredConsolidatedArea: DeclaredThemeFormatter("Área Consolidada Declarada"),
+            DeclaredRestrictedUse: DeclaredThemeFormatter("Área de Uso Restrito Declarada"),
+            DeclaredFallowArea: DeclaredThemeFormatter("Área de Pousio Declarada"),
+            DeclaredAdministrativeEasement: DeclaredThemeFormatter("Servidão Administrativa Declarada"),
             Quilombolas: QuilombolasFormatter(),
             Paths: PathsFormatter(),
             ConservationUnits: ConservationUnitsFormatter(),

@@ -7,10 +7,30 @@ Usado pelas views de upload/processar/excluir do painel "Bases de Dados",
 para não repetir em cada view qual Importer/Model pertence a qual camada.
 """
 
-from car_system.models import SicarRecord, DeclaredHydrography, CarEstadual2023
+from car_system.models import (
+    SicarRecord,
+    DeclaredHydrography,
+    CarEstadual2023,
+    DeclaredApp,
+    DeclaredNativeVegetation,
+    DeclaredLegalReserve,
+    DeclaredConsolidatedArea,
+    DeclaredRestrictedUse,
+    DeclaredFallowArea,
+    DeclaredAdministrativeEasement,
+)
 from car_system.tasks.sicar_importer import SicarImporter
 from car_system.tasks.hydrography_importer import HydrographyImporter
 from car_system.tasks.car_estadual_2023_importer import CarEstadual2023Importer
+from car_system.tasks.declared_theme_importer import (
+    DeclaredAppImporter,
+    DeclaredNativeVegetationImporter,
+    DeclaredLegalReserveImporter,
+    DeclaredConsolidatedAreaImporter,
+    DeclaredRestrictedUseImporter,
+    DeclaredFallowAreaImporter,
+    DeclaredAdministrativeEasementImporter,
+)
 
 from environmental_layers.models import (
     ZoningArea,
@@ -52,6 +72,13 @@ LAYER_REGISTRY = {
     "SicarRecord": {"model": SicarRecord, "importer": SicarImporter},
     "DeclaredHydrography": {"model": DeclaredHydrography, "importer": HydrographyImporter},
     "CarEstadual2023": {"model": CarEstadual2023, "importer": CarEstadual2023Importer},
+    "DeclaredApp": {"model": DeclaredApp, "importer": DeclaredAppImporter},
+    "DeclaredNativeVegetation": {"model": DeclaredNativeVegetation, "importer": DeclaredNativeVegetationImporter},
+    "DeclaredLegalReserve": {"model": DeclaredLegalReserve, "importer": DeclaredLegalReserveImporter},
+    "DeclaredConsolidatedArea": {"model": DeclaredConsolidatedArea, "importer": DeclaredConsolidatedAreaImporter},
+    "DeclaredRestrictedUse": {"model": DeclaredRestrictedUse, "importer": DeclaredRestrictedUseImporter},
+    "DeclaredFallowArea": {"model": DeclaredFallowArea, "importer": DeclaredFallowAreaImporter},
+    "DeclaredAdministrativeEasement": {"model": DeclaredAdministrativeEasement, "importer": DeclaredAdministrativeEasementImporter},
     "Quilombolas": {"model": Quilombolas, "importer": QuilombolasImporter},
     "Paths": {"model": Paths, "importer": PathsImporter},
     "ConservationUnits": {"model": ConservationUnits, "importer": ConservationUnitsImporter},

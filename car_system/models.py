@@ -98,3 +98,71 @@ class CarEstadual2023(GeoBaseModel):
 
     def __str__(self):
         return self.car_number
+
+
+class DeclaredSicarTheme(GeoBaseModel):
+    """Feições de um tema declarado no CAR, do download por estado do SICAR
+    (consultapublica.car.gov.br, GeoPackage `TO_<TEMA>.gpkg`). Todos os temas
+    (APP, vegetação nativa, reserva legal...) vêm com as mesmas colunas, então
+    cada base só muda a tabela."""
+    category_source = models.CharField(max_length=255, verbose_name="Tema", db_column='nom_tema')
+    car_number = models.CharField(max_length=50, verbose_name="Número do CAR", db_column='cod_imovel', db_index=True)
+    city = models.CharField(max_length=100, null=True, blank=True, verbose_name="Município", db_column='municipio')
+    pending = models.CharField(max_length=255, null=True, blank=True, verbose_name="Condição do Cadastro", db_column='des_condic')
+    car_status = models.CharField(max_length=10, null=True, blank=True, verbose_name="Status do CAR", db_column='ind_status')
+    declared_area_ha = models.FloatField(null=True, blank=True, verbose_name="Área Declarada (ha)", db_column='num_area')
+
+    class Meta:
+        abstract = True
+
+    def __str__(self):
+        return f"{self.category_source} - {self.car_number}"
+
+
+class DeclaredApp(DeclaredSicarTheme):
+    class Meta:
+        db_table = 'tb_app_declarada'
+        verbose_name = "APP declarada"
+        verbose_name_plural = "APPs declaradas"
+
+
+class DeclaredNativeVegetation(DeclaredSicarTheme):
+    class Meta:
+        db_table = 'tb_vegetacao_nativa_declarada'
+        verbose_name = "vegetação nativa declarada"
+        verbose_name_plural = "vegetações nativas declaradas"
+
+
+class DeclaredLegalReserve(DeclaredSicarTheme):
+    class Meta:
+        db_table = 'tb_reserva_legal_declarada'
+        verbose_name = "reserva legal declarada"
+        verbose_name_plural = "reservas legais declaradas"
+
+
+class DeclaredConsolidatedArea(DeclaredSicarTheme):
+    class Meta:
+        db_table = 'tb_area_consolidada_declarada'
+        verbose_name = "área consolidada declarada"
+        verbose_name_plural = "áreas consolidadas declaradas"
+
+
+class DeclaredRestrictedUse(DeclaredSicarTheme):
+    class Meta:
+        db_table = 'tb_uso_restrito_declarado'
+        verbose_name = "área de uso restrito declarada"
+        verbose_name_plural = "áreas de uso restrito declaradas"
+
+
+class DeclaredFallowArea(DeclaredSicarTheme):
+    class Meta:
+        db_table = 'tb_area_pousio_declarada'
+        verbose_name = "área de pousio declarada"
+        verbose_name_plural = "áreas de pousio declaradas"
+
+
+class DeclaredAdministrativeEasement(DeclaredSicarTheme):
+    class Meta:
+        db_table = 'tb_servidao_administrativa_declarada'
+        verbose_name = "servidão administrativa declarada"
+        verbose_name_plural = "servidões administrativas declaradas"

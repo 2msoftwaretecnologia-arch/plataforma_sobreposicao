@@ -94,6 +94,48 @@ _BASE_GUIDE = (
         'se_encontrado': 'Há água na propriedade. As margens de rios e nascentes são Áreas de Preservação Permanente (APP) e precisam manter a vegetação.',
         'nivel': INFO,
     }),
+    (('APP Declarada',), {
+        'titulo': 'Áreas de Preservação Permanente (APP) declaradas no CAR',
+        'o_que_e': 'Margens de rios, nascentes, veredas e encostas que os donos dos imóveis informaram no CAR como APP.',
+        'se_encontrado': 'A área coincide com APP informada em um CAR. Nessas faixas a vegetação deve ser mantida ou recuperada e o uso é bem limitado.',
+        'nivel': INFO,
+    }),
+    (('Vegetação Nativa',), {
+        'titulo': 'Vegetação nativa declarada no CAR',
+        'o_que_e': 'Matas e cerrados nativos que os donos dos imóveis informaram no CAR.',
+        'se_encontrado': 'Há vegetação nativa declarada no local. Retirar essa vegetação depende de autorização do órgão ambiental.',
+        'nivel': INFO,
+    }),
+    (('Reserva Legal',), {
+        'titulo': 'Reserva Legal declarada no CAR',
+        'o_que_e': 'Parte do imóvel que o dono separou no CAR para manter com vegetação nativa, como exige o Código Florestal.',
+        'se_encontrado': 'A área coincide com uma Reserva Legal informada em um CAR. Nela não se pode desmatar, só fazer manejo sustentável. Se for de outro imóvel, pode indicar sobreposição com vizinho.',
+        'nivel': INFO,
+    }),
+    (('Área Consolidada',), {
+        'titulo': 'Área consolidada declarada no CAR',
+        'o_que_e': 'Áreas que já eram usadas (lavoura, pasto, construções) antes de 22/07/2008, conforme informado no CAR.',
+        'se_encontrado': 'Parte da área foi declarada como uso consolidado, ou seja, aberta antes de 22/07/2008. Esse uso pode continuar, respeitando as regras do Código Florestal.',
+        'nivel': INFO,
+    }),
+    (('Uso Restrito',), {
+        'titulo': 'Áreas de uso restrito declaradas no CAR',
+        'o_que_e': 'Planícies alagáveis e terrenos com inclinação entre 25° e 45°, onde a lei limita o uso.',
+        'se_encontrado': 'A área tem trechos de uso restrito. Neles, novas aberturas dependem de autorização e o uso precisa seguir práticas sustentáveis.',
+        'nivel': INFO,
+    }),
+    (('Pousio',), {
+        'titulo': 'Áreas em pousio declaradas no CAR',
+        'o_que_e': 'Lavouras deixadas em descanso por até 5 anos para o solo se recuperar, conforme informado no CAR.',
+        'se_encontrado': 'Parte da área foi declarada em pousio. Ela continua sendo área de uso, apenas em descanso temporário.',
+        'nivel': INFO,
+    }),
+    (('Servidão',), {
+        'titulo': 'Servidões administrativas declaradas no CAR',
+        'o_que_e': 'Faixas do imóvel ocupadas por obras de utilidade pública, como linhas de energia, estradas e dutos.',
+        'se_encontrado': 'A área é atravessada por uma servidão administrativa. Nessa faixa o uso pelo dono é limitado pelas regras da obra.',
+        'nivel': INFO,
+    }),
     (('IPUCA',), {
         'titulo': 'Ipucas',
         'o_que_e': 'Matas naturais que ficam alagadas na época das chuvas, comuns na região do Araguaia. São protegidas.',

@@ -1,5 +1,16 @@
 from django.contrib import admin
-from car_system.models import SicarRecord, DeclaredHydrography, CarEstadual2023
+from car_system.models import (
+    SicarRecord,
+    DeclaredHydrography,
+    CarEstadual2023,
+    DeclaredApp,
+    DeclaredNativeVegetation,
+    DeclaredLegalReserve,
+    DeclaredConsolidatedArea,
+    DeclaredRestrictedUse,
+    DeclaredFallowArea,
+    DeclaredAdministrativeEasement,
+)
 from leaflet.admin import LeafletGeoAdmin
 
 @admin.register(SicarRecord)
@@ -97,3 +108,23 @@ class CarEstadual2023Admin(LeafletGeoAdmin):
     list_filter = ('status', 'city')
     readonly_fields = ('created_at', 'updated_at', 'area_m2', 'area_ha')
     list_per_page = 200
+
+
+class DeclaredSicarThemeAdmin(LeafletGeoAdmin):
+    list_display = ('id', 'car_number', 'category_source', 'city', 'pending', 'area_ha')
+    search_fields = ('car_number', 'category_source')
+    list_filter = ('category_source', 'car_status', 'city')
+    readonly_fields = ('created_at', 'updated_at', 'area_m2', 'area_ha')
+    list_per_page = 200
+
+
+for _model in (
+    DeclaredApp,
+    DeclaredNativeVegetation,
+    DeclaredLegalReserve,
+    DeclaredConsolidatedArea,
+    DeclaredRestrictedUse,
+    DeclaredFallowArea,
+    DeclaredAdministrativeEasement,
+):
+    admin.site.register(_model, DeclaredSicarThemeAdmin)

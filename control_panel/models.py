@@ -163,6 +163,63 @@ class FileManagement(models.Model):
         blank = True
     )
 
+    # Temas declarados no CAR, do download por estado do SICAR (TO_<TEMA>.gpkg).
+    declared_app_zip_file = models.FileField(
+        upload_to='documents/',
+        verbose_name="Documentos APP Declarada",
+        help_text="GeoPackage do SICAR (TO_APPS.gpkg) ou ZIP com o shapefile das APPs declaradas.",
+        null = True,
+        blank = True
+    )
+
+    declared_native_vegetation_zip_file = models.FileField(
+        upload_to='documents/',
+        verbose_name="Documentos Vegetação Nativa Declarada",
+        help_text="GeoPackage do SICAR (TO_VEGETACAO_NATIVA.gpkg) ou ZIP com o shapefile da vegetação nativa declarada.",
+        null = True,
+        blank = True
+    )
+
+    declared_legal_reserve_zip_file = models.FileField(
+        upload_to='documents/',
+        verbose_name="Documentos Reserva Legal Declarada",
+        help_text="GeoPackage do SICAR (TO_RESERVA_LEGAL.gpkg) ou ZIP com o shapefile das reservas legais declaradas.",
+        null = True,
+        blank = True
+    )
+
+    declared_consolidated_area_zip_file = models.FileField(
+        upload_to='documents/',
+        verbose_name="Documentos Área Consolidada Declarada",
+        help_text="GeoPackage do SICAR (TO_AREA_CONSOLIDADA.gpkg) ou ZIP com o shapefile das áreas consolidadas declaradas.",
+        null = True,
+        blank = True
+    )
+
+    declared_restricted_use_zip_file = models.FileField(
+        upload_to='documents/',
+        verbose_name="Documentos Uso Restrito Declarado",
+        help_text="GeoPackage do SICAR (TO_USO_RESTRITO.gpkg) ou ZIP com o shapefile das áreas de uso restrito declaradas.",
+        null = True,
+        blank = True
+    )
+
+    declared_fallow_area_zip_file = models.FileField(
+        upload_to='documents/',
+        verbose_name="Documentos Área de Pousio Declarada",
+        help_text="GeoPackage do SICAR (TO_AREA_POUSIO.gpkg) ou ZIP com o shapefile das áreas de pousio declaradas.",
+        null = True,
+        blank = True
+    )
+
+    declared_administrative_easement_zip_file = models.FileField(
+        upload_to='documents/',
+        verbose_name="Documentos Servidão Administrativa Declarada",
+        help_text="GeoPackage do SICAR (TO_SERVIDAO_ADMINISTRATIVA.gpkg) ou ZIP com o shapefile das servidões administrativas declaradas.",
+        null = True,
+        blank = True
+    )
+
     class Meta:
         db_table = 'tb_gerenciamento_arquivos'
         verbose_name = "Gerenciamento de Arquivos"
