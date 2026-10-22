@@ -298,6 +298,15 @@
             return;
         }
 
+        // Na página do mapa 3D a câmera vai buscar o imóvel enquanto o
+        // servidor analisa; o loader fica transparente por cima (ver bases_3d.js).
+        if (window.searchPropertyOnMap) {
+            window.searchPropertyOnMap({
+                mode: mode,
+                car: carValue,
+                file: zipInput.files && zipInput.files[0],
+            });
+        }
         if (loader) {
             loader.classList.add('visible');
         }

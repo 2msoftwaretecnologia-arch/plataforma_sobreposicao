@@ -469,8 +469,35 @@ html, body.bases3d-page {
 .entry-dock .status-error { background: rgba(255, 107, 61, 0.14); color: #ffb79c; }
 .entry-dock .status-success { background: rgba(95, 224, 138, 0.14); color: #a8efbf; }
 
+/* ===== Busca do imóvel (animação no mapa no lugar do loader branco) ===== */
+.panel,
+.entry-dock,
+.maplibregl-ctrl-bottom-right { transition: opacity 0.5s ease; }
+
+.is-searching .panel,
+.is-searching .entry-dock,
+.is-searching .zoom-hint,
+.is-searching .maplibregl-ctrl-bottom-right {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* O overlay continua cobrindo a tela (bloqueia cliques e reenvio), mas
+   transparente: só as mensagens aparecem, no topo. */
+.loader-overlay.on-map {
+  background: transparent;
+  justify-content: flex-start;
+  padding-top: 24px;
+  cursor: progress;
+}
+
+.loader-overlay.on-map .wheel-and-hamster { display: none; }
+
+.is-searching .caption { bottom: 32px; }
+
 @media (prefers-reduced-motion: reduce) {
-  .caption, .tour-btn, .base-item, .entry-dock-chevron { transition: none; }
+  .caption, .tour-btn, .base-item, .entry-dock-chevron,
+  .panel, .entry-dock, .maplibregl-ctrl-bottom-right { transition: none; }
 }
 
 @media (max-width: 640px) {

@@ -657,7 +657,7 @@
     }
 
     function playTour() {
-        if (!ready || !sicarBase) return;
+        if (!ready || !sicarBase || searching) return;
         setPlaying(true);
         if (!ensureStarted()) { pauseTour(); return; }
         // Voa até a cidade atual (a câmera pode ter sido movida) e segue dali.
@@ -688,6 +688,299 @@
             if (!reduceMotion && !userTookOver) playTour();
         }, 2500);
     });
+
+    // =====================================================================
+    // Busca do imóvel: enquanto o servidor faz a análise, a câmera sobe para
+    // o estado, desce no município e pousa sobre o perímetro do imóvel, que
+    // vai sendo desenhado. Chamado pelo upload.js no envio do formulário.
+    // =====================================================================
+
+    var searching = false;
+    var TARGET_COLOR = '#dba63f';
+    var TARGET_LAYERS = ['search-fill', 'search-glow', 'search-line'];
+    var loaderEl = document.getElementById('page-loader');
+
+    function ms(n) { return reduceMotion ? 0 : n; }
+
+    // flyTo que resolve ao chegar; o timeout cobre o caso de o mapa não
+    // disparar `moveend` (câmera já no lugar).
+    function flyAndWait(myToken, opts) {
+        return new Promise(function (resolve) {
+            var done = false;
+            function finish() { if (!done) { done = true; resolve(myToken === token); } }
+            map.once('moveend', finish);
+            map.flyTo(Object.assign({ essential: true }, opts));
+            setTimeout(finish, (opts.duration || 0) + 800);
+        });
+    }
+
+    function sleep(n) { return new Promise(function (r) { setTimeout(r, n); }); }
+
+    function setSearchCaption(step, title, text) {
+        captionStep.textContent = step;
+        captionTitle.textContent = title;
+        captionText.textContent = text;
+        caption.classList.add('visible');
+    }
+
+    // Área geodésica de um anel em m² (mesma fórmula do geojson-area/turf).
+    function ringArea(ring) {
+        var R = 6378137, rad = Math.PI / 180, area = 0;
+        for (var i = 0; i < ring.length - 1; i++) {
+            var p1 = ring[i], p2 = ring[i + 1];
+            area += (p2[0] - p1[0]) * rad * (2 + Math.sin(p1[1] * rad) + Math.sin(p2[1] * rad));
+        }
+        return Math.abs(area * R * R / 2);
+    }
+
+    function polygonsOf(geom) {
+        if (!geom) return [];
+        if (geom.type === 'Polygon') return [geom.coordinates];
+        if (geom.type === 'MultiPolygon') return geom.coordinates;
+        if (geom.type === 'GeometryCollection') return geom.geometries.reduce(function (acc, g) { return acc.concat(polygonsOf(g)); }, []);
+        return [];
+    }
+
+    function areaHa(features) {
+        var m2 = 0;
+        features.forEach(function (f) {
+            polygonsOf(f.geometry).forEach(function (poly) {
+                poly.forEach(function (ring, i) { m2 += (i === 0 ? 1 : -1) * ringArea(ring); });
+            });
+        });
+        return m2 / 10000;
+    }
+
+    function boundsOf(features) {
+        var b = [Infinity, Infinity, -Infinity, -Infinity];
+        function walk(c) {
+            if (typeof c[0] === 'number') {
+                b[0] = Math.min(b[0], c[0]); b[1] = Math.min(b[1], c[1]);
+                b[2] = Math.max(b[2], c[0]); b[3] = Math.max(b[3], c[1]);
+            } else c.forEach(walk);
+        }
+        features.forEach(function (f) {
+            (f.geometry.type === 'GeometryCollection' ? f.geometry.geometries : [f.geometry])
+                .forEach(function (g) { walk(g.coordinates); });
+        });
+        // Shapefile sem .prj vem em metros (UTM): não dá para mostrar no mapa.
+        var geographic = b[0] >= -180 && b[2] <= 180 && b[1] >= -90 && b[3] <= 90;
+        return isFinite(b[0]) && geographic ? [[b[0], b[1]], [b[2], b[3]]] : null;
+    }
+
+    // Imóvel buscado -> { features, area_ha, status } (ou null se não deu).
+    function locateTarget(req) {
+        if (req.mode === 'car' && req.car && cfg.propertyUrl) {
+            return fetch(cfg.propertyUrl + '?car=' + encodeURIComponent(req.car), { credentials: 'same-origin' })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (d) {
+                    if (!d || !d.geometry) return null;
+                    return { features: [{ type: 'Feature', properties: {}, geometry: d.geometry }],
+                             area_ha: d.area_ha, status: d.status };
+                });
+        }
+        if (req.mode === 'zip' && req.file && window.shp && req.file.arrayBuffer) {
+            // shpjs lê o ZIP no navegador e reprojeta pelo .prj.
+            return req.file.arrayBuffer()
+                .then(function (buf) { return window.shp(buf); })
+                .then(function (geo) {
+                    var features = [].concat(geo).reduce(function (acc, fc) {
+                        return acc.concat(fc.features || []);
+                    }, []).filter(function (f) { return f.geometry; });
+                    return features.length ? { features: features, area_ha: areaHa(features) } : null;
+                });
+        }
+        return Promise.resolve(null);
+    }
+
+    function cityOfCar(car) {
+        var code = /^[A-Za-z]{2}-(\d{7})-/.exec(car || '');
+        if (!code) return null;
+        return cities.filter(function (c) { return c.codigo === code[1]; })[0] || null;
+    }
+
+    function addTarget(features) {
+        removeTarget();
+        // Contorno em LineStrings à parte: o `line-progress` do desenho
+        // progressivo só existe em linhas, não em bordas de polígono.
+        var rings = [];
+        features.forEach(function (f) {
+            polygonsOf(f.geometry).forEach(function (poly) {
+                poly.forEach(function (ring) {
+                    rings.push({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: ring } });
+                });
+            });
+        });
+        map.addSource('search-target', { type: 'geojson',
+            data: { type: 'FeatureCollection', features: features } });
+        map.addSource('search-outline', { type: 'geojson', lineMetrics: true,
+            data: { type: 'FeatureCollection', features: rings } });
+        map.addLayer({ id: 'search-fill', type: 'fill', source: 'search-target',
+            paint: { 'fill-color': TARGET_COLOR, 'fill-opacity': 0 } });
+        map.addLayer({ id: 'search-glow', type: 'line', source: 'search-outline',
+            layout: { 'line-join': 'round', 'line-cap': 'round' },
+            paint: { 'line-color': TARGET_COLOR, 'line-width': 10, 'line-blur': 8, 'line-opacity': 0 } });
+        map.addLayer({ id: 'search-line', type: 'line', source: 'search-outline',
+            layout: { 'line-join': 'round', 'line-cap': 'round' },
+            paint: { 'line-width': 3, 'line-gradient': revealGradient(0) } });
+    }
+
+    function removeTarget() {
+        TARGET_LAYERS.forEach(function (id) { if (map.getLayer(id)) map.removeLayer(id); });
+        ['search-target', 'search-outline'].forEach(function (id) {
+            if (map.getSource(id)) map.removeSource(id);
+        });
+    }
+
+    // Contorno visível até a fração `p` do perímetro.
+    function revealGradient(p) {
+        var clear = 'rgba(219, 166, 63, 0)';
+        if (p >= 1) return ['interpolate', ['linear'], ['line-progress'], 0, '#f3e3bc', 1, '#f3e3bc'];
+        p = Math.max(0.001, Math.min(0.997, p));
+        return ['interpolate', ['linear'], ['line-progress'],
+            0, '#f3e3bc', p, '#f3e3bc', p + 0.002, clear, 1, clear];
+    }
+
+    // Desenha o contorno, acende o preenchimento e fica girando devagar em
+    // volta do imóvel até a página de resultados chegar. Depois do desenho o
+    // estilo não é mais mexido (nada de pulso: trocar paint a cada quadro
+    // fazia o imóvel piscar).
+    var ORBIT_DEG_PER_MS = 0.0025;  // ~2,5° por segundo: poucos tiles novos nas bordas
+
+    function revealAndOrbit(myToken) {
+        var start = null, DRAW_MS = ms(2600), drawn = false;
+        var bearing = map.getBearing();
+        var last = null;
+        function frame(ts) {
+            if (myToken !== token || !searching) return;
+            if (start === null) start = ts;
+            if (!drawn) {
+                var p = DRAW_MS ? Math.min(1, (ts - start) / DRAW_MS) : 1;
+                map.setPaintProperty('search-line', 'line-gradient', revealGradient(p));
+                map.setPaintProperty('search-fill', 'fill-opacity', 0.25 * p);
+                map.setPaintProperty('search-glow', 'line-opacity', 0.5 * p);
+                drawn = p >= 1;
+            }
+            if (reduceMotion) {
+                if (!drawn) requestAnimationFrame(frame);
+                return;
+            }
+            var dt = last === null ? 0 : Math.min(ts - last, 100);
+            last = ts;
+            bearing += dt * ORBIT_DEG_PER_MS;
+            map.setBearing(bearing);
+            requestAnimationFrame(frame);
+        }
+        requestAnimationFrame(frame);
+    }
+
+    // Sem perímetro (PDF, CAR fora da base, shapefile sem .prj): fica
+    // rondando a última posição enquanto o servidor trabalha.
+    function idleOrbit(myToken) {
+        if (reduceMotion) return;
+        var last = null, bearing = map.getBearing();
+        function frame(ts) {
+            if (myToken !== token || !searching) return;
+            var dt = last === null ? 0 : Math.min(ts - last, 100);
+            last = ts;
+            bearing += dt * ORBIT_DEG_PER_MS;
+            map.setBearing(bearing);
+            requestAnimationFrame(frame);
+        }
+        requestAnimationFrame(frame);
+    }
+
+    // Espera a localização no máximo `n` ms (null se não chegou a tempo).
+    function within(promise, n) {
+        return Promise.race([promise, sleep(n).then(function () { return null; })]);
+    }
+
+    function searchPropertyOnMap(req) {
+        if (!ready) return false;
+        searching = true;
+        if (playing) setPlaying(false);
+        var myToken = ++token;
+        map.stop();
+        runProgress(0);
+        caption.classList.add('paused');
+        document.body.classList.add('is-searching');
+        if (loaderEl) loaderEl.classList.add('on-map');
+        zoomHint.classList.remove('visible');
+        if (sicarBase) showOnly(sicarBase);
+
+        // Filtro e visibilidade mudam uma vez só, aqui: cada troca faz os
+        // tiles do SICAR serem redesenhados.
+        var city = req.mode === 'car' ? cityOfCar(req.car) : null;
+        setCityFilter(city ? city.codigo : null);
+        var located = locateTarget(req).catch(function () { return null; });
+
+        setSearchCaption('Buscando imóvel', city ? city.nome : 'Tocantins',
+            req.mode === 'car' ? req.car : 'Localizando a área enviada...');
+
+        // Cada mudança grande de zoom recarrega o satélite nível a nível (é o
+        // que pisca), então a câmera faz o menor número de voos possível:
+        //  - CAR: um voo até o município (enquanto o perímetro chega) e outro,
+        //    só aproximando, até o imóvel;
+        //  - ZIP: o arquivo é lido em menos de um segundo, então vai direto;
+        //  - sem localização: sobe para a visão do estado e fica rondando.
+        var first;
+        if (city) {
+            first = flyAndWait(myToken, { center: city.focus, zoom: 11, pitch: 50,
+                bearing: map.getBearing(), duration: ms(4000), curve: 1.2 })
+                .then(function (ok) { return ok && located; });
+        } else {
+            first = within(located, 1500);
+        }
+
+        first.then(function (target) {
+            if (myToken !== token) return;
+            var bounds = target && boundsOf(target.features);
+            if (!bounds) {
+                setSearchCaption('Analisando', city ? city.nome : 'Tocantins',
+                    req.mode === 'car' ? req.car : 'Cruzando com as bases...');
+                if (city) { idleOrbit(myToken); return; }
+                var cam = map.cameraForBounds(TO_BOUNDS, { padding: 40 });
+                flyAndWait(myToken, { center: cam.center, zoom: cam.zoom, pitch: 45,
+                    bearing: map.getBearing(), duration: ms(3000) })
+                    .then(function (ok) { if (ok) idleOrbit(myToken); });
+                return;
+            }
+            // Pousa sobre o imóvel, inclinado, e desenha o perímetro.
+            addTarget(target.features);
+            var status = target.status && STATUS_LABEL[String(target.status).toUpperCase()];
+            setSearchCaption(
+                req.mode === 'car' ? 'Imóvel encontrado' : 'Área enviada',
+                city ? city.nome : 'Imóvel',
+                (target.area_ha ? fmt(target.area_ha, 2) + ' ha' : '') + (status ? ' · CAR ' + status : '')
+            );
+            var fit = map.cameraForBounds(bounds, { padding: { top: 140, bottom: 180, left: 80, right: 80 } });
+            return flyAndWait(myToken, {
+                center: fit.center,
+                zoom: Math.min(15.5, fit.zoom - 0.4),  // inclinado o imóvel "cresce" na tela
+                pitch: 52,
+                bearing: map.getBearing() + 25,
+                duration: ms(4500),
+                curve: 1.2
+            }).then(function (ok) { if (ok) revealAndOrbit(myToken); });
+        });
+        return true;
+    }
+
+    function endSearch() {
+        if (!searching) return;
+        searching = false;
+        token++;
+        map.stop();
+        removeTarget();
+        document.body.classList.remove('is-searching');
+        if (loaderEl) loaderEl.classList.remove('on-map');
+        goToOverview();
+    }
+
+    window.searchPropertyOnMap = searchPropertyOnMap;
+
+    // Voltar do resultado (bfcache) devolve a página como estava: desfaz a busca.
+    window.addEventListener('pageshow', function (e) { if (e.persisted) endSearch(); });
 
     // =====================================================================
     // Destaque ao passar o mouse e popup

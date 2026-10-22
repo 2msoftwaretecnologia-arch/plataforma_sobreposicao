@@ -258,3 +258,21 @@ def cities_summary():
     ]
     cache.set(CITIES_CACHE_KEY, cities, SUMMARY_CACHE_SECONDS)
     return cities
+
+
+def property_outline(car_number):
+    """Perímetro de um imóvel do SICAR, para a câmera do mapa 3D ir até ele
+    enquanto a análise roda. Simplificado em ~2 m, como em `car_perimeters`."""
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT ST_AsGeoJSON(ST_SimplifyPreserveTopology(geometria_util, 0.00002), 6),
+                   area_ha, status
+            FROM tb_registro_sicar
+            WHERE UPPER(numero_car) = UPPER(%s) AND geometria_util IS NOT NULL
+            LIMIT 1
+        """, [car_number])
+        row = cursor.fetchone()
+    if not row or not row[0]:
+        return None
+    geojson, area_ha, status = row
+    return {'geometry': json.loads(geojson), 'area_ha': area_ha, 'status': status}

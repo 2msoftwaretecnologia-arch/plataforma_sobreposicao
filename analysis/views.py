@@ -46,6 +46,7 @@ from analysis.services.view_services.bases_3d import (
     MUNICIPIOS_JSON,
     bases_summary,
     cities_summary,
+    property_outline,
     render_tile,
 )
 from analysis.services.view_services.zip_upload_service import ZipUploadService
@@ -368,6 +369,7 @@ def _bases_3d_config(request):
         'maxTileZoom': MAX_TILE_ZOOM,
         'bases': [b for b in bases_summary() if b['modelo'] not in denied_layers(request.user)],
         'cities': cities_summary() if 'SicarRecord' not in denied_layers(request.user) else [],
+        'propertyUrl': reverse('base_property_outline'),
     }
 
 
@@ -1011,6 +1013,18 @@ class BaseTileView(View):
         response = HttpResponse(tile, content_type='application/vnd.mapbox-vector-tile')
         response['Cache-Control'] = 'private, max-age=3600'
         return response
+
+
+class PropertyOutlineView(View):
+    """Perímetro do imóvel buscado pelo CAR, para a animação de busca no
+    mapa 3D enquanto a análise roda no servidor."""
+
+    def get(self, request):
+        require_layer('SicarRecord', request.user)
+        outline = property_outline(request.GET.get('car', '').strip())
+        if not outline:
+            return JsonResponse({}, status=404)
+        return JsonResponse(outline)
 
 
 def _image_tile_response(fetch):

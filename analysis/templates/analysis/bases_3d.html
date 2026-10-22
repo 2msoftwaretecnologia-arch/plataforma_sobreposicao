@@ -103,6 +103,8 @@
         window.TOCANTINS_GEOJSON_URL = "{% static 'analysis/data/tocantins.geojson' %}";
     </script>
     <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+    <!-- Lê o shapefile do ZIP no navegador para a câmera ir até a área enviada -->
+    <script src="https://unpkg.com/shpjs@4.0.4/dist/shp.min.js" defer></script>
     <script src="{% static 'analysis/js/bases_3d.js' %}"></script>
     <script src="{% static 'analysis/js/upload.js' %}" defer></script>
 </body>
