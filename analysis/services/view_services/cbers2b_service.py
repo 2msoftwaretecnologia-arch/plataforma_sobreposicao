@@ -88,8 +88,9 @@ PREPARE_POLL = 2
 # Muda quando o meta.json ganha campos que os tiles passam a exigir, ou
 # quando a preparação muda o resultado: cenas de versão antiga são refeitas.
 # v2: a rotação da correção não era aplicada (o warp do Django copiava a
-# rotação da cena para a grade de destino).
-META_VERSION = 2
+# rotação da cena para a grade de destino). v3: sem cor nas cenas na divisa
+# de zonas UTM (CCD alinhado em coordenadas da zona errada).
+META_VERSION = 3
 
 # Correção de posição. A correlação é feita numa grade de 20 m (o Landsat
 # tem 30 m; mais fino não ganha precisão e fica mais lento).
@@ -610,6 +611,20 @@ def _build_ccd(hrc, small, ccd, out_path):
     HRC, em 20 m. Devolve (resumo do alinhamento, grade) ou (motivo da
     falha, None)."""
     grid = _grid(_extent(hrc), hrc.srid, CCD_RES)
+    if ccd.srid != hrc.srid:
+        # Cena na divisa de duas zonas UTM (ex.: 48° O): o INPE grava o HRC
+        # numa zona e o CCD na outra. A correção é aplicada nas coordenadas
+        # do geotransform, então o CCD vem antes para a zona do HRC (com a
+        # margem do erro de posição); misturar as zonas jogava o CCD a km.
+        minx, miny, maxx, maxy = _extent(hrc)
+        m = REG_MAX_SHIFT_M
+        wide = _grid((minx - m, miny - m, maxx + m, maxy + m), hrc.srid, CCD_RES)
+        ccd = ccd.warp({
+            'driver': 'MEM', 'name': 'ccd_zona', 'srid': hrc.srid,
+            'width': wide['width'], 'height': wide['height'],
+            'origin': list(wide['origin']), 'scale': [CCD_RES, -CCD_RES], 'skew': [0, 0],
+            'resampling': 'Bilinear',
+        })
     pan = _resample(small, grid, 'Bilinear')
     bands = _resample_bands(ccd, grid, 'Bilinear')
     # O pancromático do HRC (0,50–0,80 µm) se parece mais com verde + vermelho.

@@ -493,6 +493,31 @@ class Cbers2bServiceTests(SimpleTestCase):
         rows = {int(c): int(r) for r, c in zip(*np.nonzero(out))}
         self.assertEqual(rows[10] - rows[90], 16)  # 80 colunas × 0,2
 
+    def test_ccd_in_other_utm_zone_is_aligned_in_hrc_zone(self):
+        # Cena na divisa de zonas (48° O): HRC na 22S, CCD na 23S, e o CCD
+        # 1 km a oeste do lugar. Antes a correção misturava as coordenadas das
+        # duas zonas e jogava o CCD longe (sem cor: a fusão era recusada).
+        from django.contrib.gis.gdal import GDALRaster
+        data = textured((400, 400), seed=5) + 1
+        hrc = GDALRaster({'driver': 'MEM', 'name': 'hrc', 'srid': 32722, 'width': 400, 'height': 400,
+                          'origin': [805000, 8660000], 'scale': [20, -20], 'datatype': 6, 'nr_of_bands': 1,
+                          'bands': [{'data': data, 'nodata_value': 0}]})
+        minx, miny, maxx, maxy = cb._bounds(cb._extent(hrc), 32722, 32723)
+        zone23 = cb._grid((minx, miny, maxx, maxy), 32723)
+        band = cb._resample(hrc, zone23, 'Bilinear')
+        ccd = GDALRaster({'driver': 'MEM', 'name': 'ccd', 'srid': 32723, 'width': zone23['width'],
+                          'height': zone23['height'], 'origin': [zone23['origin'][0] - 1000, zone23['origin'][1]],
+                          'scale': [20, -20], 'datatype': 6, 'nr_of_bands': 4,
+                          'bands': [{'data': band, 'nodata_value': 0} for _ in range(4)]})
+        info, grid = cb._build_ccd(hrc, hrc, ccd, Path(self.tmp) / 'ccd.tif')
+        self.assertTrue(info['ok'], info)
+        self.assertAlmostEqual(info['shift_m'], 1000, delta=60)
+        out = GDALRaster(str(Path(self.tmp) / 'ccd.tif')).bands[0].data().astype(np.float32)
+        # O ccd.tif sai suavizado (listras do CCD): compara com o pan suavizado igual.
+        pan = cb.smooth(cb._resample(hrc, grid, 'Bilinear'), cb.CCD_SMOOTH_SIGMA)
+        valid = (out > 0) & (pan > 0)
+        self.assertGreater(np.corrcoef(out[valid], pan[valid])[0, 1], 0.95)
+
     @patch.object(cb.requests, 'get')
     @patch.object(cb, '_stac_search')
     def test_landsat_reference_accepts_partial_cover_preferring_more(self, search, get):
