@@ -8,6 +8,8 @@
     // Fonte que representa o contorno da propriedade — única camada que
     // começa marcada por padrão no mapa interativo.
     var PROPERTY_FONTE = 'Área da Propriedade';
+    // Ponto sem imóvel do SICAR: o mapa mostra só o local (ver result_map_formatter).
+    var POINT_FONTE = 'Ponto informado';
 
     // Tile vazio usado pelas fontes com seletor (Planet, Wayback) enquanto a
     // lista de mosaicos/datas não chega, para não pedir tiles sem a opção.
@@ -1255,10 +1257,11 @@
 
             var f = item.fonte || 'Fonte';
             var isPropriedade = (f === PROPERTY_FONTE);
+            var isPonto = (f === POINT_FONTE);
 
             // Determine color based on source
             var col;
-            if (isPropriedade) {
+            if (isPropriedade || isPonto) {
                 col = item.color || '#000000';
             } else if (f.toLowerCase().indexOf('mapbiomas') !== -1) {
                 col = '#ff0000'; // Red for Mapbiomas
@@ -1280,11 +1283,13 @@
 
             var isSicar = (f === 'Base de Dados Sicar');
             // isPropriedade already defined above
-            var baseFillOpacity = (isSicar || isPropriedade) ? 0 : 0.35;
+            var baseFillOpacity = (isSicar || isPropriedade) ? 0 : isPonto ? 0.9 : 0.35;
             var baseWeight = 2;
 
             var layer = L.geoJSON(geom, {
-                style: { color: col, weight: baseWeight, fillColor: col, fillOpacity: baseFillOpacity }
+                style: { color: col, weight: baseWeight, fillColor: col, fillOpacity: baseFillOpacity },
+                // Círculo em vez do marcador padrão: aceita setStyle no hover.
+                pointToLayer: function (feature, latlng) { return L.circleMarker(latlng, { radius: 8 }); }
             });
 
             var tt = [lbl || f, area]
@@ -1442,6 +1447,13 @@
     /**
      * Main entry point for initializing the map.
      */
+    // Só um ponto (sem imóvel): limites de tamanho zero levariam ao zoom máximo.
+    function fitToItems(map, group, opts) {
+        var bounds = group.getBounds();
+        if (bounds.getNorthEast().equals(bounds.getSouthWest())) opts.maxZoom = 16;
+        map.fitBounds(bounds, opts);
+    }
+
     global.initImoveisMap = function (items, options) {
         options = options || {};
         var elementId = options.elementId || 'map-imoveis';
@@ -1470,12 +1482,12 @@
         // (Mapas estáticos do relatório impresso continuam mostrando tudo,
         // já que lá não há como reativar uma camada escondida.)
         Object.keys(data.layersByFonte).forEach(function (f) {
-            if (isStatic || f === PROPERTY_FONTE) data.layersByFonte[f].addTo(map);
+            if (isStatic || f === PROPERTY_FONTE || f === POINT_FONTE) data.layersByFonte[f].addTo(map);
         });
 
         // 4. Fit Bounds
         if (data.allGroup.getLayers().length) {
-            map.fitBounds(data.allGroup.getBounds(), { padding: [12, 12] });
+            fitToItems(map, data.allGroup, { padding: [12, 12] });
         }
 
         // 5. Controls & Legend
@@ -1518,7 +1530,7 @@
             setupCompare(map, options.imagery || {}, panel);
 
             if (data.allGroup.getLayers().length) {
-                map.fitBounds(data.allGroup.getBounds(), panel.fitPadding(12));
+                fitToItems(map, data.allGroup, panel.fitPadding(12));
             }
         } else {
             // If static, ensure legend is empty

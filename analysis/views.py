@@ -6,6 +6,7 @@ import os
 import tempfile
 import zipfile
 from dataclasses import asdict
+from types import SimpleNamespace
 
 # Django
 from django.core.exceptions import ValidationError
@@ -696,15 +697,46 @@ class UploadZipCarView(View):
         self.progress.stage('Localizando o imóvel do ponto')
         cars = cars_at_point(lon, lat)
         if not cars:
-            context['erro'] = (f'O ponto ({lat:.6f}, {lon:.6f}) não cai em nenhum imóvel do SICAR. '
-                               'Confira a coordenada ou informe os vértices da área.')
-            return self._render_form(request, context)
+            return self._point_only_map(request, lon, lat)
         aviso = None
         if len(cars) > 1:
             aviso = (f'O ponto cai em {len(cars)} imóveis do SICAR (declarações sobrepostas); '
                      f'foi analisado o maior. Os outros: {", ".join(cars[1:])}.')
         context['car_input'] = cars[0]
         return self._handle_only_car(request, cars[0], context, SearchHistory.SearchType.COORDENADAS, aviso)
+
+    def _point_only_map(self, request, lon, lat):
+        """Ponto fora de qualquer imóvel do SICAR: não há o que cruzar, mas o
+        resultado abre só com o mapa no ponto, para ver as imagens de satélite."""
+        municipio, uf = None, None
+        try:
+            require_layer('MunicipalBoundaries', request.user)
+            self.progress.stage('Identificando o município')
+            point = SimpleNamespace(index=0, lon=lon, lat=lat, municipality=None)
+            locate_municipalities([point])
+            municipio = point.municipality
+            uf = 'TO' if municipio else None
+        except AnalysisCancelled:
+            raise
+        except Exception:
+            pass
+
+        coords = f'({lat:.6f}, {lon:.6f})'
+        if municipio:
+            aviso = (f'O ponto {coords} fica em {municipio}/TO, mas não cai em nenhum imóvel do SICAR. '
+                     'Para analisar a área, informe os vértices. O mapa abaixo mostra o local com as imagens de satélite.')
+        else:
+            aviso = (f'O ponto {coords} fica fora do Tocantins: não há imóveis nem bases da análise para ele. '
+                     'O mapa abaixo mostra o local com as imagens de satélite.')
+
+        request.session['last_analysis'] = {
+            'ponto_mapa': {'lon': lon, 'lat': lat},
+            'municipio': municipio,
+            'uf': uf,
+            'aviso': aviso,
+            'sucesso': True,
+        }
+        return redirect('results')
 
     def _process_coordinates(self, request, coordenadas_input, car_input, search_type=SearchHistory.SearchType.SHAPEFILE):
         """Processa os dados extraídos do shapefile (ou do KML)."""

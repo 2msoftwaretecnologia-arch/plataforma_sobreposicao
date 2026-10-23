@@ -208,6 +208,22 @@
         </section>
         {% endif %}
 
+        {% if resultado and not resultado.total_areas_com_sobreposicao %}
+        <section class="alert alert-warn reveal">
+            <div class="alert-icon">
+                <svg class="ico" style="width:24px;height:24px"><use href="#i-alert"/></svg>
+            </div>
+            <div>
+                <p class="alert-title">Nenhuma sobreposição encontrada</p>
+                <p class="alert-text">
+                    A área não cruzou com nenhuma das bases consultadas, nem com os limites municipais.
+                    Provavelmente esta propriedade não fica no Tocantins (ou as coordenadas estão erradas).
+                    {% if map_items %}Você ainda pode ver a área e as imagens de satélite no <a href="#map-imoveis">mapa abaixo</a>.{% endif %}
+                </p>
+            </div>
+        </section>
+        {% endif %}
+
         {% if resultado %}
         <section class="panel reveal">
             <div class="panel-header">
@@ -256,7 +272,7 @@
         </section>
         {% endif %}
 
-        {% if resultado and resultado.poligonos_imoveis %}
+        {% if map_items %}
         <section class="panel reveal">
             <div class="panel-header">
                 <div>
@@ -270,7 +286,7 @@
                     <div>
                         <div class="map-title">
                             <svg class="ico" style="width:16px;height:16px;margin-right:8px;vertical-align:-3px"><use href="#i-layers"/></svg>
-                            Propriedade e bases sobrepostas
+                            {% if resultado %}Propriedade e bases sobrepostas{% else %}Local do ponto informado{% endif %}
                         </div>
                         <p class="map-frame-hint">Use o painel <strong>Camadas</strong> no mapa para ligar as bases da análise, trocar a imagem de satélite e adicionar camadas temáticas.</p>
                     </div>

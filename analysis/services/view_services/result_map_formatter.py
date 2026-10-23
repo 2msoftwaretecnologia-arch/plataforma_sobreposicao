@@ -44,6 +44,16 @@ def format_data_map(data):
     poligonos_imoveis = resultado.get('poligonos_imoveis', [])
 
     if not alvo_geojson:
+        # Ponto sem imóvel do SICAR: o mapa mostra só o local informado.
+        ponto = data.get('ponto_mapa')
+        if ponto:
+            data['map_items'] = [{
+                "gj": {"type": "Point", "coordinates": [ponto['lon'], ponto['lat']]},
+                "label": f"{ponto['lat']:.6f}, {ponto['lon']:.6f}",
+                "area": "",
+                "color": "#FFD600",
+                "fonte": "Ponto informado",
+            }]
         return data
 
     items = [
