@@ -5,7 +5,7 @@ from .search_all import SearchAll
 
 class SearchForCar:
     
-    def execute(self, car: str, save_debug_files: bool = True, user=None) -> dict:
+    def execute(self, car: str, save_debug_files: bool = True, user=None, progress=None) -> dict:
         from control_panel.access_service import require_layer
         require_layer('SicarRecord', user)
         car_norm = (car or "").strip()
@@ -22,4 +22,4 @@ class SearchForCar:
             except Exception:
                 return {}
             obj.usable_geometry = geom
-        return SearchAll(user=user).execute(obj, save_debug_files=save_debug_files)
+        return SearchAll(user=user, progress=progress).execute(obj, save_debug_files=save_debug_files)

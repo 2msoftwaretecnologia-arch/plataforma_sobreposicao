@@ -88,8 +88,9 @@ class LayerAccessTests(SimpleTestCase):
         user = self.user([1])
         search.return_value.execute.return_value = {'ok': True}
         records.return_value.exists.return_value = False
-        result, _, _ = UploadZipCarView()._get_car_data('CAR', user)
-        search.return_value.execute.assert_called_once_with('CAR', user=user)
+        view = UploadZipCarView()
+        result, _, _ = view._get_car_data('CAR', user)
+        search.return_value.execute.assert_called_once_with('CAR', user=user, progress=view.progress)
         self.assertEqual(result, {'ok': True})
 
     @patch('analysis.views.render_tile')

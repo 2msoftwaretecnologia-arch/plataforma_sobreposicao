@@ -96,6 +96,19 @@
         </div>
     </aside>
 
+    <!-- Andamento da análise: na busca, fica no lugar do painel lateral
+         (por cima do loader, que nesta página é transparente). -->
+    <aside id="search_hud" class="search-hud is-indeterminate" aria-live="polite" aria-label="Andamento da análise" hidden>
+        <div class="search-hud-head">
+            <span class="search-hud-title">Análise em andamento</span>
+            <span id="search_hud_count" class="search-hud-count"></span>
+        </div>
+        <p id="search_hud_status" class="search-hud-status">Iniciando a análise...</p>
+        <div class="search-hud-bar"><span id="search_hud_bar"></span></div>
+        <ul id="search_hud_list" class="search-hud-list"></ul>
+        <button type="button" id="search_cancel" class="search-cancel">Cancelar análise</button>
+    </aside>
+
     {% include 'analysis/loader.html' %}
 
     {{ bases_3d_config|json_script:"bases-3d-config" }}
@@ -103,7 +116,9 @@
         window.TOCANTINS_GEOJSON_URL = "{% static 'analysis/data/tocantins.geojson' %}";
     </script>
     <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-    <!-- Lê o shapefile do ZIP no navegador para a câmera ir até a área enviada -->
+    <!-- Lê o shapefile do ZIP no navegador para a câmera ir até a área enviada
+         (o JSZip abre os zips internos do arquivo baixado do SICAR) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
     <script src="https://unpkg.com/shpjs@4.0.4/dist/shp.min.js" defer></script>
     <script src="{% static 'analysis/js/bases_3d.js' %}"></script>
     <script src="{% static 'analysis/js/upload.js' %}" defer></script>

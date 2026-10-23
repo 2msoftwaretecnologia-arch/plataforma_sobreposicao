@@ -20,8 +20,11 @@ class SearchAll:
     - Tracking performance (timing each step)
     """
 
-    def __init__(self, user=None):
+    def __init__(self, user=None, progress=None):
         self.user = user
+        # Andamento para a tela do mapa 3D (ver `analysis_progress`); None
+        # nas demais chamadas.
+        self.progress = progress
         self.pipeline = OverlapPipeline()
         self.builder = FinalResultBuilder()
         self.formatters = FormatterRegister()
@@ -46,11 +49,16 @@ class SearchAll:
         # 2) Executar pipeline de sobreposição nas camadas
         t1 = time.perf_counter()
         layers = self._get_layers()
+        if self.progress:
+            self.progress.target(target.geometry)
+            self.progress.layers(layers)
         pipeline_result = self._run_pipeline(target, layers)
         performance["time_pipeline_total"] = time.perf_counter() - t1
 
         # 3) Construir saída final estruturada
         t2 = time.perf_counter()
+        if self.progress:
+            self.progress.stage('Montando o resultado')
         final_output = self._build_final_output(target, pipeline_result, layers)
         performance["time_builder"] = time.perf_counter() - t2
 
@@ -102,6 +110,7 @@ class SearchAll:
             target=target,
             layers=layers,
             formatters=self.formatters.formatters,
+            progress=self.progress,
         )
 
     def _build_final_output(self, target, pipeline_result, layers):

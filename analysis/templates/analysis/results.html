@@ -16,6 +16,33 @@
     <link href='https://unpkg.com/leaflet-fullscreen@1.0.2/dist/leaflet.fullscreen.css' rel='stylesheet' />
 </head>
 <body>
+    <script>
+        // Vindo da busca no mapa 3D: começa sobre a última imagem do mapa
+        // (gravada por bases_3d.js) e a dissolve, em vez de um corte seco.
+        (function () {
+            var KEY = 'terraview:search-snapshot', shot = null;
+            try {
+                shot = JSON.parse(sessionStorage.getItem(KEY) || 'null');
+                sessionStorage.removeItem(KEY);
+            } catch (e) { return; }
+            if (!shot || !shot.src || Date.now() - shot.at > 2 * 60 * 1000) return;
+            if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+            var el = document.createElement('div');
+            el.className = 'search-handoff';
+            el.setAttribute('aria-hidden', 'true');
+            el.style.backgroundImage = 'url("' + shot.src + '")';
+            document.body.appendChild(el);
+            var started = false;
+            function leave() {
+                if (started) return;
+                started = true;
+                el.classList.add('is-leaving');
+                setTimeout(function () { el.remove(); }, 1100);
+            }
+            document.addEventListener('DOMContentLoaded', function () { setTimeout(leave, 150); });
+            setTimeout(leave, 2500);  // scripts externos lentos não seguram a tela
+        })();
+    </script>
 
     <!-- ===== Definições de ícones SVG ===== -->
     <svg width="0" height="0" style="position:absolute" aria-hidden="true">

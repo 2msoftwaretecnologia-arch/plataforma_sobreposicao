@@ -85,11 +85,97 @@
             .toUpperCase();
     }
 
+    // Pré-visualização no mapa 3D (bases_3d.js): mostra o imóvel antes da
+    // análise e já avisa se o CAR não está na base ou se o ZIP tem problema.
+    const carPreview = document.getElementById('car_preview');
+    const zipPreview = document.getElementById('zip_preview');
+    const canPreview = typeof window.previewPropertyOnMap === 'function';
+
+    function fmtHa(n) {
+        return Number(n).toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + ' ha';
+    }
+
+    function showNote(el, kind, text) {
+        if (!el) return;
+        el.hidden = !text;
+        el.className = 'preview-note' + (kind ? ' is-' + kind : '');
+        el.textContent = text || '';
+    }
+
+    function carNote(t) {
+        if (!t) return ['', ''];
+        if (t.status === 'found') {
+            return ['ok', ['Imóvel encontrado', t.city && t.city.nome, t.area_ha ? fmtHa(t.area_ha) : '',
+                t.statusLabel ? 'CAR ' + t.statusLabel : ''].filter(Boolean).join(' · ')];
+        }
+        if (t.status === 'not_found') {
+            return ['warn', 'Este CAR não está na base do SICAR do Tocantins: a análise pode sair sem resultado. Confira o número.'];
+        }
+        return ['', ''];
+    }
+
+    function zipNote(t) {
+        if (!t) return ['', ''];
+        if (t.status === 'found') {
+            return ['ok', 'Área lida do shapefile: ' + fmtHa(t.area_ha) + (t.layer ? ' (' + t.layer + ')' : '')];
+        }
+        if (t.status === 'outside') {
+            return ['warn', 'A área fica fora do Tocantins: as bases da análise cobrem só o estado.'];
+        }
+        if (t.status === 'no_prj') {
+            return ['warn', 'O ZIP não tem o arquivo .prj, então a área não aparece no mapa. A análise ainda pode ser feita.'];
+        }
+        return ['warn', 'Não deu para ler o shapefile aqui no navegador; a análise ainda pode ser feita.'];
+    }
+
+    let carPreviewTimer = null;
+    let carPreviewValue = '';
+
+    function scheduleCarPreview() {
+        if (!canPreview) return;
+        clearTimeout(carPreviewTimer);
+        const value = carInput.value.trim();
+        if (!CAR_REGEX.test(value)) {
+            if (carPreviewValue) {
+                carPreviewValue = '';
+                showNote(carPreview);
+                window.clearPropertyPreview();
+            }
+            return;
+        }
+        if (value === carPreviewValue) return;
+        carPreviewTimer = setTimeout(function () {
+            carPreviewValue = value;
+            showNote(carPreview, 'loading', 'Procurando o imóvel no mapa...');
+            window.previewPropertyOnMap({ mode: 'car', car: value }).then(function (t) {
+                if (carInput.value.trim() !== value) return;
+                const note = carNote(t);
+                showNote(carPreview, note[0], note[1]);
+            });
+        }, 350);
+    }
+
+    function previewZip(file) {
+        if (!canPreview) return;
+        if (!file) {
+            showNote(zipPreview);
+            window.clearPropertyPreview();
+            return;
+        }
+        showNote(zipPreview, 'loading', 'Lendo o shapefile...');
+        window.previewPropertyOnMap({ mode: 'zip', file: file }).then(function (t) {
+            if (!zipInput.files || zipInput.files[0] !== file) return;
+            const note = zipNote(t);
+            showNote(zipPreview, note[0], note[1]);
+        });
+    }
+
     if (carInput) {
         function validateAndCleanCarInput(e) {
             const cleaned = cleanCarValue(carInput.value);
             if (cleaned !== carInput.value) carInput.value = cleaned;
             clientError.style.display = 'none';
+            scheduleCarPreview();
         }
 
         carInput.addEventListener('input', validateAndCleanCarInput);
@@ -115,8 +201,10 @@
         if (zipInput.files && zipInput.files.length > 0) {
             zipLabelText.textContent = zipInput.files[0].name;
             clientError.style.display = 'none';
+            previewZip(zipInput.files[0]);
         } else {
             zipLabelText.textContent = ZIP_LABEL_DEFAULT;
+            previewZip(null);
         }
     });
 
@@ -145,6 +233,7 @@
                     zipInput.files = dt.files;
                     zipLabelText.textContent = zipFile.name;
                     clientError.style.display = 'none';
+                    previewZip(zipFile);
                 } else {
                     clientError.style.display = 'block';
                     clientError.textContent = '❌ Por favor, selecione um arquivo ZIP.';
@@ -298,6 +387,11 @@
             return;
         }
 
+        // Id desta análise: a página acompanha o andamento no servidor por ele.
+        const jobInput = document.getElementById('job_id');
+        const jobId = jobInput ? newJobId() : '';
+        if (jobInput) jobInput.value = jobId;
+
         // Na página do mapa 3D a câmera vai buscar o imóvel enquanto o
         // servidor analisa; o loader fica transparente por cima (ver bases_3d.js).
         if (window.searchPropertyOnMap) {
@@ -305,12 +399,33 @@
                 mode: mode,
                 car: carValue,
                 file: zipInput.files && zipInput.files[0],
+                jobId: jobId,
             });
         }
         if (loader) {
             loader.classList.add('visible');
         }
     });
+
+    // Id aleatório em hexadecimal (`crypto.randomUUID` só existe em HTTPS).
+    function newJobId() {
+        const bytes = new Uint8Array(16);
+        window.crypto.getRandomValues(bytes);
+        return Array.from(bytes, function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+    }
+
+    // "Buscas recentes": preenche o CAR e já mostra o imóvel no mapa.
+    document.querySelectorAll('.recent-use').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.getElementById('mode_car').checked = true;
+            applyMode();
+            carInput.value = cleanCarValue(btn.dataset.car || '');
+            scheduleCarPreview();
+        });
+    });
+
+    // CAR já preenchido (a análise voltou com erro): mostra o imóvel de novo.
+    if (carPrefilled) scheduleCarPreview();
 
     // Garante que o loader suma se o usuário clicar em "Voltar" (bfcache)
     window.addEventListener('pageshow', function (event) {

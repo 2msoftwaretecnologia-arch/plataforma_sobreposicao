@@ -1340,3 +1340,19 @@ body { background: var(--cream-50); color: var(--ink-900); }
   #map-imoveis { height: 460px; }
   .map-frame-header .online { display: none; }
 }
+
+/* ===== Transição vinda da busca no mapa 3D (ver results.html) ===== */
+.search-handoff {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  background: var(--green-950, #12271a) center / cover no-repeat;
+  pointer-events: none;
+  transition: opacity 0.9s ease, transform 0.9s ease, filter 0.9s ease;
+}
+
+.search-handoff.is-leaving {
+  opacity: 0;
+  transform: scale(1.06);
+  filter: blur(6px);
+}

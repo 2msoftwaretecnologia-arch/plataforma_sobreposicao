@@ -391,3 +391,64 @@ class LandUseComparisonTests(SimpleTestCase):
         self.assertIn('map-uso-mudancas', html)
         self.assertIn('Nativa que virou outro uso', html)
         self.assertIn('Pastagem', html)
+
+
+@override_settings(CACHES={'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache', 'LOCATION': 'progress-tests'}})
+class AnalysisProgressTests(SimpleTestCase):
+    """Andamento da análise lido pela tela do mapa 3D (`analysis_progress`)."""
+
+    JOB = '0123456789abcdef0123'
+
+    def setUp(self):
+        cache.clear()
+        self.user = Mock(pk=7)
+
+    def _layers(self):
+        return [type('Embargoes', (), {}), type('ZoningArea', (), {})]
+
+    def test_without_valid_job_id_everything_is_a_no_op(self):
+        from analysis.services.view_services.analysis_progress import AnalysisProgress, read_progress
+        progress = AnalysisProgress(self.user.pk, 'not hex!')
+        self.assertFalse(progress)
+        progress.layers(self._layers())
+        progress.check_cancelled()
+        self.assertIsNone(read_progress(self.user, 'not hex!'))
+
+    def test_layer_progress_and_only_alert_overlaps_are_drawn(self):
+        from django.contrib.gis.geos import Polygon
+        from analysis.services.view_services.analysis_progress import AnalysisProgress, read_progress
+        embargo, zoning = self._layers()
+        progress = AnalysisProgress(self.user.pk, self.JOB)
+        progress.layers([embargo, zoning])
+        progress.layer_started(embargo)
+        state = read_progress(self.user, self.JOB)
+        self.assertEqual(state['current'], 'Embargos do IBAMA')
+        self.assertEqual([b['status'] for b in state['bases']], ['running', 'pending'])
+
+        square = Polygon(((-48, -10), (-47.99, -10), (-47.99, -9.99), (-48, -9.99), (-48, -10)), srid=4674)
+        rows = [{'intersection_area_ha': 2.5, 'intersection_geom': square}]
+        progress.layer_done(embargo, rows)
+        progress.layer_started(zoning)
+        progress.layer_done(zoning, rows)
+        state = read_progress(self.user, self.JOB)
+        self.assertEqual(state['done'], 2)
+        self.assertEqual([(b['count'], b['area_ha']) for b in state['bases']], [(1, 2.5), (1, 2.5)])
+        # Zoneamento é informativo: só o embargo vai para o mapa.
+        self.assertEqual(len(state['features']), 1)
+        self.assertEqual(state['features'][0]['geometry']['type'], 'Polygon')
+
+    def test_progress_is_private_to_the_user(self):
+        from analysis.services.view_services.analysis_progress import AnalysisProgress, read_progress
+        AnalysisProgress(self.user.pk, self.JOB).stage('Lendo o documento', car='TO-1')
+        self.assertEqual(read_progress(self.user, self.JOB)['car'], 'TO-1')
+        self.assertIsNone(read_progress(Mock(pk=8), self.JOB))
+
+    def test_cancel_stops_before_the_next_layer(self):
+        from analysis.services.view_services.analysis_progress import (
+            AnalysisCancelled, AnalysisProgress, cancel_progress,
+        )
+        progress = AnalysisProgress(self.user.pk, self.JOB)
+        progress.layers(self._layers())
+        cancel_progress(self.user, self.JOB)
+        with self.assertRaises(AnalysisCancelled):
+            progress.layer_started(self._layers()[0])

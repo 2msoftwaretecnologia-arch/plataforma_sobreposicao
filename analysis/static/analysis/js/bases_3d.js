@@ -685,20 +685,36 @@
         setPlaying(false);
         // Mostra a visão geral por alguns segundos e então começa a voar.
         setTimeout(function () {
-            if (!reduceMotion && !userTookOver) playTour();
+            // Voltou com erro: o imóvel buscado fica na tela (ver "Busca do imóvel").
+            if (!reduceMotion && !userTookOver && !cfg.searchError) playTour();
         }, 2500);
     });
 
     // =====================================================================
-    // Busca do imóvel: enquanto o servidor faz a análise, a câmera sobe para
-    // o estado, desce no município e pousa sobre o perímetro do imóvel, que
-    // vai sendo desenhado. Chamado pelo upload.js no envio do formulário.
+    // Busca do imóvel
+    // ---------------------------------------------------------------------
+    // Pré-visualização: assim que o CAR é digitado ou o ZIP escolhido, a
+    // câmera vai até o imóvel e desenha o perímetro (upload.js chama
+    // `previewPropertyOnMap`), e o formulário mostra área e situação.
+    //
+    // Análise: no envio, a câmera pousa sobre o imóvel enquanto o servidor
+    // trabalha. A página consulta o andamento real (`analysis_progress.py`):
+    // cada base consultada aparece no painel e os recortes que acendem o
+    // semáforo do relatório (embargo, PRODES...) surgem no mapa.
     // =====================================================================
 
     var searching = false;
+    var search = null;  // análise em curso (ver `searchPropertyOnMap`)
     var TARGET_COLOR = '#dba63f';
-    var TARGET_LAYERS = ['search-fill', 'search-glow', 'search-line'];
+    var TARGET_LAYERS = ['search-hits-fill', 'search-hits-line', 'search-fill', 'search-glow', 'search-line'];
+    var TARGET_SOURCES = ['search-hits', 'search-target', 'search-outline'];
+    var LAST_TARGET_KEY = 'terraview:last-target';
+    var SNAPSHOT_KEY = 'terraview:search-snapshot';
     var loaderEl = document.getElementById('page-loader');
+
+    var whenReady = new Promise(function (resolve) {
+        if (ready) resolve(); else map.once('load', resolve);
+    });
 
     function ms(n) { return reduceMotion ? 0 : n; }
 
@@ -723,6 +739,12 @@
         caption.classList.add('visible');
     }
 
+    function storage(fn) {
+        try { return fn(window.sessionStorage); } catch (e) { return null; }
+    }
+
+    // ----- Geometria -----
+
     // Área geodésica de um anel em m² (mesma fórmula do geojson-area/turf).
     function ringArea(ring) {
         var R = 6378137, rad = Math.PI / 180, area = 0;
@@ -740,6 +762,8 @@
         if (geom.type === 'GeometryCollection') return geom.geometries.reduce(function (acc, g) { return acc.concat(polygonsOf(g)); }, []);
         return [];
     }
+
+    function isPolygonFeature(f) { return f && polygonsOf(f.geometry).length > 0; }
 
     function areaHa(features) {
         var m2 = 0;
@@ -768,29 +792,9 @@
         return isFinite(b[0]) && geographic ? [[b[0], b[1]], [b[2], b[3]]] : null;
     }
 
-    // Imóvel buscado -> { features, area_ha, status } (ou null se não deu).
-    function locateTarget(req) {
-        if (req.mode === 'car' && req.car && cfg.propertyUrl) {
-            return fetch(cfg.propertyUrl + '?car=' + encodeURIComponent(req.car), { credentials: 'same-origin' })
-                .then(function (r) { return r.ok ? r.json() : null; })
-                .then(function (d) {
-                    if (!d || !d.geometry) return null;
-                    return { features: [{ type: 'Feature', properties: {}, geometry: d.geometry }],
-                             area_ha: d.area_ha, status: d.status };
-                });
-        }
-        if (req.mode === 'zip' && req.file && window.shp && req.file.arrayBuffer) {
-            // shpjs lê o ZIP no navegador e reprojeta pelo .prj.
-            return req.file.arrayBuffer()
-                .then(function (buf) { return window.shp(buf); })
-                .then(function (geo) {
-                    var features = [].concat(geo).reduce(function (acc, fc) {
-                        return acc.concat(fc.features || []);
-                    }, []).filter(function (f) { return f.geometry; });
-                    return features.length ? { features: features, area_ha: areaHa(features) } : null;
-                });
-        }
-        return Promise.resolve(null);
+    function insideTocantins(bounds) {
+        return !(bounds[1][0] < TO_BOUNDS[0][0] || bounds[0][0] > TO_BOUNDS[1][0]
+            || bounds[1][1] < TO_BOUNDS[0][1] || bounds[0][1] > TO_BOUNDS[1][1]);
     }
 
     function cityOfCar(car) {
@@ -798,6 +802,106 @@
         if (!code) return null;
         return cities.filter(function (c) { return c.codigo === code[1]; })[0] || null;
     }
+
+    // ----- Localização do imóvel -----
+    // Resultado: { status: 'found' | 'not_found' | 'outside' | 'no_prj' |
+    // 'unreadable', features, bounds, area_ha, statusLabel, city, layer }.
+
+    function targetFrom(features, extra) {
+        var bounds = boundsOf(features);
+        if (!bounds) return { status: 'no_prj' };
+        return Object.assign({
+            status: insideTocantins(bounds) ? 'found' : 'outside',
+            features: features,
+            bounds: bounds,
+            area_ha: areaHa(features)
+        }, extra || {});
+    }
+
+    function locateCar(car) {
+        if (!cfg.propertyUrl) return Promise.resolve(null);
+        return fetch(cfg.propertyUrl + '?car=' + encodeURIComponent(car), { credentials: 'same-origin' })
+            .then(function (r) {
+                if (r.status === 404) return { status: 'not_found' };
+                if (!r.ok) return null;  // sem acesso ao SICAR, erro do servidor...
+                return r.json().then(function (d) {
+                    if (!d || !d.geometry) return { status: 'not_found' };
+                    return targetFrom([{ type: 'Feature', properties: {}, geometry: d.geometry }], {
+                        area_ha: d.area_ha,
+                        statusLabel: STATUS_LABEL[String(d.status || '').toUpperCase()] || '',
+                        city: cityOfCar(car)
+                    });
+                });
+            });
+    }
+
+    // O ZIP baixado do SICAR traz cada tema (área do imóvel, APP, reserva
+    // legal...) num zip dentro do zip; o shpjs só lê o nível de cima, então
+    // os zips internos são abertos com o JSZip (como faz o ZipUploadService).
+    function readShapefileZip(buf, depth) {
+        if (!window.JSZip) return window.shp(buf).then(function (g) { return [].concat(g); });
+        return window.JSZip.loadAsync(buf).then(function (zip) {
+            var names = Object.keys(zip.files).filter(function (n) {
+                return !zip.files[n].dir && !/__macosx/i.test(n);
+            });
+            var jobs = [];
+            if (names.some(function (n) { return /\.shp$/i.test(n); })) {
+                jobs.push(window.shp(buf)
+                    .then(function (g) { return [].concat(g); })
+                    .catch(function () { return []; }));
+            }
+            if (depth < 3) {
+                names.filter(function (n) { return /\.zip$/i.test(n); }).forEach(function (n) {
+                    jobs.push(zip.file(n).async('arraybuffer')
+                        .then(function (inner) { return readShapefileZip(inner, depth + 1); })
+                        .catch(function () { return []; }));
+                });
+            }
+            return Promise.all(jobs).then(function (lists) { return [].concat.apply([], lists); });
+        });
+    }
+
+    function locateZip(file) {
+        if (!window.shp || !file || !file.arrayBuffer) return Promise.resolve(null);
+        return file.arrayBuffer()
+            .then(function (buf) { return readShapefileZip(buf, 0); })
+            .then(function (collections) {
+                var layers = collections.map(function (fc) {
+                    return { name: String(fc.fileName || '').split('/').pop(), features: (fc.features || []).filter(isPolygonFeature) };
+                }).filter(function (l) { return l.features.length; });
+                if (!layers.length) return { status: 'unreadable' };
+                // Mesma preferência do servidor: a camada do imóvel primeiro.
+                var layer = layers.filter(function (l) { return /AREA_IMOVEL/i.test(l.name); })[0] || layers[0];
+                return targetFrom(layer.features, { layer: layer.name });
+            })
+            .catch(function () { return { status: 'unreadable' }; });
+    }
+
+    function keyFor(req) {
+        if (req.mode === 'car' && req.car) return 'car:' + req.car.toUpperCase();
+        if (req.mode === 'zip' && req.file) return 'zip:' + [req.file.name, req.file.size, req.file.lastModified].join(':');
+        return null;
+    }
+
+    var located = {};   // chave -> Promise do resultado (não repete a busca)
+    var resolved = {};  // chave -> resultado já conhecido
+
+    function locate(req) {
+        var key = keyFor(req);
+        if (!key) return Promise.resolve(null);
+        if (!located[key]) {
+            located[key] = (req.mode === 'car' ? locateCar(req.car) : locateZip(req.file))
+                .catch(function () { return null; })
+                .then(function (target) {
+                    if (target) resolved[key] = target;
+                    else delete located[key];  // falha de rede: tenta de novo depois
+                    return target;
+                });
+        }
+        return located[key];
+    }
+
+    // ----- Camadas do imóvel e dos recortes -----
 
     function addTarget(features) {
         removeTarget();
@@ -811,10 +915,15 @@
                 });
             });
         });
+        map.addSource('search-hits', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         map.addSource('search-target', { type: 'geojson',
             data: { type: 'FeatureCollection', features: features } });
         map.addSource('search-outline', { type: 'geojson', lineMetrics: true,
             data: { type: 'FeatureCollection', features: rings } });
+        map.addLayer({ id: 'search-hits-fill', type: 'fill', source: 'search-hits',
+            paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.42 } });
+        map.addLayer({ id: 'search-hits-line', type: 'line', source: 'search-hits',
+            paint: { 'line-color': ['get', 'color'], 'line-width': 1.6 } });
         map.addLayer({ id: 'search-fill', type: 'fill', source: 'search-target',
             paint: { 'fill-color': TARGET_COLOR, 'fill-opacity': 0 } });
         map.addLayer({ id: 'search-glow', type: 'line', source: 'search-outline',
@@ -827,9 +936,18 @@
 
     function removeTarget() {
         TARGET_LAYERS.forEach(function (id) { if (map.getLayer(id)) map.removeLayer(id); });
-        ['search-target', 'search-outline'].forEach(function (id) {
-            if (map.getSource(id)) map.removeSource(id);
-        });
+        TARGET_SOURCES.forEach(function (id) { if (map.getSource(id)) map.removeSource(id); });
+        shownKey = null;
+    }
+
+    // Recortes encontrados pelo servidor até agora. Só troca os dados quando
+    // chegou recorte novo: cada `setData` redesenha a fonte.
+    function drawHits(features) {
+        var src = map.getSource('search-hits');
+        if (!src) return;
+        src.setData({ type: 'FeatureCollection', features: features.map(function (f) {
+            return { type: 'Feature', properties: { color: f.color }, geometry: f.geometry };
+        }) });
     }
 
     // Contorno visível até a fração `p` do perímetro.
@@ -841,58 +959,277 @@
             0, '#f3e3bc', p, '#f3e3bc', p + 0.002, clear, 1, clear];
     }
 
-    // Desenha o contorno, acende o preenchimento e fica girando devagar em
-    // volta do imóvel até a página de resultados chegar. Depois do desenho o
-    // estilo não é mais mexido (nada de pulso: trocar paint a cada quadro
-    // fazia o imóvel piscar).
-    var ORBIT_DEG_PER_MS = 0.0025;  // ~2,5° por segundo: poucos tiles novos nas bordas
+    // Desenha o contorno e acende o preenchimento; depois disso o estilo não
+    // é mais mexido (trocar paint a cada quadro fazia o imóvel piscar).
+    // Contorno completo de uma vez (o desenho anterior foi interrompido).
+    function finishReveal() {
+        if (!map.getLayer('search-line')) return;
+        map.setPaintProperty('search-line', 'line-gradient', revealGradient(1));
+        map.setPaintProperty('search-fill', 'fill-opacity', 0.25);
+        map.setPaintProperty('search-glow', 'line-opacity', 0.5);
+    }
 
-    function revealAndOrbit(myToken) {
-        var start = null, DRAW_MS = ms(2600), drawn = false;
-        var bearing = map.getBearing();
-        var last = null;
-        function frame(ts) {
-            if (myToken !== token || !searching) return;
-            if (start === null) start = ts;
-            if (!drawn) {
+    function reveal(myToken) {
+        return new Promise(function (resolve) {
+            var start = null, DRAW_MS = ms(2600);
+            function frame(ts) {
+                if (myToken !== token || !map.getLayer('search-line')) return resolve(false);
+                if (start === null) start = ts;
                 var p = DRAW_MS ? Math.min(1, (ts - start) / DRAW_MS) : 1;
                 map.setPaintProperty('search-line', 'line-gradient', revealGradient(p));
                 map.setPaintProperty('search-fill', 'fill-opacity', 0.25 * p);
                 map.setPaintProperty('search-glow', 'line-opacity', 0.5 * p);
-                drawn = p >= 1;
+                if (p >= 1) return resolve(true);
+                requestAnimationFrame(frame);
             }
-            if (reduceMotion) {
-                if (!drawn) requestAnimationFrame(frame);
-                return;
-            }
-            var dt = last === null ? 0 : Math.min(ts - last, 100);
-            last = ts;
-            bearing += dt * ORBIT_DEG_PER_MS;
-            map.setBearing(bearing);
             requestAnimationFrame(frame);
-        }
-        requestAnimationFrame(frame);
+        });
     }
 
-    // Sem perímetro (PDF, CAR fora da base, shapefile sem .prj): fica
-    // rondando a última posição enquanto o servidor trabalha.
-    function idleOrbit(myToken) {
+    var ORBIT_DEG_PER_MS = 0.0025;  // ~2,5° por segundo: poucos tiles novos nas bordas
+    // Copiar o quadro do WebGL custa uma pausa curta da GPU: só de vez em quando.
+    var SNAPSHOT_EVERY_MS = 6000;
+
+    // Gira devagar em volta do ponto atual até a página de resultados
+    // chegar, guardando de tempos em tempos a imagem do mapa para a
+    // transição até ela (ver `pagehide` abaixo).
+    function orbit(myToken) {
+        captureSnapshot();
         if (reduceMotion) return;
-        var last = null, bearing = map.getBearing();
+        var last = null, bearing = map.getBearing(), sinceShot = 0;
         function frame(ts) {
             if (myToken !== token || !searching) return;
             var dt = last === null ? 0 : Math.min(ts - last, 100);
             last = ts;
             bearing += dt * ORBIT_DEG_PER_MS;
             map.setBearing(bearing);
+            sinceShot += dt;
+            if (sinceShot >= SNAPSHOT_EVERY_MS) { sinceShot = 0; captureSnapshot(); }
             requestAnimationFrame(frame);
         }
         requestAnimationFrame(frame);
     }
 
-    // Espera a localização no máximo `n` ms (null se não chegou a tempo).
-    function within(promise, n) {
-        return Promise.race([promise, sleep(n).then(function () { return null; })]);
+    // Margem para o imóvel não ficar atrás do painel ou do formulário.
+    function framePadding() {
+        if (window.innerWidth < 900) return { top: 90, bottom: 210, left: 40, right: 40 };
+        return { top: 110, bottom: 170, left: 360, right: searching ? 90 : 390 };
+    }
+
+    function cameraFor(bounds) {
+        var fit = map.cameraForBounds(bounds, { padding: framePadding() })
+            || map.cameraForBounds(bounds, { padding: 20 });
+        if (!fit) return { center: [(bounds[0][0] + bounds[1][0]) / 2, (bounds[0][1] + bounds[1][1]) / 2], zoom: 14 };
+        return { center: fit.center, zoom: Math.min(15.5, fit.zoom - 0.4) };  // inclinado o imóvel "cresce" na tela
+    }
+
+    // ----- Pré-visualização -----
+
+    var previewKey = null;  // último pedido de pré-visualização
+    var shownKey = null;    // imóvel desenhado no mapa agora
+
+    function targetCaption(target, step) {
+        var parts = [];
+        if (target.area_ha) parts.push(fmt(target.area_ha, 2) + ' ha');
+        if (target.statusLabel) parts.push('CAR ' + target.statusLabel);
+        setSearchCaption(step,
+            target.city ? target.city.nome : (target.layer ? 'Shapefile · ' + target.layer : 'Área enviada'),
+            parts.join(' · '));
+    }
+
+    function showPreview(key, target, step) {
+        if (shownKey === key) return;
+        userTookOver = true;  // o tour não volta sozinho por cima do imóvel
+        pauseTour();
+        var myToken = ++token;
+        map.stop();
+        runProgress(0);
+        caption.classList.add('paused');
+        if (sicarBase) ensureOnlySicar();
+        setCityFilter(target.city ? target.city.codigo : null);
+        addTarget(target.features);
+        shownKey = key;
+        targetCaption(target, step || 'Pré-visualização');
+        var cam = cameraFor(target.bounds);
+        flyAndWait(myToken, { center: cam.center, zoom: cam.zoom, pitch: 50,
+            bearing: map.getBearing() + 20, duration: ms(3500), curve: 1.3 })
+            .then(function (ok) { if (ok) reveal(myToken); });
+    }
+
+    function previewPropertyOnMap(req) {
+        var key = keyFor(req);
+        if (!key) return Promise.resolve(null);
+        previewKey = key;
+        return whenReady
+            .then(function () { return locate(req); })
+            .then(function (target) {
+                if (!searching && previewKey === key && target && target.status === 'found') showPreview(key, target);
+                return target && Object.assign({}, target, { city: target.city && { nome: target.city.nome } });
+            });
+    }
+
+    function clearPropertyPreview() {
+        previewKey = null;
+        if (!searching && shownKey) {
+            removeTarget();
+            showOverviewCaption();
+        }
+    }
+
+    // ----- Painel de andamento -----
+
+    var hud = document.getElementById('search_hud');
+    var hudStatus = document.getElementById('search_hud_status');
+    var hudCount = document.getElementById('search_hud_count');
+    var hudBar = document.getElementById('search_hud_bar');
+    var hudList = document.getElementById('search_hud_list');
+    var cancelBtn = document.getElementById('search_cancel');
+
+    var LEVEL_COLOR = { alerta: '#ff6b5a', atencao: '#ffc34d', info: '#9fd8ff' };
+
+    function renderHud(state) {
+        var bases = state.bases || [];
+        var total = state.total || bases.length;
+        if (total) {
+            hudCount.textContent = fmt(state.done || 0) + ' de ' + fmt(total) + ' bases';
+            hud.classList.remove('is-indeterminate');
+            hudBar.style.width = ((state.finished ? 1 : (state.done || 0) / total) * 100).toFixed(1) + '%';
+            setProgress(state.finished ? 1 : (state.done || 0) / total);
+            caption.classList.remove('paused');
+        }
+        hudStatus.textContent = state.finished ? 'Pronto! Abrindo o resultado...'
+            : state.current ? 'Consultando: ' + state.current
+            : state.stage || hudStatus.textContent;
+
+        hudList.textContent = '';
+        var running = null;
+        bases.forEach(function (b) {
+            var li = document.createElement('li');
+            li.className = 'search-hud-item is-' + b.status;
+            var icon = document.createElement('span');
+            icon.className = 'search-hud-icon';
+            icon.setAttribute('aria-hidden', 'true');
+            var name = document.createElement('span');
+            name.className = 'search-hud-name';
+            name.textContent = b.nome;
+            name.title = b.nome;
+            var result = document.createElement('span');
+            result.className = 'search-hud-result';
+            if (b.status === 'done') {
+                if (b.count) {
+                    result.textContent = fmt(b.count) + ' · ' + fmt(b.area_ha, 1) + ' ha';
+                    result.style.setProperty('--c', LEVEL_COLOR[b.nivel] || LEVEL_COLOR.info);
+                    li.classList.add('has-hits', 'level-' + b.nivel);
+                } else {
+                    result.textContent = 'nada';
+                }
+            }
+            li.appendChild(icon);
+            li.appendChild(name);
+            li.appendChild(result);
+            hudList.appendChild(li);
+            if (b.status === 'running') running = li;
+        });
+        if (running) hudList.scrollTop = running.offsetTop - hudList.clientHeight / 2;
+    }
+
+    function startPolling(s) {
+        if (!s.req.jobId || !cfg.progressUrl) return;
+        var url = cfg.progressUrl.replace('{job}', s.req.jobId);
+        function poll() {
+            if (search !== s) return;
+            fetch(url, { credentials: 'same-origin', cache: 'no-store' })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (state) { if (search === s && state) applyProgress(s, state); })
+                .catch(function () { /* a próxima consulta tenta de novo */ })
+                .then(function () { if (search === s) setTimeout(poll, 1000); });
+        }
+        setTimeout(poll, 500);
+    }
+
+    function applyProgress(s, state) {
+        renderHud(state);
+        // PDF: o CAR só aparece depois que o servidor lê o documento.
+        if (state.car && !s.carAsked && s.req.mode !== 'car') {
+            s.carAsked = true;
+            locate({ mode: 'car', car: state.car }).then(function (t) {
+                s.carLookupDone = true;
+                offerTarget(s, t);
+            });
+        }
+        // Perímetro do servidor: para quando o navegador não conseguiu
+        // localizar sozinho (shapefile sem .prj, PDF de CAR fora da base).
+        if (state.target && !s.target && s.clientDone && (!s.carAsked || s.carLookupDone)) {
+            offerTarget(s, targetFrom([{ type: 'Feature', properties: {}, geometry: state.target }]));
+        }
+        var hits = state.features || [];
+        if (hits.length !== s.hits.length) {
+            s.hits = hits;
+            if (s.landed) drawHits(hits);
+        }
+    }
+
+    // ----- Análise -----
+
+    function offerTarget(s, target) {
+        if (search !== s || s.target || !target || target.status !== 'found') return;
+        s.target = target;
+        saveLastTarget(keyFor(s.req), target);
+        if (s.phaseDone) land(s);
+    }
+
+    function saveLastTarget(key, target) {
+        storage(function (st) {
+            var raw = JSON.stringify({
+                at: Date.now(),
+                key: key,
+                target: Object.assign({}, target, { city: target.city ? target.city.codigo : null })
+            });
+            if (raw.length < 1500000) st.setItem(LAST_TARGET_KEY, raw);
+        });
+    }
+
+    function finishPhase(s) {
+        if (search !== s) return;
+        s.phaseDone = true;
+        if (s.target) { land(s); return; }
+        // Ainda sem perímetro: fica rondando até o servidor revelar a área.
+        setSearchCaption('Analisando', s.city ? s.city.nome : 'Tocantins',
+            s.req.mode === 'car' ? s.req.car : 'Cruzando com as bases...');
+        orbit(++token);
+    }
+
+    function land(s) {
+        var t = s.target, myToken = ++token;
+        s.landed = true;
+        map.stop();
+        var step = s.req.mode === 'car' || s.carAsked ? 'Imóvel em análise' : 'Área em análise';
+
+        // Já na tela pela pré-visualização: nada de redesenhar nem voar de
+        // novo (trocar o zoom recarrega o satélite). Só ajusta o centro,
+        // inclina e começa a rondar. O zoom só muda se o envio interrompeu o
+        // voo da pré-visualização no meio (câmera ainda longe do imóvel).
+        if (shownKey && shownKey === keyFor(s.req) && map.getLayer('search-line')) {
+            finishReveal();
+            if (s.hits.length) drawHits(s.hits);
+            targetCaption(t, step);
+            var near = cameraFor(t.bounds);
+            var keepZoom = Math.abs(map.getZoom() - near.zoom) < 0.6;
+            flyAndWait(myToken, { center: near.center, zoom: keepZoom ? map.getZoom() : near.zoom,
+                pitch: 52, bearing: map.getBearing() + 15, duration: ms(keepZoom ? 2500 : 4000) })
+                .then(function (ok) { if (ok) orbit(myToken); });
+            return;
+        }
+
+        addTarget(t.features);
+        shownKey = keyFor(s.req);
+        if (s.hits.length) drawHits(s.hits);
+        targetCaption(t, step);
+        var cam = cameraFor(t.bounds);
+        flyAndWait(myToken, { center: cam.center, zoom: cam.zoom, pitch: 52,
+            bearing: map.getBearing() + 25, duration: ms(4500), curve: 1.2 })
+            .then(function (ok) { return ok && reveal(myToken); })
+            .then(function (ok) { if (ok) orbit(myToken); });
     }
 
     function searchPropertyOnMap(req) {
@@ -906,81 +1243,173 @@
         document.body.classList.add('is-searching');
         if (loaderEl) loaderEl.classList.add('on-map');
         zoomHint.classList.remove('visible');
-        if (sicarBase) showOnly(sicarBase);
+        hud.hidden = false;
+        hud.classList.add('is-indeterminate');
+        hudBar.style.width = '';
+        hudCount.textContent = '';
+        hudList.textContent = '';
+        hudStatus.textContent = req.mode === 'car' ? 'Iniciando a análise...' : 'Enviando o arquivo...';
+        cancelBtn.disabled = false;
+
+        var key = keyFor(req);
+        var known = key && resolved[key] && resolved[key].status === 'found' ? resolved[key] : null;
+        var city = req.mode === 'car' ? cityOfCar(req.car) : null;
+        var s = search = { req: req, city: city, target: null, hits: [], phaseDone: false, landed: false };
 
         // Filtro e visibilidade mudam uma vez só, aqui: cada troca faz os
-        // tiles do SICAR serem redesenhados.
-        var city = req.mode === 'car' ? cityOfCar(req.car) : null;
-        setCityFilter(city ? city.codigo : null);
-        var located = locateTarget(req).catch(function () { return null; });
+        // tiles do SICAR serem redesenhados. Se o imóvel já está na tela
+        // (pré-visualização), nada muda.
+        if (!known || shownKey !== key) {
+            if (sicarBase) showOnly(sicarBase);
+            setCityFilter(city ? city.codigo : null);
+        }
+        startPolling(s);
+        locate(req).then(function (t) {
+            s.clientDone = true;
+            offerTarget(s, t);
+        });
 
         setSearchCaption('Buscando imóvel', city ? city.nome : 'Tocantins',
             req.mode === 'car' ? req.car : 'Localizando a área enviada...');
 
         // Cada mudança grande de zoom recarrega o satélite nível a nível (é o
         // que pisca), então a câmera faz o menor número de voos possível:
-        //  - CAR: um voo até o município (enquanto o perímetro chega) e outro,
-        //    só aproximando, até o imóvel;
-        //  - ZIP: o arquivo é lido em menos de um segundo, então vai direto;
-        //  - sem localização: sobe para a visão do estado e fica rondando.
-        var first;
-        if (city) {
-            first = flyAndWait(myToken, { center: city.focus, zoom: 11, pitch: 50,
+        //  - imóvel já localizado (pré-visualização): pousa direto;
+        //  - CAR: um voo até o município enquanto o perímetro chega;
+        //  - ZIP: o arquivo é lido em menos de um segundo;
+        //  - PDF: sobe para o estado e espera o servidor ler o CAR.
+        if (known) {
+            s.target = known;
+            saveLastTarget(key, known);
+            finishPhase(s);
+        } else if (city) {
+            flyAndWait(myToken, { center: city.focus, zoom: 11, pitch: 50,
                 bearing: map.getBearing(), duration: ms(4000), curve: 1.2 })
-                .then(function (ok) { return ok && located; });
+                .then(function (ok) { if (ok) finishPhase(s); });
         } else {
-            first = within(located, 1500);
-        }
-
-        first.then(function (target) {
-            if (myToken !== token) return;
-            var bounds = target && boundsOf(target.features);
-            if (!bounds) {
-                setSearchCaption('Analisando', city ? city.nome : 'Tocantins',
-                    req.mode === 'car' ? req.car : 'Cruzando com as bases...');
-                if (city) { idleOrbit(myToken); return; }
+            Promise.race([locate(req), sleep(1500)]).then(function () {
+                if (search !== s) return;
+                if (s.target) { finishPhase(s); return; }
                 var cam = map.cameraForBounds(TO_BOUNDS, { padding: 40 });
                 flyAndWait(myToken, { center: cam.center, zoom: cam.zoom, pitch: 45,
                     bearing: map.getBearing(), duration: ms(3000) })
-                    .then(function (ok) { if (ok) idleOrbit(myToken); });
-                return;
-            }
-            // Pousa sobre o imóvel, inclinado, e desenha o perímetro.
-            addTarget(target.features);
-            var status = target.status && STATUS_LABEL[String(target.status).toUpperCase()];
-            setSearchCaption(
-                req.mode === 'car' ? 'Imóvel encontrado' : 'Área enviada',
-                city ? city.nome : 'Imóvel',
-                (target.area_ha ? fmt(target.area_ha, 2) + ' ha' : '') + (status ? ' · CAR ' + status : '')
-            );
-            var fit = map.cameraForBounds(bounds, { padding: { top: 140, bottom: 180, left: 80, right: 80 } });
-            return flyAndWait(myToken, {
-                center: fit.center,
-                zoom: Math.min(15.5, fit.zoom - 0.4),  // inclinado o imóvel "cresce" na tela
-                pitch: 52,
-                bearing: map.getBearing() + 25,
-                duration: ms(4500),
-                curve: 1.2
-            }).then(function (ok) { if (ok) revealAndOrbit(myToken); });
-        });
+                    .then(function (ok) { if (ok) finishPhase(s); });
+            });
+        }
         return true;
     }
 
-    function endSearch() {
+    // `keep`: continua mostrando o imóvel (cancelamento, voltar do resultado).
+    function endSearch(keep) {
         if (!searching) return;
+        var s = search;
         searching = false;
-        token++;
+        search = null;
+        var myToken = ++token;
         map.stop();
-        removeTarget();
         document.body.classList.remove('is-searching');
-        if (loaderEl) loaderEl.classList.remove('on-map');
-        goToOverview();
+        if (loaderEl) loaderEl.classList.remove('on-map', 'visible');
+        hud.hidden = true;
+        runProgress(0);
+        caption.classList.add('paused');
+        if (keep && s && s.target) {
+            if (map.getSource('search-hits')) drawHits([]);
+            targetCaption(s.target, 'Pré-visualização');
+            // Voo curto: além de liberar o painel, pede de novo os tiles
+            // que o `window.stop()` do cancelamento interrompeu.
+            var cam = cameraFor(s.target.bounds);
+            map.flyTo({ center: cam.center, zoom: cam.zoom, pitch: 50, duration: ms(1500), essential: true });
+            if (!map.getLayer('search-line')) {
+                addTarget(s.target.features);
+                shownKey = keyFor(s.req);
+                reveal(myToken);
+            }
+        } else {
+            removeTarget();
+            goToOverview();
+        }
+    }
+
+    function csrfToken() {
+        var el = document.querySelector('input[name="csrfmiddlewaretoken"]');
+        return el ? el.value : '';
+    }
+
+    cancelBtn.addEventListener('click', function () {
+        if (!search) return;
+        var jobId = search.req.jobId;
+        cancelBtn.disabled = true;
+        // Desiste da resposta do formulário (a página não troca mais)...
+        try { window.stop(); } catch (e) { /* navegador sem suporte */ }
+        // ...e avisa o servidor, que para antes da próxima base.
+        if (jobId && cfg.cancelUrl) {
+            fetch(cfg.cancelUrl.replace('{job}', jobId), {
+                method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': csrfToken() }
+            }).catch(function () { /* a análise só termina sozinha */ });
+        }
+        endSearch(true);
+        setDockOpen(true);
+    });
+
+    // ----- Transição para a página de resultados -----
+
+    var snapshot = null;
+
+    // Copia o quadro que acabou de ser desenhado (o buffer do WebGL ainda
+    // está intacto durante o evento `render`), reduzido e em JPEG. O
+    // `toBlob` comprime fora da thread principal: a animação não engasga.
+    function captureSnapshot() {
+        map.once('render', function () {
+            try {
+                var src = map.getCanvas();
+                var w = Math.min(1280, src.width), h = Math.round(src.height * w / src.width);
+                var c = document.createElement('canvas');
+                c.width = w;
+                c.height = h;
+                c.getContext('2d').drawImage(src, 0, 0, w, h);
+                c.toBlob(function (blob) {
+                    if (!blob) return;
+                    var reader = new FileReader();
+                    reader.onload = function () { if (searching) snapshot = reader.result; };
+                    reader.readAsDataURL(blob);
+                }, 'image/jpeg', 0.75);
+            } catch (e) { /* sem imagem, a página de resultados só não faz a transição */ }
+        });
+        map.triggerRepaint();
+    }
+
+    // A página de resultados (results.html) abre por cima desta imagem e a
+    // dissolve: a câmera "vira" o relatório em vez de um corte seco.
+    window.addEventListener('pagehide', function () {
+        if (!searching || !snapshot) return;
+        storage(function (st) { st.setItem(SNAPSHOT_KEY, JSON.stringify({ src: snapshot, at: Date.now() })); });
+    });
+    storage(function (st) { st.removeItem(SNAPSHOT_KEY); });
+
+    // Voltar do resultado (bfcache) devolve a página como estava: encerra a
+    // busca mas deixa o imóvel analisado na tela.
+    window.addEventListener('pageshow', function (e) { if (e.persisted) endSearch(true); });
+
+    // A análise voltou com erro (a página recarregou): em vez de recomeçar o
+    // tour, mostra de novo o imóvel que estava sendo analisado.
+    if (cfg.searchError) {
+        var last = storage(function (st) { return JSON.parse(st.getItem(LAST_TARGET_KEY) || 'null'); });
+        if (last && last.target && Date.now() - last.at < 30 * 60 * 1000) {
+            var restored = Object.assign({}, last.target, {
+                city: last.target.city ? cities.filter(function (c) { return c.codigo === last.target.city; })[0] : null
+            });
+            // Registrado pela chave original: a pré-visualização que o
+            // upload.js pede para o CAR preenchido não voa de novo.
+            var restoredKey = last.key || 'restored';
+            located[restoredKey] = Promise.resolve(restored);
+            resolved[restoredKey] = restored;
+            whenReady.then(function () { showPreview(restoredKey, restored, 'Análise não concluída'); });
+        }
     }
 
     window.searchPropertyOnMap = searchPropertyOnMap;
-
-    // Voltar do resultado (bfcache) devolve a página como estava: desfaz a busca.
-    window.addEventListener('pageshow', function (e) { if (e.persisted) endSearch(); });
+    window.previewPropertyOnMap = previewPropertyOnMap;
+    window.clearPropertyPreview = clearPropertyPreview;
 
     // =====================================================================
     // Destaque ao passar o mouse e popup

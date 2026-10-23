@@ -50,6 +50,12 @@ from analysis.services.view_services.bases_3d import (
     render_tile,
 )
 from analysis.services.view_services.zip_upload_service import ZipUploadService
+from analysis.services.view_services.analysis_progress import (
+    AnalysisCancelled,
+    AnalysisProgress,
+    cancel_progress,
+    read_progress,
+)
 from analysis.services.view_services import cross_batch_service
 from analysis.services.view_services.kmz_points_service import (
     KmzPointsError,
@@ -370,7 +376,56 @@ def _bases_3d_config(request):
         'bases': [b for b in bases_summary() if b['modelo'] not in denied_layers(request.user)],
         'cities': cities_summary() if 'SicarRecord' not in denied_layers(request.user) else [],
         'propertyUrl': reverse('base_property_outline'),
+        # `{job}` é trocado pelo id da análise gerado no navegador.
+        'progressUrl': reverse('analysis_progress', args=('JOB',)).replace('JOB', '{job}'),
+        'cancelUrl': reverse('analysis_cancel', args=('JOB',)).replace('JOB', '{job}'),
     }
+
+
+def _recent_searches(user, limit=5):
+    """Últimos CARs analisados pelo usuário (sem repetir), para o atalho
+    "Buscas recentes" no painel da página inicial."""
+    denied = denied_layers(user)
+    if 'SicarRecord' in denied:
+        return []
+    qs = (
+        SearchHistory.objects
+        .filter(user=user, sucesso=True, search_type__in=[
+            SearchHistory.SearchType.CAR,
+            SearchHistory.SearchType.DEMONSTRATIVO,
+            SearchHistory.SearchType.RECIBO,
+        ])
+        .exclude(car_input='')
+        # `result_data` chega a vários MB: só as colunas da lista.
+        .only('pk', 'car_input', 'municipio', 'area_ha', 'created_at')[:40]
+    )
+    recent, seen = [], set()
+    for history in qs:
+        car = history.car_input.strip().upper()
+        if car in seen:
+            continue
+        seen.add(car)
+        if 'MunicipalBoundaries' in denied:
+            history.municipio = ''
+        recent.append(history)
+        if len(recent) == limit:
+            break
+    return recent
+
+
+class AnalysisProgressView(View):
+    """Andamento da análise em curso (ver `analysis_progress`)."""
+
+    def get(self, request, job_id):
+        return JsonResponse(read_progress(request.user, job_id) or {})
+
+
+class AnalysisCancelView(View):
+    """Botão "Cancelar análise" da tela do mapa 3D."""
+
+    def post(self, request, job_id):
+        cancel_progress(request.user, job_id)
+        return HttpResponse(status=204)
 
 
 class UploadZipCarView(View):
@@ -378,15 +433,34 @@ class UploadZipCarView(View):
     em cidade e o formulário de análise no canto."""
     template_upload = 'analysis/bases_3d.html'
     template_index = 'analysis/results.html'
+    # Trocado em `post` pelo andamento da análise pedida; este é no-op.
+    progress = AnalysisProgress()
 
     def get(self, request):
         return self._render_form(request, {})
 
     def _render_form(self, request, context):
-        context['bases_3d_config'] = _bases_3d_config(request)
+        config = _bases_3d_config(request)
+        # Voltou com erro: o mapa fica no imóvel buscado em vez de recomeçar o tour.
+        config['searchError'] = bool(context.get('erro'))
+        context['bases_3d_config'] = config
+        context['recent_searches'] = _recent_searches(request.user)
         return render(request, self.template_upload, context)
 
     def post(self, request):
+        # Andamento para a tela (ver `analysis_progress`): a página consulta
+        # `AnalysisProgressView` enquanto espera esta resposta.
+        self.progress = AnalysisProgress.from_request(request)
+        try:
+            response = self._post(request)
+        except AnalysisCancelled:
+            # A página já desistiu da resposta; 204 não troca de página.
+            return HttpResponse(status=204)
+        if response.status_code == 302:
+            self.progress.finish()
+        return response
+
+    def _post(self, request):
         zip_file = request.FILES.get('zip_file')
         car_input = request.POST.get('car_input', '').strip()
         mode = request.POST.get('mode', '').strip()
@@ -443,6 +517,7 @@ class UploadZipCarView(View):
         # 3) Caso ZIP enviado
         # --------------------------------------
         try:
+            self.progress.stage('Lendo o shapefile')
             zip_dataframe = ZipUploadService().extract_geodataframe(zip_file)
 
             if zip_dataframe is None or zip_dataframe.empty:
@@ -461,6 +536,9 @@ class UploadZipCarView(View):
             context['erro'] = 'Arquivo ZIP inválido ou corrompido.'
             return self._render_form(request, context)
 
+        except AnalysisCancelled:
+            raise
+
         except Exception as e:
             context['erro'] = f'Erro ao processar o arquivo: {str(e)}'
             return self._render_form(request, context)
@@ -476,12 +554,16 @@ class UploadZipCarView(View):
         
         if car_number:
             try:
-                resultado = SearchForCar().execute(car_number, user=user) or {}
+                self.progress.stage('Localizando o imóvel', car=car_number)
+                resultado = SearchForCar().execute(car_number, user=user, progress=self.progress) or {}
                 qs = get_sicar_record(car_number__iexact=car_number)
                 if qs.exists():
                     geometry = qs.first().geometry
                     require_layer('MunicipalBoundaries', user)
+                    self.progress.stage('Identificando o município')
                     municipio, state = locate_city_state(geometry)
+            except AnalysisCancelled:
+                raise
             except Exception:
                 pass
         return resultado, municipio, state
@@ -498,6 +580,7 @@ class UploadZipCarView(View):
             return self._render_form(request, context)
 
         try:
+            self.progress.stage('Lendo o documento')
             parser = DocumentsParserFactory.create_parser(doc_type)
             extractor = ExtractDocumentPdfPlumber()
             ctx = DocumentDataContext(extractor, parser)
@@ -523,6 +606,8 @@ class UploadZipCarView(View):
             request.session['last_analysis'] = data
             return redirect('results')
 
+        except AnalysisCancelled:
+            raise
         except Exception as e:
             context['erro'] = f'{error_prefix}: {str(e)}'
             return self._render_form(request, context)
@@ -543,6 +628,8 @@ class UploadZipCarView(View):
             request.session['last_analysis'] = data
             return redirect('results')
 
+        except AnalysisCancelled:
+            raise
         except Exception as e:
             context['erro'] = f'Erro ao analisar pelo CAR: {str(e)}'
             return self._render_form(request, context)
@@ -550,10 +637,11 @@ class UploadZipCarView(View):
     def _process_coordinates(self, request, coordenadas_input, car_input):
         """Processa os dados extraídos do shapefile."""
         try:
-            resultado = SearchAll(user=request.user).execute(coordenadas_input)
+            resultado = SearchAll(user=request.user, progress=self.progress).execute(coordenadas_input)
             municipio, uf = None, None
             try:
                 require_layer('MunicipalBoundaries', request.user)
+                self.progress.stage('Identificando o município')
                 municipio, uf = locate_city_state(coordenadas_input)
             except Exception:
                 pass
@@ -568,6 +656,8 @@ class UploadZipCarView(View):
             _save_search_history(request, data, SearchHistory.SearchType.SHAPEFILE)
             request.session['last_analysis'] = data
             return redirect('results')
+        except AnalysisCancelled:
+            raise
         except Exception as e:
             data = {
                 'erro': f'Erro ao processar coordenadas: {str(e)}',

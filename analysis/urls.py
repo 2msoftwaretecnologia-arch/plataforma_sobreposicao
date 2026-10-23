@@ -20,6 +20,8 @@ urlpatterns = [
     path('download/property-shp/', login_required(views.DownloadPropertyShapefileView.as_view()), name='download_property_shp'),
     path('bases-3d/tiles/<str:modelo>/<int:z>/<int:x>/<int:y>.pbf', login_required(views.BaseTileView.as_view()), name='base_tiles'),
     path('bases-3d/imovel/', login_required(views.PropertyOutlineView.as_view()), name='base_property_outline'),
+    path('analise/<str:job_id>/progresso/', login_required(views.AnalysisProgressView.as_view()), name='analysis_progress'),
+    path('analise/<str:job_id>/cancelar/', login_required(views.AnalysisCancelView.as_view()), name='analysis_cancel'),
     # Imagens de satélite do mapa de resultados (proxy para não expor as chaves).
     path('imagens/google/<int:z>/<int:x>/<int:y>', login_required(views.GoogleTileView.as_view()), name='imagery_google_tile'),
     path('imagens/wayback/datas/', login_required(views.WaybackReleasesView.as_view()), name='imagery_wayback_releases'),

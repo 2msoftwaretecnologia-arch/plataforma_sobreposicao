@@ -4,6 +4,8 @@ do mapa 3D da página inicial; o comportamento vem de upload.js.
 {% endcomment %}
 <form method="post" action="{% url 'upload_zip_car' %}" enctype="multipart/form-data" id="upload_form">
     {% csrf_token %}
+    <!-- Id da análise, gerado no envio: a página acompanha o andamento por ele -->
+    <input type="hidden" name="job_id" id="job_id" value="">
     <div class="form-group">
         <label class="field-label">Modo de análise</label>
         <div class="mode-switch" role="radiogroup" aria-label="Modo de análise">
@@ -37,6 +39,7 @@ do mapa 3D da página inicial; o comportamento vem de upload.js.
             <strong>Arquivo ZIP do Shapefile</strong>
             <p id="zip_label_text">Arraste e solte o ZIP aqui ou clique para selecionar!</p>
         </label>
+        <div id="zip_preview" class="preview-note" role="status" hidden></div>
         <div class="note-box zip-warning-message">
             <svg class="ico"><use href="#i-alert"/></svg>
             <p>O arquivo ZIP deve conter os arquivos do Shapefile: <strong>.shp, .shx, .dbf</strong>, etc.</p>
@@ -76,6 +79,7 @@ do mapa 3D da página inicial; o comportamento vem de upload.js.
             pattern="[A-Za-z]{2}-[0-9]{7}-[0-9A-Fa-f]{32}"
             title="Formato: UF-0000000-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX (sem pontos)"
             value="{% if car_input %}{{ car_input }}{% endif %}">
+        <div id="car_preview" class="preview-note" role="status" hidden></div>
         <div class="note-box car-warning-message">
             <svg class="ico"><use href="#i-alert"/></svg>
             <p>Utilize o CAR do <strong>Recibo Federal</strong>, no formato <strong>UF-0000000-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX</strong>. Digite apenas números e letras, <strong>sem pontos</strong>.</p>
@@ -98,4 +102,21 @@ do mapa 3D da página inicial; o comportamento vem de upload.js.
 {% endif %}
 {% if erro %}
 <div class="status-error">❌ {{ erro }}</div>
+{% endif %}
+
+{% if recent_searches %}
+<div class="recent-searches">
+    <span class="field-label">Buscas recentes</span>
+    <ul class="recent-list">
+        {% for item in recent_searches %}
+        <li class="recent-item">
+            <button type="button" class="recent-use" data-car="{{ item.car_input }}" title="Preencher {{ item.car_input }} e ver no mapa">
+                <span class="recent-car">{{ item.car_input|slice:":10" }}…{{ item.car_input|slice:"-6:" }}</span>
+                <span class="recent-meta">{% if item.municipio %}{{ item.municipio }} · {% endif %}{{ item.created_at|date:"d/m H:i" }}</span>
+            </button>
+            <a class="recent-open" href="{% url 'historico_detalhe' item.pk %}" title="Abrir o resultado salvo, sem refazer a análise">Resultado</a>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
 {% endif %}
