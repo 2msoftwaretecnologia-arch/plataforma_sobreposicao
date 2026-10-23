@@ -14,6 +14,7 @@ class SearchHistory(models.Model):
     class SearchType(models.TextChoices):
         CAR = 'car', 'Número do CAR'
         SHAPEFILE = 'shapefile', 'Upload de shapefile'
+        KML = 'kml', 'Upload de KML/KMZ'
         COORDENADAS = 'coordenadas', 'Coordenadas'
         DEMONSTRATIVO = 'demonstrativo', 'PDF — Demonstrativo'
         RECIBO = 'recibo', 'PDF — Recibo'

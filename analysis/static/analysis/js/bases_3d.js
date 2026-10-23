@@ -877,9 +877,62 @@
             .catch(function () { return { status: 'unreadable' }; });
     }
 
+    // KML/KMZ: cada <Polygon> do arquivo vira uma feição (o servidor junta
+    // todos numa área só, ver `KmlUploadService`). O KMZ é um zip com o KML.
+    function readKmlText(file) {
+        return file.arrayBuffer().then(function (buf) {
+            var head = new Uint8Array(buf, 0, Math.min(2, buf.byteLength));
+            if (head[0] !== 0x50 || head[1] !== 0x4b) return new TextDecoder().decode(buf);  // não é zip ("PK")
+            if (!window.JSZip) return null;
+            return window.JSZip.loadAsync(buf).then(function (zip) {
+                var names = Object.keys(zip.files).filter(function (n) { return /\.kml$/i.test(n); });
+                names.sort(function (a, b) {
+                    return (a.toLowerCase() !== 'doc.kml') - (b.toLowerCase() !== 'doc.kml')
+                        || a.split('/').length - b.split('/').length;
+                });
+                return names.length ? zip.file(names[0]).async('string') : null;
+            });
+        });
+    }
+
+    function kmlRing(boundary) {
+        var el = boundary.getElementsByTagNameNS('*', 'coordinates')[0];
+        if (!el) return null;
+        var ring = el.textContent.trim().split(/\s+/).map(function (chunk) {
+            var p = chunk.split(',');
+            return [parseFloat(p[0]), parseFloat(p[1])];
+        }).filter(function (c) { return isFinite(c[0]) && isFinite(c[1]); });
+        return ring.length >= 3 ? ring : null;
+    }
+
+    function locateKml(file) {
+        if (!file || !file.arrayBuffer) return Promise.resolve(null);
+        return readKmlText(file)
+            .then(function (text) {
+                if (!text) return { status: 'unreadable' };
+                var doc = new DOMParser().parseFromString(text, 'application/xml');
+                if (doc.getElementsByTagName('parsererror').length) return { status: 'unreadable' };
+                var features = [];
+                Array.prototype.forEach.call(doc.getElementsByTagNameNS('*', 'Polygon'), function (poly) {
+                    var rings = [];
+                    Array.prototype.forEach.call(poly.children, function (b) {
+                        var ring = (b.localName === 'outerBoundaryIs' || b.localName === 'innerBoundaryIs') && kmlRing(b);
+                        if (!ring) return;
+                        if (b.localName === 'outerBoundaryIs') rings.unshift(ring); else rings.push(ring);
+                    });
+                    if (rings.length) features.push({ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: rings } });
+                });
+                if (!features.length) return { status: 'no_polygon' };
+                return targetFrom(features, { source: 'KML', polygons: features.length });
+            })
+            .catch(function () { return { status: 'unreadable' }; });
+    }
+
     function keyFor(req) {
         if (req.mode === 'car' && req.car) return 'car:' + req.car.toUpperCase();
-        if (req.mode === 'zip' && req.file) return 'zip:' + [req.file.name, req.file.size, req.file.lastModified].join(':');
+        if ((req.mode === 'zip' || req.mode === 'kml') && req.file) {
+            return req.mode + ':' + [req.file.name, req.file.size, req.file.lastModified].join(':');
+        }
         return null;
     }
 
@@ -890,7 +943,9 @@
         var key = keyFor(req);
         if (!key) return Promise.resolve(null);
         if (!located[key]) {
-            located[key] = (req.mode === 'car' ? locateCar(req.car) : locateZip(req.file))
+            var locator = { car: function () { return locateCar(req.car); },
+                kml: function () { return locateKml(req.file); } }[req.mode] || function () { return locateZip(req.file); };
+            located[key] = locator()
                 .catch(function () { return null; })
                 .then(function (target) {
                     if (target) resolved[key] = target;
@@ -1033,7 +1088,9 @@
         if (target.area_ha) parts.push(fmt(target.area_ha, 2) + ' ha');
         if (target.statusLabel) parts.push('CAR ' + target.statusLabel);
         setSearchCaption(step,
-            target.city ? target.city.nome : (target.layer ? 'Shapefile · ' + target.layer : 'Área enviada'),
+            target.city ? target.city.nome
+                : target.layer ? 'Shapefile · ' + target.layer
+                : target.source ? target.source + ' enviado' : 'Área enviada',
             parts.join(' · '));
     }
 

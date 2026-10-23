@@ -1,5 +1,5 @@
 {% comment %}
-Formulário de entrada da análise (ZIP, CAR, demonstrativo, recibo), no canto
+Formulário de entrada da análise (ZIP, KML, CAR, demonstrativo, recibo), no canto
 do mapa 3D da página inicial; o comportamento vem de upload.js.
 {% endcomment %}
 <form method="post" action="{% url 'upload_zip_car' %}" enctype="multipart/form-data" id="upload_form">
@@ -13,6 +13,11 @@ do mapa 3D da página inicial; o comportamento vem de upload.js.
             <label class="mode-pill" for="mode_zip">
                 <svg class="ico"><use href="#i-folder"/></svg>
                 ZIP
+            </label>
+            <input class="mode-input" id="mode_kml" type="radio" name="mode" value="kml" />
+            <label class="mode-pill" for="mode_kml">
+                <svg class="ico"><use href="#i-pin"/></svg>
+                KML
             </label>
             <input class="mode-input" id="mode_car" type="radio" name="mode" value="car" />
             <label class="mode-pill" for="mode_car">
@@ -43,6 +48,20 @@ do mapa 3D da página inicial; o comportamento vem de upload.js.
         <div class="note-box zip-warning-message">
             <svg class="ico"><use href="#i-alert"/></svg>
             <p>O arquivo ZIP deve conter os arquivos do Shapefile: <strong>.shp, .shx, .dbf</strong>, etc.</p>
+        </div>
+    </div>
+
+    <div class="form-group" id="group_kml" style="display:none;">
+        <label class="drop-zone drag-zone" for="kml_file">
+            <input type="file" id="kml_file" name="kml_file" accept=".kml,.kmz,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz" />
+            <span class="drop-icon"><svg class="ico"><use href="#i-upload"/></svg></span>
+            <strong>Arquivo KML ou KMZ</strong>
+            <p id="kml_label_text">Arraste e solte o KML aqui ou clique para selecionar!</p>
+        </label>
+        <div id="kml_preview" class="preview-note" role="status" hidden></div>
+        <div class="note-box kml-warning-message">
+            <svg class="ico"><use href="#i-alert"/></svg>
+            <p>O arquivo deve ter o <strong>polígono</strong> da área (Google Earth, SIGEF...). Vários polígonos são analisados juntos; pontos e linhas são ignorados.</p>
         </div>
     </div>
 
@@ -94,7 +113,7 @@ do mapa 3D da página inicial; o comportamento vem de upload.js.
     <a class="termos-uso" href="{% url 'termos_de_uso' %}">Termos de Uso</a>
 </form>
 
-<div id="client_error" class="status-error" style="display:none;">❌ Por favor, envie um ZIP ou
+<div id="client_error" class="status-error" style="display:none;">❌ Por favor, envie um ZIP ou KML, ou
     informe o número do CAR.</div>
 
 {% if sucesso %}

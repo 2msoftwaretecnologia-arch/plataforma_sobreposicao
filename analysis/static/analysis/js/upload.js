@@ -10,6 +10,9 @@
     const groupRecibo = document.getElementById('group_recibo');
     const zipInput = document.getElementById('zip_file');
     const zipLabelText = document.getElementById('zip_label_text');
+    const groupKml = document.getElementById('group_kml');
+    const kmlInput = document.getElementById('kml_file');
+    const kmlLabelText = document.getElementById('kml_label_text');
     const carInput = document.getElementById('car_input');
     const demoInput = document.getElementById('demo_file');
     const demoLabelText = document.getElementById('demo_label_text');
@@ -27,41 +30,23 @@
         return selected ? selected.value : null;
     }
 
+    // Cada modo mostra só o seu grupo e só o seu campo é obrigatório.
+    const modeGroups = {
+        zip: [groupZip, zipInput],
+        kml: [groupKml, kmlInput],
+        car: [groupCar, carInput],
+        demostrativo: [groupDemo, demoInput],
+        recibo: [groupRecibo, reciboInput],
+    };
+
     function applyMode() {
         const mode = getSelectedMode();
-        if (mode === 'zip') {
-            groupZip.style.display = '';
-            groupCar.style.display = 'none';
-            if (groupDemo) groupDemo.style.display = 'none';
-            if (groupRecibo) groupRecibo.style.display = 'none';
-            carInput.required = false;
-            zipInput.required = true;
-        } else if (mode === 'car') {
-            groupZip.style.display = 'none';
-            groupCar.style.display = '';
-            if (groupDemo) groupDemo.style.display = 'none';
-            if (groupRecibo) groupRecibo.style.display = 'none';
-            zipInput.required = false;
-            carInput.required = true;
-        } else if (mode === 'demostrativo') {
-            groupZip.style.display = 'none';
-            groupCar.style.display = 'none';
-            if (groupDemo) groupDemo.style.display = '';
-            if (groupRecibo) groupRecibo.style.display = 'none';
-            zipInput.required = false;
-            carInput.required = false;
-            if (demoInput) demoInput.required = true;
-            if (reciboInput) reciboInput.required = false;
-        } else if (mode === 'recibo') {
-            groupZip.style.display = 'none';
-            groupCar.style.display = 'none';
-            if (groupDemo) groupDemo.style.display = 'none';
-            if (groupRecibo) groupRecibo.style.display = '';
-            zipInput.required = false;
-            carInput.required = false;
-            if (demoInput) demoInput.required = false;
-            if (reciboInput) reciboInput.required = true;
-        }
+        Object.keys(modeGroups).forEach(function (key) {
+            const group = modeGroups[key][0];
+            const input = modeGroups[key][1];
+            if (group) group.style.display = key === mode ? '' : 'none';
+            if (input) input.required = key === mode;
+        });
         clientError.style.display = 'none';
     }
 
@@ -89,6 +74,7 @@
     // análise e já avisa se o CAR não está na base ou se o ZIP tem problema.
     const carPreview = document.getElementById('car_preview');
     const zipPreview = document.getElementById('zip_preview');
+    const kmlPreview = document.getElementById('kml_preview');
     const canPreview = typeof window.previewPropertyOnMap === 'function';
 
     function fmtHa(n) {
@@ -126,6 +112,20 @@
             return ['warn', 'O ZIP não tem o arquivo .prj, então a área não aparece no mapa. A análise ainda pode ser feita.'];
         }
         return ['warn', 'Não deu para ler o shapefile aqui no navegador; a análise ainda pode ser feita.'];
+    }
+
+    function kmlNote(t) {
+        if (!t) return ['', ''];
+        if (t.status === 'found') {
+            return ['ok', 'Área lida do KML: ' + fmtHa(t.area_ha) + (t.polygons > 1 ? ' (' + t.polygons + ' polígonos)' : '')];
+        }
+        if (t.status === 'outside') {
+            return ['warn', 'A área fica fora do Tocantins: as bases da análise cobrem só o estado.'];
+        }
+        if (t.status === 'no_polygon') {
+            return ['warn', 'O arquivo não tem nenhum polígono: a análise precisa da área desenhada, não só de pontos ou linhas.'];
+        }
+        return ['warn', 'Não deu para ler o KML aqui no navegador; a análise ainda pode ser feita.'];
     }
 
     let carPreviewTimer = null;
@@ -167,6 +167,21 @@
             if (!zipInput.files || zipInput.files[0] !== file) return;
             const note = zipNote(t);
             showNote(zipPreview, note[0], note[1]);
+        });
+    }
+
+    function previewKml(file) {
+        if (!canPreview) return;
+        if (!file) {
+            showNote(kmlPreview);
+            window.clearPropertyPreview();
+            return;
+        }
+        showNote(kmlPreview, 'loading', 'Lendo o KML...');
+        window.previewPropertyOnMap({ mode: 'kml', file: file }).then(function (t) {
+            if (!kmlInput.files || kmlInput.files[0] !== file) return;
+            const note = kmlNote(t);
+            showNote(kmlPreview, note[0], note[1]);
         });
     }
 
@@ -240,6 +255,60 @@
                     zipLabelText.textContent = ZIP_LABEL_DEFAULT;
                 }
             }
+        });
+    }
+
+    const KML_LABEL_DEFAULT = 'Arraste e solte o KML aqui ou clique para selecionar!';
+    const dragZoneKml = groupKml ? groupKml.querySelector('.drag-zone') : null;
+
+    function isKml(file) {
+        return !!file && /\.(kml|kmz)$/i.test(file.name || '');
+    }
+
+    function setKmlFile(file) {
+        if (file && !isKml(file)) {
+            kmlInput.value = '';
+            clientError.style.display = 'block';
+            clientError.textContent = '❌ Por favor, selecione um arquivo KML ou KMZ.';
+            file = null;
+        } else {
+            clientError.style.display = 'none';
+        }
+        kmlLabelText.textContent = file ? file.name : KML_LABEL_DEFAULT;
+        previewKml(file);
+    }
+
+    if (kmlInput) {
+        kmlInput.addEventListener('change', function () {
+            setKmlFile(kmlInput.files && kmlInput.files[0]);
+        });
+    }
+
+    if (dragZoneKml) {
+        ['dragenter','dragover'].forEach(evt => {
+            dragZoneKml.addEventListener(evt, function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dragZoneKml.classList.add('active');
+            });
+        });
+        ['dragleave','drop'].forEach(evt => {
+            dragZoneKml.addEventListener(evt, function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dragZoneKml.classList.remove('active');
+            });
+        });
+        dragZoneKml.addEventListener('drop', function (e) {
+            const files = e.dataTransfer && e.dataTransfer.files ? Array.from(e.dataTransfer.files) : [];
+            if (!files.length) return;
+            const kmlFile = files.find(f => isKml(f)) || files[0];
+            if (isKml(kmlFile)) {
+                const dt = new DataTransfer();
+                dt.items.add(kmlFile);
+                kmlInput.files = dt.files;
+            }
+            setKmlFile(kmlFile);
         });
     }
 
@@ -366,17 +435,20 @@
 
         const carValue = carInput.value.trim();
         const zipSelectedEmpty = mode === 'zip' && (!zipInput.files || zipInput.files.length === 0);
+        const kmlSelectedEmpty = mode === 'kml' && (!kmlInput.files || kmlInput.files.length === 0);
         const carSelectedEmpty = mode === 'car' && carValue === '';
         const carHasDots = mode === 'car' && carInput.value.includes('.'); // Será false se limpo acima
         const carInvalidFormat = mode === 'car' && carValue !== '' && !CAR_REGEX.test(carValue);
         const demoInvalidPdf = mode === 'demostrativo' && demoInput && demoInput.files && demoInput.files.length > 0 && !isPdf(demoInput.files[0]);
         const reciboInvalidPdf = mode === 'recibo' && reciboInput && reciboInput.files && reciboInput.files.length > 0 && !isPdf(reciboInput.files[0]);
 
-        if (zipSelectedEmpty || carSelectedEmpty || demoInvalidPdf || reciboInvalidPdf || carHasDots || carInvalidFormat) {
+        if (zipSelectedEmpty || kmlSelectedEmpty || carSelectedEmpty || demoInvalidPdf || reciboInvalidPdf || carHasDots || carInvalidFormat) {
             e.preventDefault();
             clientError.style.display = 'block';
             if (carHasDots) {
                 clientError.textContent = '❌ Não é permitido o uso de pontos no número do CAR.';
+            } else if (kmlSelectedEmpty) {
+                clientError.textContent = '❌ Por favor, envie um arquivo KML ou KMZ.';
             } else if (carSelectedEmpty) {
                 clientError.textContent = '❌ Por favor, informe o número do CAR.';
             } else if (carInvalidFormat) {
@@ -398,7 +470,7 @@
             window.searchPropertyOnMap({
                 mode: mode,
                 car: carValue,
-                file: zipInput.files && zipInput.files[0],
+                file: mode === 'kml' ? kmlInput.files && kmlInput.files[0] : zipInput.files && zipInput.files[0],
                 jobId: jobId,
             });
         }

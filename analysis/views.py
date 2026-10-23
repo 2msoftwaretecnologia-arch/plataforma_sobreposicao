@@ -50,6 +50,7 @@ from analysis.services.view_services.bases_3d import (
     render_tile,
 )
 from analysis.services.view_services.zip_upload_service import ZipUploadService
+from analysis.services.view_services.kml_upload_service import KmlUploadError, KmlUploadService
 from analysis.services.view_services.analysis_progress import (
     AnalysisCancelled,
     AnalysisProgress,
@@ -491,6 +492,9 @@ class UploadZipCarView(View):
                 context
             )
 
+        if mode == 'kml':
+            return self._handle_kml_upload(request, request.FILES.get('kml_file'), car_input, context)
+
         # --------------------------------------
         # 1) Busca pelo número do CAR (sem ZIP): o número é obrigatório e
         #    precisa seguir o formato oficial do CAR (ver `analysis/validators.py`).
@@ -634,8 +638,31 @@ class UploadZipCarView(View):
             context['erro'] = f'Erro ao analisar pelo CAR: {str(e)}'
             return self._render_form(request, context)
 
-    def _process_coordinates(self, request, coordenadas_input, car_input):
-        """Processa os dados extraídos do shapefile."""
+    def _handle_kml_upload(self, request, kml_file, car_input, context):
+        """Área do imóvel desenhada num KML/KMZ: segue o mesmo cruzamento do shapefile."""
+        if not kml_file:
+            context['erro'] = 'Por favor, envie um arquivo KML ou KMZ.'
+            return self._render_form(request, context)
+        if not kml_file.name.lower().endswith(('.kml', '.kmz')):
+            context['erro'] = 'Só são aceitos arquivos .kml ou .kmz.'
+            return self._render_form(request, context)
+
+        try:
+            self.progress.stage('Lendo o KML')
+            kml_dataframe = KmlUploadService().extract_geodataframe(kml_file)
+        except KmlUploadError as e:
+            context['erro'] = str(e)
+            return self._render_form(request, context)
+
+        coordenadas_input = extract_geometry(kml_dataframe)
+        if not coordenadas_input:
+            context['erro'] = 'O arquivo não tem nenhum polígono: desenhe a área do imóvel (não só pontos ou linhas).'
+            return self._render_form(request, context)
+
+        return self._process_coordinates(request, coordenadas_input, car_input, SearchHistory.SearchType.KML)
+
+    def _process_coordinates(self, request, coordenadas_input, car_input, search_type=SearchHistory.SearchType.SHAPEFILE):
+        """Processa os dados extraídos do shapefile (ou do KML)."""
         try:
             resultado = SearchAll(user=request.user, progress=self.progress).execute(coordenadas_input)
             municipio, uf = None, None
@@ -653,7 +680,7 @@ class UploadZipCarView(View):
                 'uf': uf,
                 'sucesso': True
             }
-            _save_search_history(request, data, SearchHistory.SearchType.SHAPEFILE)
+            _save_search_history(request, data, search_type)
             request.session['last_analysis'] = data
             return redirect('results')
         except AnalysisCancelled:
@@ -665,7 +692,7 @@ class UploadZipCarView(View):
                 'car_input': car_input,
                 'sucesso': False
             }
-            _save_search_history(request, data, SearchHistory.SearchType.SHAPEFILE)
+            _save_search_history(request, data, search_type)
             request.session['last_analysis'] = data
             return redirect('results')
 

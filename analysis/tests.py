@@ -452,3 +452,51 @@ class AnalysisProgressTests(SimpleTestCase):
         cancel_progress(self.user, self.JOB)
         with self.assertRaises(AnalysisCancelled):
             progress.layer_started(self._layers()[0])
+
+
+KML_TWO_PARCELS = b"""<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2"><Document>
+  <Placemark><name>Gleba 1</name><Polygon><outerBoundaryIs><LinearRing><coordinates>
+    -48.30,-10.20,0 -48.29,-10.20,0 -48.29,-10.19,0 -48.30,-10.19,0 -48.30,-10.20,0
+  </coordinates></LinearRing></outerBoundaryIs>
+  <innerBoundaryIs><LinearRing><coordinates>
+    -48.298,-10.198 -48.296,-10.198 -48.296,-10.196 -48.298,-10.196 -48.298,-10.198
+  </coordinates></LinearRing></innerBoundaryIs></Polygon></Placemark>
+  <Placemark><name>Gleba 2</name><MultiGeometry><Polygon><outerBoundaryIs><LinearRing><coordinates>
+    -48.28,-10.20 -48.27,-10.20 -48.27,-10.19 -48.28,-10.19 -48.28,-10.20
+  </coordinates></LinearRing></outerBoundaryIs></Polygon></MultiGeometry></Placemark>
+  <Placemark><name>Sede</name><Point><coordinates>-48.295,-10.195,0</coordinates></Point></Placemark>
+</Document></kml>"""
+
+
+class KmlUploadServiceTests(SimpleTestCase):
+
+    def _read(self, content, name='area.kml'):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from analysis.services.view_services.kml_upload_service import KmlUploadService
+        return KmlUploadService().extract_geodataframe(SimpleUploadedFile(name, content))
+
+    def test_junta_todos_os_poligonos_e_mantem_o_furo(self):
+        gdf = self._read(KML_TWO_PARCELS)
+        geom = gdf.geometry.iloc[0]
+        self.assertEqual(gdf.crs.to_epsg(), 4326)
+        self.assertEqual(geom.geom_type, 'MultiPolygon')
+        self.assertEqual(len(geom.geoms), 2)
+        self.assertAlmostEqual(geom.area, 0.0001 * 2 - 0.002 * 0.002)
+
+    def test_kmz_le_o_kml_de_dentro(self):
+        import zipfile
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, 'w') as zf:
+            zf.writestr('doc.kml', KML_TWO_PARCELS)
+        gdf = self._read(buf.getvalue(), 'area.kmz')
+        self.assertEqual(len(gdf.geometry.iloc[0].geoms), 2)
+
+    def test_so_pontos_nao_tem_area(self):
+        kml = b'<kml xmlns="http://www.opengis.net/kml/2.2"><Placemark><Point><coordinates>-48.3,-10.2</coordinates></Point></Placemark></kml>'
+        self.assertIsNone(self._read(kml))
+
+    def test_arquivo_invalido(self):
+        from analysis.services.view_services.kml_upload_service import KmlUploadError
+        with self.assertRaises(KmlUploadError):
+            self._read(b'isto nao e xml')
