@@ -134,7 +134,23 @@ direto dos GeoTIFFs públicos, só no trecho de cada tile. Cada tile novo custa
 de 0,3 a 3 s; depois fica no cache do Django (Redis) por 7 dias. Os GeoTIFFs
 do MapBiomas não têm pirâmide de zoom, por isso só aparecem a partir do zoom
 10 (CBERS, do zoom 12).
+
+CBERS-2B HRC (2,7 m, set/2007–mar/2010; `cbers2b_service.py`): o nível 2 do
+INPE chega a ter quilômetros de erro de posição e os GeoTIFFs não têm
+pirâmide. O painel mostra a miniatura do INPE de cada cena (para ver nuvem
+antes de baixar) e, no botão "Baixar e corrigir esta cena", o servidor baixa
+o HRC (~55 MB) e só as linhas do CCD sobre ele, corrige a posição pelo
+Landsat 5/7 da data (correlação de fase, ajuste afim; erro restante de
+10–16 m nos testes), alinha o CCD da mesma passagem para a fusão colorida e
+guarda tudo em `IMAGERY_CACHE_DIR` (~20–30 s, metade no download; o painel
+mostra a etapa). As seguintes abrem na hora.
+
+"Melhorar imagem" (painel Imagem; Landsat 5/7, CBERS-4A, CBERS-2B): contraste
+da cena, interpolação bicúbica e nitidez na escala do pixel do sensor
+(`image_enhance.py`). Não é super-resolução: não cria detalhe.
 - `GOOGLE_MAPS_API_KEY`: chave opcional do Google com a Map Tiles API ativada (imagem de satélite do Google).
+- `IMAGERY_CACHE_DIR`: pasta das cenas CBERS-2B baixadas (padrão `.cache/imagens`, fora de `media/`).
+- `IMAGERY_CACHE_MAX_MB`: limite dessa pasta (padrão 6000); acima dele saem as cenas usadas há mais tempo.
 - `STATIC_VERSION`: versão/cache-busting de arquivos estáticos.
 
 ## Comandos úteis de importação

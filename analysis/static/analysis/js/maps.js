@@ -15,6 +15,20 @@
     // lista de mosaicos/datas não chega, para não pedir tiles sem a opção.
     var BLANK_TILE = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 
+    // "Melhorar imagem" (painel Imagem): as fontes com `enhance` no picker
+    // pedem os tiles com ?realce=1 (contraste, interpolação e nitidez no
+    // servidor; ver image_enhance.py).
+    var ENHANCE_QUERY = '?realce={realce}';
+    var ENHANCE_HINT = 'Contraste ajustado à cena, interpolação suave e nitidez. ' +
+        'Deixa mais legível o que o satélite registrou; não cria detalhes.';
+
+    function csrfToken() {
+        var el = document.querySelector('input[name="csrfmiddlewaretoken"]');
+        if (el) return el.value;
+        var match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+        return match ? decodeURIComponent(match[1]) : '';
+    }
+
     // Sentinel-2 (Copernicus) no Living Atlas da Esri: público, cenas dos
     // últimos ~14 meses, com composições de banda prontas no servidor.
     var SENTINEL2_URL = 'https://sentinel.arcgis.com/arcgis/rest/services/Sentinel2/ImageServer';
@@ -253,17 +267,18 @@
         // escolhida; a lista de cenas depende do centro do mapa.
         if (imagery.cbers) {
             var baseCbers = new MinZoomTileLayer(BLANK_TILE, {
-                maxZoom: 19, minDataZoom: imagery.cbers.min_zoom, scene: '', pane: pane,
+                maxZoom: 19, minDataZoom: imagery.cbers.min_zoom, scene: '', realce: '0', pane: pane,
                 attribution: 'CBERS-4A &copy; INPE (Brazil Data Cube)'
             });
             baseCbers.imageryInfo = { kind: 'cbers', minZoom: imagery.cbers.min_zoom };
             layers['CBERS-4A (2 m, INPE)'] = baseCbers;
             pickers.push({
                 layer: baseCbers,
-                template: imagery.cbers.tile_url,
+                template: imagery.cbers.tile_url + ENHANCE_QUERY,
                 param: 'scene',
                 label: 'Cena CBERS-4A',
                 followsCenter: true,
+                enhance: {},
                 listUrl: function (center) {
                     return imagery.cbers.scenes_url + '?lat=' + center.lat.toFixed(3) + '&lon=' + center.lng.toFixed(3);
                 },
@@ -275,22 +290,117 @@
             });
         }
 
+        // CBERS-2B HRC (INPE), 2,7 m de set/2007 a mar/2010: na 1ª vez o
+        // servidor baixa a cena e corrige a posição dela pelo Landsat
+        // (cbers2b_service.py), daí o `prepare` antes de pedir os tiles.
+        if (imagery.cbers2b) {
+            var c2 = imagery.cbers2b;
+            var baseCbers2b = new MinZoomTileLayer(BLANK_TILE, {
+                maxZoom: 19, minDataZoom: c2.min_zoom, scene: '', comp: 'pan', realce: '0', pane: pane,
+                attribution: 'CBERS-2B &copy; INPE (Brazil Data Cube), posição corrigida pelo Landsat (USGS/NASA)'
+            });
+            baseCbers2b.imageryInfo = { kind: 'cbers2b', minZoom: c2.min_zoom, years: c2.years };
+            layers['CBERS-2B (2,7 m, ' + c2.years[0] + '–' + c2.years[1] + ')'] = baseCbers2b;
+            var c2Picker = {
+                layer: baseCbers2b,
+                template: c2.tile_url + ENHANCE_QUERY,
+                param: 'scene',
+                label: 'Cena CBERS-2B (câmera HRC)',
+                emptyText: 'Nenhuma cena CBERS-2B HRC (' + c2.years[0] + '–' + c2.years[1] + ') cobre este ponto.',
+                followsCenter: true,
+                enhance: {},
+                listUrl: function (center) {
+                    return c2.scenes_url + '?lat=' + center.lat.toFixed(3) + '&lon=' + center.lng.toFixed(3);
+                },
+                parse: function (json) {
+                    return (json.scenes || []).map(function (s) {
+                        return {
+                            value: s.id,
+                            date: s.date,
+                            ready: s.ready,
+                            thumbnail: s.thumbnail,
+                            text: formatDateBR(s.date) + ' · cena ' + s.name.replace(/_/g, '-') + (s.ready ? ' · já baixada' : '')
+                        };
+                    });
+                },
+                // A mais perto do marco de 22/07/2008, entre as já baixadas
+                // se houver (abrem na hora; as outras esperam o botão).
+                initial: function (options) {
+                    var ready = options.filter(function (o) { return o.ready; });
+                    var pool = ready.length ? ready : options;
+                    var target = Date.UTC(2008, 6, 22);
+                    function gap(o) { return Math.abs(Date.parse(o.date) - target); }
+                    return pool.reduce(function (best, o) { return gap(o) < gap(best) ? o : best; }).value;
+                },
+                // Cena ainda não baixada só prepara no botão: trocar de cena no
+                // seletor (vendo a miniatura) não dispara downloads à toa.
+                prepareOnDemand: true,
+                prepareLabel: 'Baixar e corrigir esta cena',
+                prepareHint: 'Só na primeira vez: ~20 s (download do INPE e correção da posição pelo Landsat).',
+                previewCaption: 'Prévia do INPE (antes da correção de posição)',
+                preparingText: 'Preparando a cena…',
+                progress: function (scene) {
+                    return fetch(c2.progress_url.replace('{scene}', encodeURIComponent(scene)), { credentials: 'same-origin' })
+                        .then(function (r) { return r.json(); })
+                        .then(function (json) { return json.etapa || ''; });
+                },
+                prepare: function (scene) {
+                    return fetch(c2.prepare_url.replace('{scene}', encodeURIComponent(scene)), {
+                        method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': csrfToken() }
+                    }).then(function (r) {
+                        return r.json().catch(function () { return null; }).then(function (json) {
+                            if (r.ok && json) return json;
+                            var reason = r.status === 403 ? 'sessão expirada ou página antiga; recarregue a página'
+                                : 'erro ' + r.status + ' do servidor';
+                            throw new Error((json && json.erro) || 'Não foi possível preparar a cena (' + reason + ').');
+                        });
+                    }, function () {
+                        throw new Error('Não foi possível preparar a cena (sem resposta do servidor). Clique de novo para tentar outra vez.');
+                    });
+                },
+                // Composições que a cena tem (sem CCD do mesmo dia, só a
+                // pancromática). Começa na cor natural, até o usuário escolher.
+                onPrepared: function (info) {
+                    var sec = c2Picker.secondary;
+                    sec.options = info.compositions;
+                    var has = function (v) { return info.compositions.some(function (c) { return c.value === v; }); };
+                    if (!sec.touched || !has(sec.selected)) sec.selected = has('cor') ? 'cor' : 'pan';
+                    baseCbers2b.options.comp = sec.selected;
+                },
+                secondary: {
+                    label: 'Composição',
+                    options: [{ value: 'pan', text: 'Pancromática (preto e branco)' }],
+                    selected: 'pan',
+                    onSelect: function (comp) {
+                        c2Picker.secondary.touched = true;
+                        baseCbers2b.options.comp = comp;
+                        baseCbers2b.redraw();
+                    }
+                }
+            };
+            pickers.push(c2Picker);
+        }
+
         // Landsat 4/5/7 de 1984 a 2012 (Planetary Computer), 30 m: as cenas
         // de menos nuvem de cada ano no centro do mapa; começa na melhor de
         // 2008 (marco de 22/07/2008 do Código Florestal).
         if (imagery.landsat_legacy) {
             var ll = imagery.landsat_legacy;
             var baseLandsatLegacy = L.tileLayer(BLANK_TILE, {
-                maxZoom: 19, maxNativeZoom: ll.max_native_zoom, scene: '', comp: ll.compositions[0].value, pane: pane,
+                maxZoom: 19, maxNativeZoom: ll.max_native_zoom, scene: '', comp: ll.compositions[0].value, realce: '0', pane: pane,
                 attribution: 'Landsat (USGS/NASA) via Microsoft Planetary Computer'
             });
             baseLandsatLegacy.imageryInfo = { kind: 'landsat_legacy', years: ll.years };
             layers['Landsat 5/7 (' + ll.years[0] + '–' + ll.years[1] + ')'] = baseLandsatLegacy;
             pickers.push({
                 layer: baseLandsatLegacy,
-                template: ll.tile_url,
+                template: ll.tile_url + ENHANCE_QUERY,
                 param: 'scene',
                 label: 'Cena (ano · data · satélite · nuvens)',
+                followsCenter: true,
+                // Com realce o servidor interpola até o zoom 17 (sem ele, o
+                // navegador amplia o pixel de 30 m a partir do 15).
+                enhance: { maxZoom: ll.enhanced_max_zoom },
                 listUrl: function (center) {
                     return ll.scenes_url + '?lat=' + center.lat.toFixed(3) + '&lon=' + center.lng.toFixed(3);
                 },
@@ -366,6 +476,10 @@
 
     function formatMeters(m) {
         return m.toLocaleString('pt-BR', { maximumFractionDigits: m < 1 ? 2 : 1 }) + ' m';
+    }
+
+    function formatDistance(m) {
+        return m < 1000 ? formatMeters(m) : (m / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' km';
     }
 
     /**
@@ -632,7 +746,9 @@
         var activeBase = opts.initial || baseLayersInfo.defaultLayer;
         var infoSeq = 0, infoTimer = null;
 
-        var container, chooserEl, labelEl, selectEl, subLabelEl, subSelectEl, statusEl, infoEl, current = null;
+        var container, chooserEl, labelEl, selectEl, subLabelEl, subSelectEl, enhanceEl, enhanceInput, statusEl, infoEl;
+        var previewEl, previewImg, previewCaption, prepareBtn, prepareHint;
+        var current = null;
 
         (function build() {
             container = L.DomUtil.create('div', 'imagery-picker', opts.mount);
@@ -657,6 +773,22 @@
             // Segundo seletor (ex.: ano do Landsat), só nas fontes com `secondary`.
             subLabelEl = L.DomUtil.create('label', 'imagery-picker-label', container);
             subSelectEl = L.DomUtil.create('select', 'imagery-picker-select', container);
+            // "Melhorar imagem", só nas fontes com `enhance`.
+            enhanceEl = L.DomUtil.create('label', 'imagery-picker-enhance', container);
+            enhanceEl.title = ENHANCE_HINT;
+            enhanceInput = L.DomUtil.create('input', '', enhanceEl);
+            enhanceInput.type = 'checkbox';
+            L.DomUtil.create('span', '', enhanceEl).textContent = 'Melhorar imagem';
+            // Fontes preparadas no servidor sob demanda (CBERS-2B): miniatura
+            // da cena escolhida e o botão que dispara o preparo.
+            previewEl = L.DomUtil.create('figure', 'imagery-picker-preview', container);
+            previewImg = L.DomUtil.create('img', '', previewEl);
+            previewImg.alt = '';
+            previewImg.loading = 'lazy';
+            previewCaption = L.DomUtil.create('figcaption', '', previewEl);
+            prepareBtn = L.DomUtil.create('button', 'imagery-picker-button', container);
+            prepareBtn.type = 'button';
+            prepareHint = L.DomUtil.create('div', 'imagery-picker-hint', container);
             statusEl = L.DomUtil.create('div', 'imagery-picker-status', container);
             infoEl = L.DomUtil.create('div', 'imagery-picker-info', container);
             selectEl.id = 'imagery-picker-select' + suffix;
@@ -675,6 +807,13 @@
                 current.secondary.onSelect(subSelectEl.value);
                 refreshInfo();
             });
+            enhanceInput.addEventListener('change', function () {
+                if (current && current.enhance) setEnhanced(current, enhanceInput.checked);
+            });
+            prepareBtn.addEventListener('click', function () {
+                if (!current || !current.prepare || current.preparing) return;
+                prepareAndShow(current, current.selected, selectedOption(current) || {});
+            });
         })();
 
         function selectedOption(picker) {
@@ -682,23 +821,135 @@
             return picker.options.find(function (o) { return o.value === picker.selected; }) || null;
         }
 
+        // Zoom nativo da opção, ou o do realce (Landsat: 17) com ele ligado.
+        function nativeZoom(picker, opt) {
+            return picker.enhanced && picker.enhance.maxZoom ? picker.enhance.maxZoom : opt.maxZoom;
+        }
+
+        function showLayerOption(picker, value, opt) {
+            picker.layer.options[picker.param] = value;
+            picker.layer.options.maxNativeZoom = nativeZoom(picker, opt);
+            // setUrl não redesenha quando a URL-modelo é a mesma; aqui só
+            // muda o parâmetro ({layer}/{release}), então o redraw é explícito.
+            picker.layer.setUrl(picker.template, true);
+            picker.layer.redraw();
+        }
+
         function apply(picker, value) {
             var opt = picker.options.find(function (o) { return o.value === value; }) || {};
             picker.selected = value;
-            if (picker.onSelect) {
+            if (picker.prepare && picker.prepared !== value) {
+                if (opt.ready || !picker.prepareOnDemand) {
+                    prepareAndShow(picker, value, opt);
+                } else {
+                    // Espera o botão "Baixar e corrigir": a camada fica vazia e
+                    // a miniatura mostra a cena (nuvem?) antes do download.
+                    picker.prepareSeq = (picker.prepareSeq || 0) + 1;
+                    picker.preparing = false;
+                    picker.prepared = null;
+                    picker.info = null;
+                    picker.status = '';
+                    picker.layer.setUrl(BLANK_TILE);
+                    if (current === picker) setStatus('');
+                }
+                if (current === picker) fillPrepare(picker);
+            } else if (picker.onSelect) {
                 picker.onSelect(value);
             } else {
-                picker.layer.options[picker.param] = value;
-                picker.layer.options.maxNativeZoom = opt.maxZoom;
-                // setUrl não redesenha quando a URL-modelo é a mesma; aqui só
-                // muda o parâmetro ({layer}/{release}), então o redraw é explícito.
-                picker.layer.setUrl(picker.template, true);
-                picker.layer.redraw();
+                showLayerOption(picker, value, opt);
             }
             refreshInfo();
         }
 
+        // Fontes que o servidor precisa preparar antes dos tiles (CBERS-2B):
+        // a camada fica vazia até `prepare` responder; numa troca de cena no
+        // meio do caminho, só vale a resposta da última.
+        function prepareAndShow(picker, value, opt) {
+            var seq = picker.prepareSeq = (picker.prepareSeq || 0) + 1;
+            picker.preparing = true;
+            picker.prepared = null;
+            picker.info = null;
+            picker.status = picker.preparingText;
+            picker.layer.setUrl(BLANK_TILE);
+            if (current === picker) {
+                setStatus(picker.status);
+                fillPrepare(picker);
+            }
+            // Etapa do servidor ("Baixando… 35 de 56 MB") enquanto espera.
+            var poll = picker.progress && setInterval(function () {
+                picker.progress(value).then(function (step) {
+                    if (seq !== picker.prepareSeq || !picker.preparing || !step) return;
+                    picker.status = step;
+                    if (current === picker) setStatus(step);
+                }, function () {});
+            }, 1500);
+            function finish() {
+                clearInterval(poll);
+                picker.preparing = false;
+                if (current === picker) fillPrepare(picker);
+            }
+            picker.prepare(value).then(function (info) {
+                if (seq !== picker.prepareSeq) return;
+                picker.prepared = value;
+                picker.info = info;
+                picker.status = '';
+                finish();
+                // Na próxima vez abre direto (e a lista diz que já está baixada).
+                if (!opt.ready && opt.text) {
+                    opt.ready = true;
+                    opt.text += ' · já baixada';
+                    if (current === picker) fillSelect(picker);
+                }
+                if (picker.onPrepared) picker.onPrepared(info);
+                if (current === picker) {
+                    setStatus('');
+                    fillSecondary(picker);
+                }
+                showLayerOption(picker, value, opt);
+            }, function (err) {
+                if (seq !== picker.prepareSeq) return;
+                finish();
+                picker.status = err.message;
+                if (current === picker) setStatus(picker.status);
+            }).then(refreshInfo);
+        }
+
+        // Miniatura da cena escolhida e o botão de preparo (só nas fontes com
+        // `prepareOnDemand`, enquanto a cena não está pronta).
+        function fillPrepare(picker) {
+            var opt = picker && picker.prepareOnDemand ? selectedOption(picker) : null;
+            previewEl.style.display = opt && opt.thumbnail ? '' : 'none';
+            if (opt && opt.thumbnail) {
+                if (previewImg.src !== opt.thumbnail) previewImg.src = opt.thumbnail;
+                previewCaption.textContent = picker.previewCaption;
+            }
+            var waiting = !!opt && picker.prepared !== picker.selected && !picker.preparing;
+            prepareBtn.style.display = waiting ? '' : 'none';
+            prepareHint.style.display = waiting ? '' : 'none';
+            if (waiting) {
+                prepareBtn.textContent = picker.prepareLabel;
+                prepareHint.textContent = picker.prepareHint;
+            }
+        }
+
+        function setEnhanced(picker, on) {
+            picker.enhanced = on;
+            picker.layer.options.realce = on ? '1' : '0';
+            picker.layer.options.maxNativeZoom = nativeZoom(picker, selectedOption(picker) || {});
+            picker.layer.redraw();
+            refreshInfo();
+        }
+
+        function fillEnhance(picker) {
+            enhanceEl.style.display = picker && picker.enhance ? '' : 'none';
+            enhanceInput.checked = !!(picker && picker.enhanced);
+        }
+
         function setInfo(lines) {
+            // Com realce, avisa antes da linha do zoom o que foi feito na imagem.
+            if (current && current.enhanced && lines.length) {
+                lines = lines.slice(0, -1).concat('Realce ligado: contraste, interpolação e nitidez (sem criar detalhes).', lines.slice(-1));
+            }
             infoEl.innerHTML = '';
             lines.forEach(function (text, i) {
                 var line = document.createElement('div');
@@ -720,6 +971,35 @@
         function refreshInfo() {
             clearTimeout(infoTimer);
             infoTimer = setTimeout(renderInfo, 400);
+        }
+
+        // CBERS-2B: resolução conforme a composição e, da cena preparada, o
+        // resultado da correção de posição (é o que diz se dá para sobrepor
+        // o CAR) e por que não há cor, quando for o caso.
+        function cbers2bInfoLines(picker, info) {
+            var scene = selectedOption(picker);
+            var details = picker.prepared === picker.selected ? picker.info : null;
+            var pan = picker.secondary.selected === 'pan';
+            var lines = ['Resolução: 2,7 m' + (pan ? ' (pancromática)' : ' (detalhe do HRC; cor do CCD de 20 m da mesma passagem)')];
+            if (scene) {
+                lines.push('Cena: ' + formatDateBR(scene.date) + ' · CBERS-2B (câmera HRC)');
+            } else if (picker.options && !picker.options.length) {
+                lines.push('Nenhuma cena CBERS-2B HRC (' + info.years[0] + '–' + info.years[1] + ') cobre este ponto.');
+            }
+            if (details) {
+                var reg = details.registration;
+                if (reg.ok) {
+                    lines.push('Posição corrigida pelo ' + reg.reference.platform.replace('landsat-', 'Landsat ') + ' de ' +
+                        formatDateBR(reg.reference.date) + ': estava ' + formatDistance(reg.shift_m) +
+                        ' fora do lugar; erro restante ≈ ' + formatMeters(reg.residual_m) + '.');
+                } else {
+                    lines.push('⚠ Posição não corrigida: ' + reg.reason + ' A imagem pode estar até ~3 km fora do lugar; não use para sobrepor o CAR.');
+                }
+                if (!details.fusion) lines.push('Só em preto e branco: ' + details.fusion_note);
+            }
+            lines.push('Fonte: INPE – Brazil Data Cube (nível 2)');
+            if (map.getZoom() < info.minZoom) lines.push('Aproxime o mapa (zoom ' + info.minZoom + '+) para ver a imagem.');
+            return lines.concat(zoomLine(2.7));
         }
 
         function renderInfo() {
@@ -744,14 +1024,17 @@
                 return;
             }
 
+            // Lista de cenas que depende do lugar (CBERS, Landsat 5/7): vale
+            // para onde foi pedida; longe dali (o usuário arrastou o mapa),
+            // busca de novo.
+            if (current && current.followsCenter && current.listCenter && !current.loading &&
+                    map.getCenter().distanceTo(current.listCenter) > 20000) {
+                current.options = null;
+                show(current);
+            }
+
             if (info.kind === 'cbers') {
                 var cbers = current;
-                // A lista de cenas vale para onde foi pedida; longe dali (o
-                // usuário arrastou o mapa), busca de novo.
-                if (cbers.listCenter && !cbers.loading && map.getCenter().distanceTo(cbers.listCenter) > 20000) {
-                    cbers.options = null;
-                    show(cbers);
-                }
                 var scene = selectedOption(cbers);
                 var cbersLines = ['Resolução: 2 m'];
                 if (scene) {
@@ -765,13 +1048,13 @@
                 return;
             }
 
+            if (info.kind === 'cbers2b') {
+                setInfo(cbers2bInfoLines(current, info));
+                return;
+            }
+
             if (info.kind === 'landsat_legacy') {
                 var legacy = current;
-                // Como no CBERS: a lista de cenas vale para onde foi pedida.
-                if (legacy.listCenter && !legacy.loading && map.getCenter().distanceTo(legacy.listCenter) > 20000) {
-                    legacy.options = null;
-                    show(legacy);
-                }
                 var legacyScene = selectedOption(legacy);
                 var legacyLines = ['Resolução: 30 m'];
                 if (legacyScene) {
@@ -921,6 +1204,8 @@
                 labelEl.textContent = 'Detalhes da imagem';
                 selectEl.style.display = 'none';
                 fillSecondary(null);
+                fillEnhance(null);
+                fillPrepare(null);
                 setStatus('');
             }
             refreshInfo();
@@ -948,10 +1233,14 @@
             container.style.display = '';
             labelEl.textContent = picker.label;
             fillSecondary(picker);
+            fillEnhance(picker);
 
+            fillPrepare(picker);
             if (picker.options) {
                 fillSelect(picker);
-                setStatus(!picker.options.length ? picker.error : (picker.isLoading ? 'Carregando imagem…' : ''));
+                // `status`: preparo da cena no servidor (CBERS-2B) ou o erro dele.
+                setStatus(!picker.options.length ? picker.error
+                    : (picker.status || (picker.isLoading ? 'Carregando imagem…' : '')));
                 return;
             }
 
@@ -969,19 +1258,28 @@
                 picker.listCenter = map.getCenter();
                 url = url(picker.listCenter);
             }
+            picker.failed = false;
             fetch(url, { credentials: 'same-origin' })
                 .then(function (r) {
-                    return r.json().catch(function () { return {}; }).then(function (json) {
+                    // Sessão expirada: o login redireciona para a página de entrada (HTML).
+                    if (r.redirected && /\/auth\//.test(r.url)) throw new Error('sua sessão expirou; entre de novo');
+                    return r.json().catch(function () { return null; }).then(function (json) {
+                        if (!json) throw new Error('o servidor respondeu com erro ' + r.status);
                         return { ok: r.ok, json: json };
                     });
                 })
                 .then(function (res) {
                     picker.options = picker.parse(res.json);
-                    picker.error = res.json.erro || 'Nenhuma imagem disponível.';
+                    picker.error = res.json.erro || picker.emptyText || 'Nenhuma imagem cobre este ponto.';
+                    picker.failed = !res.ok;
                 })
-                .catch(function () {
+                .catch(function (err) {
                     picker.options = [];
-                    picker.error = 'Não foi possível carregar a lista de imagens.';
+                    picker.failed = true;
+                    // Sem resposta nenhuma (TypeError do fetch): servidor fora do ar ou reiniciando.
+                    var reason = err instanceof TypeError ? 'sem resposta do servidor' : err.message;
+                    picker.error = 'Não foi possível carregar a lista de imagens (' + reason + '). Escolha a camada de novo para tentar outra vez.';
+                    if (global.console) console.warn('[imagens] lista', url, err);
                 })
                 .then(function () {
                     picker.loading = false;
@@ -1023,6 +1321,8 @@
                 if (p.backdrop && p.layer !== layer && map.hasLayer(p.backdrop)) map.removeLayer(p.backdrop);
             });
             var picker = pickers.find(function (p) { return p.layer === layer; });
+            // Lista que falhou (servidor reiniciando, sessão...): tenta de novo.
+            if (picker && picker.failed && !picker.loading) picker.options = null;
             // Com a lista já carregada e vazia (falhou no prefetch), sem fundo.
             var semImagens = picker && picker.options && !picker.options.length;
             if (picker && picker.backdrop && !semImagens) picker.backdrop.addTo(map);

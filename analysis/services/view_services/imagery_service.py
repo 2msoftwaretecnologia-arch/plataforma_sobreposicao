@@ -17,6 +17,8 @@ from django.conf import settings
 from django.core.cache import cache
 from django.urls import reverse
 
+from analysis.services.view_services import image_enhance
+
 logger = logging.getLogger(__name__)
 
 TIMEOUT = 20
@@ -144,8 +146,19 @@ def imagery_config():
         'tile_url': reverse('imagery_landsat_legacy_tile', args=('CENA', 'COMP', 0, 0, 0)).replace(
             '/CENA/COMP/0/0/0.png', '/{scene}/{comp}/{z}/{x}/{y}.png'),
         'max_native_zoom': LANDSAT_LEGACY_MAX_NATIVE_ZOOM,
+        'enhanced_max_zoom': LANDSAT_LEGACY_ENHANCED_MAX_ZOOM,
         'years': list(LANDSAT_LEGACY_YEARS),
         'compositions': [{'value': k, 'text': v['label']} for k, v in LANDSAT_LEGACY_COMPOSITIONS.items()],
+    }
+    from analysis.services.view_services import cbers2b_service
+    config['cbers2b'] = {
+        'scenes_url': reverse('imagery_cbers2b_scenes'),
+        'prepare_url': reverse('imagery_cbers2b_prepare', args=('CENA',)).replace('CENA', '{scene}'),
+        'progress_url': reverse('imagery_cbers2b_progress', args=('CENA',)).replace('CENA', '{scene}'),
+        'tile_url': reverse('imagery_cbers2b_tile', args=('CENA', 'COMP', 0, 0, 0)).replace(
+            '/CENA/COMP/0/0/0.webp', '/{scene}/{comp}/{z}/{x}/{y}.webp'),
+        'min_zoom': cbers2b_service.HRC_MIN_ZOOM,
+        'years': list(cbers2b_service.HRC_YEARS),
     }
     return config
 
@@ -491,6 +504,8 @@ def wayback_releases():
 
 PC_STAC_SEARCH = 'https://planetarycomputer.microsoft.com/api/stac/v1/search'
 PC_TILE_URL = 'https://planetarycomputer.microsoft.com/api/data/v1/item/tiles/WebMercatorQuad/{z}/{x}/{y}@1x.png'
+PC_STATS_URL = 'https://planetarycomputer.microsoft.com/api/data/v1/item/statistics'
+PC_BBOX_URL = 'https://planetarycomputer.microsoft.com/api/data/v1/item/bbox/{minx},{miny},{maxx},{maxy}/{width}x{height}.tif'
 LANDSAT_LEGACY_COLLECTION = 'landsat-c2-l2'
 LANDSAT_LEGACY_YEARS = (1984, 2012)
 LANDSAT_LEGACY_PLATFORMS = ['landsat-4', 'landsat-5', 'landsat-7']
@@ -504,6 +519,19 @@ LANDSAT7_SLC_OFF_PENALTY = 15
 LANDSAT_LEGACY_SCENES_TTL = 24 * 60 * 60
 LANDSAT_LEGACY_TILE_TTL = 7 * 24 * 60 * 60
 LANDSAT_LEGACY_MAX_NATIVE_ZOOM = 15
+LANDSAT_LEGACY_RES = 30
+# "Melhorar imagem": o servidor de tiles reamostra com interpolação bicúbica
+# até esse zoom (1 px ≈ 1 m), em vez de o navegador ampliar o pixel de 30 m.
+LANDSAT_LEGACY_ENHANCED_MAX_ZOOM = 17
+LANDSAT_LEGACY_RESAMPLING = 'cubic'
+# Clareia os tons médios que o piso mais alto escurece (rio-color).
+LANDSAT_LEGACY_COLOR_FORMULA = 'Gamma RGB 1.25'
+LANDSAT_LEGACY_STATS_TTL = 30 * 24 * 60 * 60
+# Sem estatística (servidor fora do ar), tenta de novo depois disso.
+LANDSAT_LEGACY_STATS_RETRY_TTL = 10 * 60
+# Faixa mínima do contraste (DN; ≈ 4 % de reflectância): numa cena muito
+# uniforme, esticar menos que isso só realça ruído.
+LANDSAT_LEGACY_MIN_SPAN = 1500
 LANDSAT_SCENE_RE = re.compile(r'^L[TE]0[457]_L2SP_\d{6}_(\d{8})_\d{2}_T[12]$')
 
 # Bandas e contraste (valores digitais da Collection 2: refl = DN·0,0000275 − 0,2).
@@ -572,17 +600,67 @@ def landsat_legacy_scenes(lon, lat):
     return scenes
 
 
-def landsat_legacy_tile(scene, composition, z, x, y):
-    """(PNG com transparência, content-type), ou None fora da cena."""
+def landsat_legacy_stretch(scene, composition):
+    """Contraste por banda da cena para o realce.
+
+    O piso sobe até o menor percentil 2 entre as bandas: tira o véu da
+    atmosfera sem mudar a cor (um piso por banda deixava a vegetação marrom).
+    O teto fica o da composição: com o percentil 98 de uma cena quase toda de
+    vegetação, cidade e solo exposto estouravam em branco. Sai da cena
+    inteira (não do tile), então os tiles não têm emenda entre si."""
+    comp = LANDSAT_LEGACY_COMPOSITIONS[composition]
+    key = f'imagery:landsat-legacy:stretch:{scene}:{composition}'
+    stretch = cache.get(key)
+    if stretch is not None:
+        return stretch
+    base_lo, base_hi = (float(v) for v in comp['rescale'].split(','))
+    params = [('collection', LANDSAT_LEGACY_COLLECTION), ('item', scene), ('nodata', '0'),
+              ('max_size', '512'), ('p', '2')]
+    params += [('assets', asset) for asset in comp['assets']]
+    stats = {}
+    try:
+        response = _get(PC_STATS_URL, params, timeout=CAPABILITIES_TIMEOUT)
+        if response.status_code == 200:
+            stats = response.json()
+    except (ImageryError, ValueError):
+        pass
+    if not stats:
+        logger.warning('Sem estatística da cena %s: realce com o contraste padrão.', scene)
+    floors = [(stats.get(f'{asset}_b1') or {}).get('percentile_2', base_lo) for asset in comp['assets']]
+    lo = min(max(base_lo, min(floors)), base_hi - LANDSAT_LEGACY_MIN_SPAN)
+    stretch = (round(lo), round(base_hi))
+    cache.set(key, stretch, LANDSAT_LEGACY_STATS_TTL if stats else LANDSAT_LEGACY_STATS_RETRY_TTL)
+    return stretch
+
+
+def landsat_legacy_tile(scene, composition, z, x, y, enhance=False):
+    """(PNG com transparência, content-type), ou None fora da cena.
+
+    `enhance` ("Melhorar imagem"): contraste da própria cena, interpolação
+    bicúbica até o zoom 17 e nitidez na escala do pixel de 30 m."""
     comp = LANDSAT_LEGACY_COMPOSITIONS.get(composition)
-    if comp is None or not LANDSAT_SCENE_RE.match(scene or '') or z > LANDSAT_LEGACY_MAX_NATIVE_ZOOM:
+    max_zoom = LANDSAT_LEGACY_ENHANCED_MAX_ZOOM if enhance else LANDSAT_LEGACY_MAX_NATIVE_ZOOM
+    if comp is None or not LANDSAT_SCENE_RE.match(scene or '') or z > max_zoom:
         return None
-    key = f'imagery:landsat-legacy:{scene}:{composition}:{z}:{x}:{y}'
+    key = f'imagery:landsat-legacy:{scene}:{composition}:{"realce" if enhance else "padrao"}:{z}:{x}:{y}'
     tile = cache.get(key)
     if tile is not None:
         return tile
-    params = [('collection', LANDSAT_LEGACY_COLLECTION), ('item', scene), ('nodata', '0'), ('rescale', comp['rescale'])]
+    params = [('collection', LANDSAT_LEGACY_COLLECTION), ('item', scene), ('nodata', '0')]
     params += [('assets', asset) for asset in comp['assets']]
-    tile = _image_response(_get(PC_TILE_URL.format(z=z, x=x, y=y), params), 'Planetary Computer')
+    if not enhance:
+        params.append(('rescale', comp['rescale']))
+        tile = _image_response(_get(PC_TILE_URL.format(z=z, x=x, y=y), params), 'Planetary Computer')
+    else:
+        lo, hi = landsat_legacy_stretch(scene, composition)
+        params += [('rescale', f'{lo},{hi}'), ('color_formula', LANDSAT_LEGACY_COLOR_FORMULA)]
+        radius = image_enhance.sharpen_radius(LANDSAT_LEGACY_RES, z, y)
+        buffer = image_enhance.sharpen_buffer(radius)
+        # `reproject` é a reamostragem do warp para o Web Mercator (é ela que
+        # amplia o pixel); `resampling` só vale para ler a pirâmide do COG.
+        params += [('reproject', LANDSAT_LEGACY_RESAMPLING), ('buffer', str(buffer))]
+        tile = _image_response(_get(PC_TILE_URL.format(z=z, x=x, y=y), params), 'Planetary Computer')
+        if tile is not None:
+            tile = image_enhance.sharpen_png(tile[0], radius, buffer), 'image/png'
     cache.set(key, tile, LANDSAT_LEGACY_TILE_TTL)
     return tile

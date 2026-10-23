@@ -1,5 +1,8 @@
 import io
 import json
+import shutil
+import tempfile
+from pathlib import Path
 from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlsplit
 
@@ -10,6 +13,8 @@ from django.test import SimpleTestCase, override_settings
 import numpy as np
 from PIL import Image
 
+from analysis.services.view_services import cbers2b_service as cb
+from analysis.services.view_services import image_enhance as ie
 from analysis.services.view_services import imagery_service as svc
 from analysis.services.view_services import raster_tiles as rt
 from analysis.services.view_services import land_use_service as lu
@@ -188,8 +193,11 @@ class ImageryServiceTests(SimpleTestCase):
         config = svc.imagery_config()
         self.assertEqual(config['providers'], [])
         self.assertEqual(set(config), {'wayback_tile_url', 'wayback_releases_url', 'providers', 'mapbiomas', 'cbers',
-                                       'landsat_legacy'})
+                                       'landsat_legacy', 'cbers2b'})
         self.assertTrue(config['landsat_legacy']['tile_url'].endswith('/imagens/landsat-antigo/{scene}/{comp}/{z}/{x}/{y}.png'))
+        self.assertEqual(config['landsat_legacy']['enhanced_max_zoom'], 17)
+        self.assertTrue(config['cbers2b']['tile_url'].endswith('/imagens/cbers2b/{scene}/{comp}/{z}/{x}/{y}.webp'))
+        self.assertTrue(config['cbers2b']['prepare_url'].endswith('/imagens/cbers2b/{scene}/preparar/'))
 
     @patch.object(svc, '_http')
     def test_landsat_legacy_keeps_least_cloudy_per_year_and_avoids_slc_off(self, http):
@@ -221,6 +229,39 @@ class ImageryServiceTests(SimpleTestCase):
         params = http.get.call_args.kwargs['params']
         self.assertIn(('item', 'LT05_L2SP_222067_20080722_02_T1'), params)
         self.assertEqual([v for k, v in params if k == 'assets'], ['nir08', 'red', 'green'])
+
+    @patch.object(svc, '_http')
+    def test_landsat_legacy_enhanced_tile_lifts_floor_interpolates_and_sharpens(self, http):
+        scene = 'LT05_L2SP_222067_20080722_02_T1'
+        stats = {'red_b1': {'percentile_2': 9265.0}, 'green_b1': {'percentile_2': 9479.0},
+                 'blue_b1': {'percentile_2': 8533.0}}
+
+        def get(url, params=None, timeout=None):
+            if url == svc.PC_STATS_URL:
+                return http_response(json=stats, content_type='application/json')
+            size = 256 + 2 * int(dict(params).get('buffer', 0))
+            out = io.BytesIO()
+            Image.new('RGBA', (size, size), (90, 120, 60, 255)).save(out, format='PNG')
+            return http_response(content=out.getvalue())
+
+        http.get.side_effect = get
+        self.assertIsNone(svc.landsat_legacy_tile(scene, 'natural', 18, 1, 1, enhance=True))
+        png, ctype = svc.landsat_legacy_tile(scene, 'natural', 17, 47938, 69262, enhance=True)
+        self.assertEqual(ctype, 'image/png')
+        self.assertEqual(Image.open(io.BytesIO(png)).size, (256, 256))  # margem cortada
+        params = http.get.call_args.kwargs['params']
+        # Piso comum = menor percentil 2 (não muda a cor); teto da composição.
+        self.assertEqual([v for k, v in params if k == 'rescale'], ['8533,13500'])
+        self.assertIn(('reproject', 'cubic'), params)
+        self.assertGreater(int(dict(params)['buffer']), 0)
+        # Sem realce, o mesmo tile é outro pedido (cache separado), sem margem.
+        svc.landsat_legacy_tile(scene, 'natural', 15, 1, 1)
+        self.assertNotIn('buffer', dict(http.get.call_args.kwargs['params']))
+
+    @patch.object(svc, '_http')
+    def test_landsat_legacy_stretch_falls_back_without_stats(self, http):
+        http.get.return_value = http_response(status=500, content_type='application/json')
+        self.assertEqual(svc.landsat_legacy_stretch('LT05_L2SP_222067_20080722_02_T1', 'natural'), (7500, 13500))
 
     @override_settings(PLANET_WMS_URL='https://x/wms?key=SEGREDO', COPERNICUS_WMS_URL='https://c/ogc/wms/CSEGREDO',
                        GOOGLE_MAPS_API_KEY='GSEGREDO')
@@ -324,12 +365,301 @@ class RasterTilesTests(SimpleTestCase):
         self.assertAlmostEqual(r, 128, delta=6)  # (60-10)*255/100 ≈ 127
         self.assertIsNone(rt.cbers_tile('CBERS4A_WPM_PCA_RGB321_20240831_208_126', rt.CBERS_MIN_ZOOM - 1, 0, 0))
 
+    @patch.object(rt, '_cbers_stretch', return_value=[(10.0, 110.0)] * 3)
+    @patch.object(rt, '_warp_tile')
+    def test_cbers_enhanced_tile_reads_margin_and_crops_it(self, warp, stretch):
+        def bands(url, z, x, y, resampling, buffer=0):
+            size = 256 + 2 * buffer
+            return [np.full((size, size), 60, dtype=np.uint8) for _ in range(3)]
+
+        warp.side_effect = bands
+        webp, _ = rt.cbers_tile('CBERS4A_WPM_PCA_RGB321_20240831_208_126', 17, 0, 0, enhance=True)
+        self.assertEqual(Image.open(io.BytesIO(webp)).size, (256, 256))
+        args = warp.call_args.args
+        self.assertEqual(args[4], 'Cubic')
+        self.assertGreater(args[5], 0)
+
     def test_config_lists_server_rendered_layers(self):
         config = svc.imagery_config()
         self.assertTrue(config['mapbiomas']['tile_url'].endswith('/imagens/mapbiomas/{product}/{year}/{z}/{x}/{y}.png'))
         self.assertEqual(config['mapbiomas']['products']['cobertura']['years'][0], 2025)
         self.assertIn(2008, config['mapbiomas']['products']['cobertura']['years'])
         self.assertTrue(config['cbers']['tile_url'].endswith('/imagens/cbers/{scene}/{z}/{x}/{y}.webp'))
+
+
+class ImageEnhanceTests(SimpleTestCase):
+    def test_sharpen_radius_follows_source_pixel_on_screen(self):
+        # Landsat (30 m): afastado o pixel cabe num px do tile (raio mínimo);
+        # aproximado, o raio cresce com o pixel ampliado (até o teto).
+        self.assertEqual(ie.sharpen_radius(30, 10, 500), ie.SHARPEN_MIN_RADIUS)
+        self.assertGreater(ie.sharpen_radius(30, 16, 34631), ie.sharpen_radius(30, 15, 17315))
+        self.assertLessEqual(ie.sharpen_radius(30, 19, 277000), ie.SHARPEN_MAX_RADIUS)
+
+    def test_tiles_with_margin_have_no_seam(self):
+        # Nitidez tile a tile, cada um lido com margem, = nitidez da imagem
+        # inteira recortada: nada muda na borda entre dois tiles.
+        rng = np.random.default_rng(1)
+        full = np.dstack([rng.integers(0, 255, (512, 768), dtype=np.uint8) for _ in range(3)]
+                         + [np.full((512, 768), 255, np.uint8)])
+        radius = 2.0
+        buffer = ie.sharpen_buffer(radius)
+        whole = ie.sharpen_rgba(full, radius)
+        top, left = 128, 256
+        tile = full[top - buffer:top + 256 + buffer, left - buffer:left + 256 + buffer]
+        np.testing.assert_array_equal(ie.sharpen_rgba(tile, radius, buffer), whole[top:top + 256, left:left + 256])
+
+
+def textured(shape, seed=0):
+    """Imagem com textura de vários tamanhos (para a correlação ter o que casar)."""
+    rng = np.random.default_rng(seed)
+    noise = rng.random(shape)
+    image = sum(cb.smooth(noise + 1, s) for s in (1, 3, 8))
+    return (image * 40).astype(np.float32)
+
+
+class Cbers2bServiceTests(SimpleTestCase):
+    """cbers2b_service.py sem rede: catálogo e GDAL trocados por respostas
+    prontas; a matemática (correlação, ajuste, fusão) com dados sintéticos."""
+
+    SCENE = 'CBERS_2B_HRC_20080721_159_D_111_4_L2'
+
+    def setUp(self):
+        cache.clear()
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        override = override_settings(IMAGERY_CACHE_DIR=self.tmp, IMAGERY_CACHE_MAX_MB=1000)
+        override.enable()
+        self.addCleanup(override.disable)
+
+    def write_meta(self, scene=SCENE, **extra):
+        scene_dir = cb._scene_dir(scene)
+        scene_dir.mkdir(parents=True)
+        meta = {'version': cb.META_VERSION, 'scene': scene, 'date': '2008-07-21',
+                'registration': {'ok': True, 'reference': {'scene': 'LT05', 'date': '2008-07-22', 'platform': 'landsat-5'},
+                                 'shift_m': 2510, 'residual_m': 14},
+                'pan_stretch': [20.0, 60.0], 'bounds_3857': [-6e6, -2e6, -4e6, 0], 'fusion': None,
+                'compositions': ['pan'], **extra}
+        (scene_dir / 'meta.json').write_text(json.dumps(meta), encoding='utf-8')
+        return meta
+
+    def test_phase_shift_recovers_subpixel_offset(self):
+        fixed = textured((256, 256))
+        # moving(r, c) = fixed(r - 7, c + 4): o conteúdo do pixel p está em p − (7, −4).
+        moving = np.roll(fixed, (7, -4), axis=(0, 1))
+        dy, dx, peak = cb.phase_shift(moving, fixed, np.ones_like(fixed, bool))
+        self.assertAlmostEqual(dy, 7, delta=0.2)
+        self.assertAlmostEqual(dx, -4, delta=0.2)
+        self.assertGreater(peak, cb.REG_MIN_PEAK)
+
+    def test_register_refuses_unrelated_images(self):
+        self.assertIsNone(cb.register(textured((400, 400), seed=1) + 1, textured((400, 400), seed=2) + 1))
+
+    def test_register_fits_translation_from_blocks(self):
+        fixed = textured((480, 480)) + 1
+        moving = np.roll(fixed, (-12, 9), axis=(0, 1))
+        fit = cb.register(moving, fixed)
+        self.assertEqual(fit['method'], 'afim')
+        dy, dx = cb.shift_at(fit, 240, 240)
+        self.assertAlmostEqual(dy, -12, delta=0.3)
+        self.assertAlmostEqual(dx, 9, delta=0.3)
+        self.assertLess(abs(fit['x'][1]) + abs(fit['x'][2]) + abs(fit['y'][1]) + abs(fit['y'][2]), 1e-3)
+
+    def test_corrected_geotransform_moves_scene_to_true_position(self):
+        grid = {'origin': (1000.0, 9000.0), 'res': 20.0}
+        # Conteúdo 2 px a leste (dx = −2 ⇒ está 2 px à direita) e 3 px ao sul.
+        fit = {'x': [-2.0, 0.0, 0.0], 'y': [3.0, 0.0, 0.0]}
+        gt = cb.corrected_geotransform((1000.0, 2.5, 0.0, 9000.0, 0.0, -2.5), grid, fit)
+        self.assertAlmostEqual(gt[0], 1040.0)
+        self.assertAlmostEqual(gt[3], 9060.0)
+        self.assertAlmostEqual(gt[1], 2.5)
+        self.assertAlmostEqual(gt[5], -2.5)
+        # Com rotação/escala no ajuste, o pixel também muda (geotransform afim).
+        fit = {'x': [0.0, 0.001, 0.0], 'y': [0.0, 0.0, 0.0]}
+        gt = cb.corrected_geotransform((1000.0, 2.5, 0.0, 9000.0, 0.0, -2.5), grid, fit)
+        self.assertAlmostEqual(gt[1], 2.5 * (1 - 0.001))
+
+    def test_resample_honors_rotated_geotransform(self):
+        # O HRC corrigido tem rotação no geotransform. Sem `skew` no destino,
+        # o warp do Django copia a rotação da origem e ela some (bug real:
+        # a correção deixava ~40 m de erro na borda da cena).
+        from django.contrib.gis.gdal import GDALRaster
+        data = np.zeros((100, 100), np.float32)
+        data[50, 10] = data[50, 90] = 1
+        raster = GDALRaster({'driver': 'MEM', 'name': 'r', 'srid': 32722, 'width': 100, 'height': 100,
+                             'datatype': 6, 'nr_of_bands': 1, 'bands': [{'data': data}]})
+        raster.geotransform = [0.0, 1.0, 0.0, 100.0, 0.2, -1.0]  # Y sobe 0,2 por coluna
+        out = cb._resample(raster, {'srid': 32722, 'origin': (0, 120), 'res': 1.0, 'width': 100, 'height': 140},
+                           'NearestNeighbour')
+        rows = {int(c): int(r) for r, c in zip(*np.nonzero(out))}
+        self.assertEqual(rows[10] - rows[90], 16)  # 80 colunas × 0,2
+
+    @patch.object(cb.requests, 'get')
+    @patch.object(cb, '_stac_search')
+    def test_landsat_reference_accepts_partial_cover_preferring_more(self, search, get):
+        # HRC na divisa de duas órbitas do Landsat: nenhuma cena o contém inteiro.
+        footprint = {'type': 'Polygon', 'coordinates': [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]]}
+        hrc = {'id': self.SCENE, 'geometry': footprint, 'properties': {'datetime': '2008-07-21T13:00:00Z'}}
+
+        def scene(scene_id, maxx, cloud=0):
+            return {'id': scene_id, 'geometry': {'type': 'Polygon', 'coordinates': [[[-5, -5], [maxx, -5], [maxx, 5], [-5, 5], [-5, -5]]]},
+                    'properties': {'datetime': '2008-07-22T13:00:00Z', 'platform': 'landsat-5', 'eo:cloud_cover': cloud}}
+
+        search.return_value = [scene('LT05_POUCO_T1', 0.5), scene('LT05_MAIS_T1', 0.9),
+                               scene('LT05_QUASE_NADA_T1', 0.3), scene('LT05_TIER2_T2', 5)]
+        get.return_value = http_response(content=b'II*\x00resto', content_type='image/tiff')
+        reference = cb._landsat_reference(hrc, Path(self.tmp))
+        self.assertEqual(reference['scene'], 'LT05_MAIS_T1')
+        self.assertEqual(get.call_args.kwargs['params']['return_mask'], 'false')
+
+    @patch.object(cb, '_prepare')
+    def test_progress_is_published_while_preparing_and_cleared_after(self, prepare):
+        seen = []
+
+        def fake(scene, report):
+            report('Baixando a cena do INPE (20 de 56 MB)…')
+            seen.append(cb.hrc_progress(scene))
+            return {}
+
+        prepare.side_effect = fake
+        cb.hrc_prepare(self.SCENE)
+        self.assertEqual(seen, ['Baixando a cena do INPE (20 de 56 MB)…'])
+        self.assertEqual(cb.hrc_progress(self.SCENE), '')
+
+    def test_thumbnail_only_from_inpe_archive(self):
+        ok = 'https://data.inpe.br/bdc/data/CB2B-HRC-L2-DN/2008_07/x/CBERS_2B_HRC_20080721_159_D_111_4.png'
+        self.assertEqual(cb._thumbnail_href({'assets': {'thumbnail': {'href': ok}}}), ok)
+        self.assertEqual(cb._thumbnail_href({'assets': {'thumbnail': {'href': 'https://evil/x.png'}}}), '')
+        self.assertEqual(cb._thumbnail_href({}), '')
+
+    def test_fusion_params_predict_pan_from_bands(self):
+        bands = [textured((200, 200), seed=s) + 10 for s in range(4)]
+        pan = 5 + 0.4 * bands[1] + 0.6 * bands[2]
+        fusion = cb.fusion_params(pan, bands)
+        self.assertGreater(fusion['r2'], 0.99)
+        np.testing.assert_allclose(fusion['coef'], [5, 0, 0.4, 0.6, 0], atol=1e-3)
+        self.assertEqual(len(fusion['gains']), 4)
+
+    def test_natural_color_brings_ccd_to_landsat_scale(self):
+        ccd = [textured((200, 200), seed=s) + 20 for s in range(3)]
+        landsat = [c * 20 + 6000 for c in ccd]  # ~10 000 DN, como reflectância de cerrado
+        params = cb.natural_color_params(ccd, landsat)
+        # Mesmo valor do CCD → mesma posição na escala da camada Landsat (piso comum, teto 13500).
+        lo = min(float(np.percentile(l, 2)) for l in landsat)
+        for i in range(3):
+            value = float(ccd[i][50, 50])
+            self.assertAlmostEqual(params['a'][i] * value + params['b'][i], (landsat[i][50, 50] - lo) / (13500 - lo), places=3)
+
+    def test_smooth_keeps_nodata_and_mean(self):
+        band = np.full((60, 60), 100, np.float32)
+        band[:, :10] = 0
+        out = cb.smooth(band, 1.5)
+        self.assertTrue((out[:, :10] == 0).all())
+        self.assertAlmostEqual(float(out[:, 10:].mean()), 100, places=3)  # borda não escurece
+
+    def test_tif_href_only_accepts_inpe_archive(self):
+        ok = 'https://data.inpe.br/bdc/data/CB2B-HRC-L2-DN/2008_07/x/CBERS_2B_HRC_20080721_159_D_111_4_L2_BAND1.tif'
+        self.assertEqual(cb._tif_href({'href': ok}), ok)
+        for bad in ('http://evil/x.tif', 'https://data.inpe.br/bdc/data/../../etc.tif', 'https://data.inpe.br/bdc/data/x.png', None):
+            with self.assertRaises(svc.ImageryError):
+                cb._tif_href({'href': bad} if bad else None)
+
+    @patch.object(cb.requests, 'post')
+    def test_scenes_sorted_with_ready_flag_and_cached(self, post):
+        self.write_meta()
+        post.return_value = http_response(json={'features': [
+            {'id': 'CBERS_2B_HRC_20071009_159_C_111_4_L2', 'properties': {'datetime': '2007-10-09T13:00:00Z'},
+             'assets': {'thumbnail': {'href': 'https://data.inpe.br/bdc/data/x/CBERS_2B_HRC_20071009_159_C_111_4.png'}}},
+            {'id': self.SCENE, 'properties': {'datetime': '2008-07-21T13:00:00Z'}},
+            {'id': 'outro', 'properties': {'datetime': '2009-01-01T00:00:00Z'}},
+        ]})
+        scenes = cb.hrc_scenes(-48.2, -10.03)
+        self.assertEqual([(s['date'], s['ready'], s['name']) for s in scenes],
+                         [('2008-07-21', True, '159_D_111_4'), ('2007-10-09', False, '159_C_111_4')])
+        self.assertTrue(scenes[1]['thumbnail'].endswith('_159_C_111_4.png'))
+        self.assertEqual(scenes[0]['thumbnail'], '')
+        body = post.call_args.kwargs['json']
+        self.assertEqual(body['collections'], [cb.HRC_COLLECTION])
+        self.assertEqual(body['intersects']['type'], 'Polygon')  # ponto com margem (erro de posição)
+        cb.hrc_scenes(-48.2, -10.03)
+        self.assertEqual(post.call_count, 1)
+
+    @patch.object(cb, '_prepare')
+    def test_prepare_validates_id_and_reuses_prepared_scene(self, prepare):
+        with self.assertRaises(svc.ImageryError):
+            cb.hrc_prepare('../../etc/passwd')
+        meta = self.write_meta()
+        self.assertEqual(cb.hrc_prepare(self.SCENE), meta)
+        prepare.assert_not_called()
+
+    def test_prepare_waits_for_other_process_then_gives_up(self):
+        cache.add(f'raster:cbers2b:preparando:{self.SCENE}', 1, 60)
+        with patch.object(cb, 'PREPARE_WAIT', 0.01), patch.object(cb, 'PREPARE_POLL', 0.01):
+            with self.assertRaises(svc.ImageryError):
+                cb.hrc_prepare(self.SCENE)
+
+    def test_tile_needs_prepared_scene_known_composition_and_zoom(self):
+        self.assertIsNone(cb.hrc_tile(self.SCENE, 'pan', 15, 11991, 17299))  # ainda não preparada
+        self.write_meta()
+        self.assertIsNone(cb.hrc_tile(self.SCENE, 'cor', 15, 11991, 17299))  # sem fusão nesta cena
+        self.assertIsNone(cb.hrc_tile(self.SCENE, 'outra', 15, 11991, 17299))
+        self.assertIsNone(cb.hrc_tile(self.SCENE, 'pan', cb.HRC_MIN_ZOOM - 1, 0, 0))
+        self.assertIsNone(cb.hrc_tile(self.SCENE, 'pan', 15, 0, 0))  # fora da cena
+
+    @patch.object(rt, '_warp_tile')
+    def test_tile_fuses_and_falls_back_to_pan_outside_ccd(self, warp):
+        fusion = {'coef': [0, 0.25, 0.25, 0.25, 0.25], 'gains': [1, 1, 1, 1],
+                  'stretch': [[0, 100]] * 4, 'r2': 0.8, 'natural': None}
+        self.write_meta(fusion=fusion, compositions=['pan', 'cor', 'falsa_cor'])
+        pan = np.full((256, 256), 40, np.uint8)
+        pan[0, 0] = 0  # fora da faixa imageada
+        ccd = [np.full((256, 256), v, np.uint8) for v in (20, 40, 60, 80)]
+        for band in ccd:
+            band[:, 200:] = 0  # CCD não cobre a borda direita
+
+        warp.side_effect = lambda path, *args: [pan] if path.endswith('hrc.tif') else ccd
+        webp, _ = cb.hrc_tile(self.SCENE, 'falsa_cor', 15, 11991, 17299)
+        image = Image.open(io.BytesIO(webp)).convert('RGBA')
+        self.assertEqual(image.getpixel((0, 0))[3], 0)
+        r, g, b, a = image.getpixel((100, 100))
+        # Falsa cor = B4, B3, B2 (+ detalhe pan − I = 40 − 50 = −10): 70, 50, 30 de 0–100.
+        self.assertAlmostEqual(r, 178, delta=8)
+        self.assertAlmostEqual(g, 128, delta=8)
+        self.assertAlmostEqual(b, 76, delta=8)
+        gray = image.getpixel((230, 100))
+        self.assertEqual(gray[0], gray[1])  # sem CCD: pancromático
+        self.assertEqual(gray[1], gray[2])
+
+    def test_prepare_view_rejects_bad_id_and_reports_errors(self):
+        from django.http import Http404
+        from django.test import RequestFactory
+        from analysis import views
+        view = views.Cbers2bPrepareView.as_view()
+        factory = RequestFactory()
+        with self.assertRaises(Http404):
+            view(factory.post('/'), scene='nao-e-cena')
+        self.assertEqual(view(factory.get('/'), scene=self.SCENE).status_code, 405)  # só POST
+        with patch.object(views, 'hrc_prepare', side_effect=svc.ImageryError('Falha ao baixar a cena do INPE.')):
+            response = view(factory.post('/'), scene=self.SCENE)
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(json.loads(response.content)['erro'], 'Falha ao baixar a cena do INPE.')
+
+    def test_scenes_view_answers_json_even_on_unexpected_error(self):
+        # O painel mostra o motivo; uma página de erro em HTML virava
+        # "Nenhuma imagem disponível" sem explicação.
+        from django.test import RequestFactory
+        from analysis import views
+        request = RequestFactory().get('/', {'lat': '-12.2', 'lon': '-47.8'})
+        with patch.object(views, 'hrc_scenes', side_effect=KeyError('x')):
+            response = views.Cbers2bScenesView.as_view()(request)
+        self.assertEqual(response.status_code, 500)
+        self.assertIn('KeyError', json.loads(response.content)['erro'])
+
+    def test_client_info_explains_missing_color(self):
+        info = cb.hrc_client_info(self.write_meta(ccd_alignment={'ok': False, 'reason': 'O CCD não casou com o HRC.'}))
+        self.assertFalse(info['fusion'])
+        self.assertEqual(info['fusion_note'], 'O CCD não casou com o HRC.')
+        self.assertEqual(info['compositions'], [{'value': 'pan', 'text': cb.COMPOSITIONS['pan']['label']}])
+        self.assertEqual(info['registration']['shift_m'], 2510)
 
 
 class LandUseComparisonTests(SimpleTestCase):

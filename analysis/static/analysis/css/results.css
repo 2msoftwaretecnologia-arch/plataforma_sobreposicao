@@ -1297,6 +1297,65 @@ body { background: var(--cream-50); color: var(--ink-900); }
 
 .imagery-picker-select:focus { outline: 2px solid var(--primary-light); border-color: var(--green-600); }
 
+/* "Melhorar imagem" (fontes com realce no servidor). */
+.imagery-picker-enhance {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--green-900);
+  cursor: pointer;
+}
+
+.imagery-picker-enhance input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--green-600);
+}
+
+/* Miniatura da cena (CBERS-2B) antes de baixá-la. */
+.imagery-picker-preview {
+  margin: 2px 0 0;
+}
+
+.imagery-picker-preview img {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #1f2a24;
+}
+
+.imagery-picker-preview figcaption {
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--ink-500);
+}
+
+.imagery-picker-button {
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--green-600);
+  cursor: pointer;
+}
+
+.imagery-picker-button:hover { background: var(--green-800); }
+.imagery-picker-button:focus-visible { outline: 2px solid var(--primary-light); outline-offset: 2px; }
+
+.imagery-picker-hint {
+  font-size: 11.5px;
+  color: var(--ink-500);
+}
+
 .imagery-picker-status {
   font-size: 12px;
   font-weight: 600;

@@ -1,6 +1,7 @@
 # Standard library
 import io
 import json
+import logging
 import re
 import os
 import tempfile
@@ -22,6 +23,8 @@ from shapely import wkt as shapely_wkt
 
 from control_panel.access_service import denied_layers, require_layer, filter_result, filter_batch_item
 
+logger = logging.getLogger(__name__)
+
 # Local apps – analysis
 from analysis.models import CrossBatch, CrossBatchItem, SearchHistory
 from analysis.services.analyze_coordinates.search_all import SearchAll
@@ -41,6 +44,14 @@ from analysis.services.view_services.imagery_service import (
     wayback_releases,
 )
 from analysis.services.view_services.raster_tiles import cbers_scenes, cbers_tile, mapbiomas_tile
+from analysis.services.view_services.cbers2b_service import (
+    HRC_SCENE_RE,
+    hrc_client_info,
+    hrc_prepare,
+    hrc_progress,
+    hrc_scenes,
+    hrc_tile,
+)
 from analysis.services.view_services.result_map_formatter import format_data_map
 from analysis.services.view_services.bases_3d import (
     MAX_TILE_ZOOM,
@@ -1322,48 +1333,88 @@ class MapbiomasTileView(View):
         return _image_tile_response(lambda: mapbiomas_tile(product, year, z, x, y))
 
 
+def _enhance(request):
+    """"Melhorar imagem" ligado no painel do mapa (?realce=1)."""
+    return request.GET.get('realce') == '1'
+
+
+def _scenes_response(request, scenes):
+    """Lista de cenas que cobrem o ponto ?lat=&lon=, de `scenes(lon, lat)`."""
+    try:
+        lat = float(request.GET.get('lat', ''))
+        lon = float(request.GET.get('lon', ''))
+    except ValueError:
+        return JsonResponse({'erro': 'Informe lat e lon.', 'scenes': []}, status=400)
+    if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        return JsonResponse({'erro': 'Coordenadas inválidas.', 'scenes': []}, status=400)
+    try:
+        return JsonResponse({'scenes': scenes(lon, lat)})
+    except ImageryError as e:
+        return JsonResponse({'erro': str(e), 'scenes': []}, status=502)
+    except Exception as e:  # noqa: BLE001 - o painel mostra o motivo em vez de uma página de erro
+        logger.exception('Falha ao listar cenas em %s, %s', lat, lon)
+        return JsonResponse({'erro': f'Erro no servidor ao listar as cenas ({type(e).__name__}).', 'scenes': []}, status=500)
+
+
 class CbersScenesView(View):
     """Cenas CBERS-4A de 2 m que cobrem o ponto (?lat=&lon=)."""
 
     def get(self, request):
-        try:
-            lat = float(request.GET.get('lat', ''))
-            lon = float(request.GET.get('lon', ''))
-        except ValueError:
-            return JsonResponse({'erro': 'Informe lat e lon.', 'scenes': []}, status=400)
-        if not (-90 <= lat <= 90 and -180 <= lon <= 180):
-            return JsonResponse({'erro': 'Coordenadas inválidas.', 'scenes': []}, status=400)
-        try:
-            return JsonResponse({'scenes': cbers_scenes(lon, lat)})
-        except ImageryError as e:
-            return JsonResponse({'erro': str(e), 'scenes': []}, status=502)
+        return _scenes_response(request, cbers_scenes)
 
 
 class CbersTileView(View):
     def get(self, request, scene, z, x, y):
-        return _image_tile_response(lambda: cbers_tile(scene, z, x, y))
+        return _image_tile_response(lambda: cbers_tile(scene, z, x, y, _enhance(request)))
+
+
+class Cbers2bScenesView(View):
+    """Cenas CBERS-2B HRC (2,7 m, 2007–2010) que cobrem o ponto (?lat=&lon=)."""
+
+    def get(self, request):
+        return _scenes_response(request, hrc_scenes)
+
+
+class Cbers2bPrepareView(View):
+    """Baixa a cena e corrige a posição (~30 s na 1ª vez; depois, na hora).
+    POST porque grava a cena no disco do servidor."""
+
+    def post(self, request, scene):
+        if not HRC_SCENE_RE.match(scene):
+            raise Http404
+        try:
+            return JsonResponse(hrc_client_info(hrc_prepare(scene)))
+        except ImageryError as e:
+            return JsonResponse({'erro': str(e)}, status=502)
+        except Exception as e:  # noqa: BLE001 - idem _scenes_response
+            logger.exception('Falha ao preparar a cena %s', scene)
+            return JsonResponse({'erro': f'Erro no servidor ao preparar a cena ({type(e).__name__}).'}, status=500)
+
+
+class Cbers2bProgressView(View):
+    """Etapa da preparação em andamento (o painel consulta enquanto espera)."""
+
+    def get(self, request, scene):
+        if not HRC_SCENE_RE.match(scene):
+            raise Http404
+        return JsonResponse({'etapa': hrc_progress(scene)})
+
+
+class Cbers2bTileView(View):
+    def get(self, request, scene, comp, z, x, y):
+        return _image_tile_response(lambda: hrc_tile(scene, comp, z, x, y, _enhance(request)))
 
 
 class LandsatLegacyScenesView(View):
     """Cenas Landsat 4/5/7 (1984–2012) que cobrem o ponto (?lat=&lon=)."""
 
     def get(self, request):
-        try:
-            lat = float(request.GET.get('lat', ''))
-            lon = float(request.GET.get('lon', ''))
-        except ValueError:
-            return JsonResponse({'erro': 'Informe lat e lon.', 'scenes': []}, status=400)
-        if not (-90 <= lat <= 90 and -180 <= lon <= 180):
-            return JsonResponse({'erro': 'Coordenadas inválidas.', 'scenes': []}, status=400)
-        try:
-            return JsonResponse({'scenes': landsat_legacy_scenes(lon, lat)})
-        except ImageryError as e:
-            return JsonResponse({'erro': str(e), 'scenes': []}, status=502)
+        return _scenes_response(request, landsat_legacy_scenes)
 
 
 class LandsatLegacyTileView(View):
     def get(self, request, scene, comp, z, x, y):
-        return _image_tile_response(lambda: landsat_legacy_tile(scene, comp, z, x, y))
+        return _image_tile_response(lambda: landsat_legacy_tile(scene, comp, z, x, y, _enhance(request)))
 
 
 class WaybackReleasesView(View):

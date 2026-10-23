@@ -15,6 +15,10 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 from decouple import config
 import os
+import sys
+
+# Servidor de desenvolvimento (`manage.py runserver`), que atende em threads.
+RUNSERVER = len(sys.argv) > 1 and sys.argv[1] == 'runserver'
 
 
 def config_bool(name, default=False):
@@ -125,8 +129,12 @@ DATABASES = {
         'HOST': config('HOST_BD'),
         'PORT': config('PORT_BD'),
         # Reaproveita a conexão TCP com o Postgres entre requisições em vez
-        # de abrir/fechar uma a cada request.
-        'CONN_MAX_AGE': config('DB_CONN_MAX_AGE', default=60, cast=int),
+        # de abrir/fechar uma a cada request. Menos no runserver: ele atende
+        # cada requisição numa thread nova, e cada thread deixava a sua
+        # conexão aberta (o mapa pede dezenas de tiles por movimento, todos
+        # passando pelo login). Pelo túnel elas lotavam o Postgres de
+        # produção: "FATAL: sorry, too many clients already".
+        'CONN_MAX_AGE': 0 if RUNSERVER else config('DB_CONN_MAX_AGE', default=60, cast=int),
         'CONN_HEALTH_CHECKS': True,
     }
 }
@@ -200,6 +208,11 @@ PLANET_WMS_URL = config('PLANET_WMS_URL', default='')
 PLANET_API_KEY = config('PLANET_API_KEY', default='')
 COPERNICUS_WMS_URL = config('COPERNICUS_WMS_URL', default='')
 GOOGLE_MAPS_API_KEY = config('GOOGLE_MAPS_API_KEY', default='')
+# Cenas CBERS-2B baixadas e corrigidas no servidor (cbers2b_service.py). Fora
+# de MEDIA_ROOT, que o nginx publica; `.cache/` já está no .gitignore.
+IMAGERY_CACHE_DIR = config('IMAGERY_CACHE_DIR', default=str(BASE_DIR / '.cache' / 'imagens'))
+# Acima disso as cenas usadas há mais tempo são apagadas (~65 MB por cena).
+IMAGERY_CACHE_MAX_MB = config('IMAGERY_CACHE_MAX_MB', default=6000, cast=int)
 
 
 # Porta pública do nginx no host (mesma variável usada no docker-compose.yml).

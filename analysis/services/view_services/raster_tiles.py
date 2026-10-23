@@ -23,6 +23,7 @@ from django.contrib.gis.gdal.srs import AxisOrder
 from django.core.cache import cache
 from PIL import Image
 
+from analysis.services.view_services import image_enhance
 from analysis.services.view_services.imagery_service import (
     TIMEOUT,
     ImageryError,
@@ -105,6 +106,7 @@ CBERS_FILE_URL = 'https://data.inpe.br/bdc/data/CB4A-WPM-PCA-FUSED/v001/{path}/{
 # Cena de 2 m: abaixo disso a reprojeção lê área demais (o warp do Django
 # não usa a pirâmide do COG).
 CBERS_MIN_ZOOM = 12
+CBERS_RES = 2
 CBERS_SCENES_TTL = 6 * 60 * 60
 CBERS_STATS_TTL = 30 * 24 * 60 * 60
 
@@ -141,7 +143,8 @@ def _configure_gdal():
 
 
 def _open(url):
-    """(GDALRaster, lock) do arquivo remoto, reaproveitando o já aberto.
+    """(GDALRaster, lock) do arquivo remoto (ou local, quando `url` é um
+    caminho: cenas baixadas pelo cbers2b_service), reaproveitando o já aberto.
 
     Abrir fica inteiro sob o lock global: duas threads abrindo arquivos (e
     registrando os drivers do GDAL) ao mesmo tempo corrompem memória e
@@ -153,9 +156,9 @@ def _open(url):
             return _datasets[url]
         _configure_gdal()
         try:
-            raster = GDALRaster('/vsicurl/' + url)
+            raster = GDALRaster('/vsicurl/' + url if url.startswith(('http://', 'https://')) else url)
         except GDALException:
-            logger.warning('Não foi possível abrir o GeoTIFF remoto %s', url)
+            logger.warning('Não foi possível abrir o GeoTIFF %s', url)
             raise ImageryError('Arquivo de imagem indisponível.') from None
         entry = (raster, threading.Lock())
         _datasets[url] = entry
@@ -210,15 +213,17 @@ def _in_gdal_thread(fn, *args):
     return done.get('result')
 
 
-def _warp_tile(url, z, x, y, resampling):
-    return _in_gdal_thread(_warp_tile_gdal, url, z, x, y, resampling)
+def _warp_tile(url, z, x, y, resampling, buffer=0):
+    return _in_gdal_thread(_warp_tile_gdal, url, z, x, y, resampling, buffer)
 
 
-def _warp_tile_gdal(url, z, x, y, resampling):
-    """Bandas (arrays numpy) do tile XYZ em EPSG:3857, lidas do GeoTIFF."""
+def _warp_tile_gdal(url, z, x, y, resampling, buffer=0):
+    """Bandas (arrays numpy) do tile XYZ em EPSG:3857, lidas do GeoTIFF, com
+    `buffer` pixels a mais em cada lado (margem da nitidez do realce)."""
     minx, miny, maxx, maxy = tile_bbox(z, x, y)
     pixel = (maxx - minx) / TILE_SIZE
-    return _warp_window_gdal(url, (minx, maxy), pixel, TILE_SIZE, TILE_SIZE, resampling)
+    size = TILE_SIZE + 2 * buffer
+    return _warp_window_gdal(url, (minx - buffer * pixel, maxy + buffer * pixel), pixel, size, size, resampling)
 
 
 def _warp_window(url, origin, pixel, width, height, resampling):
@@ -243,6 +248,9 @@ def _warp_window_gdal(url, origin, pixel, width, height, resampling):
                     'height': height,
                     'origin': list(origin),
                     'scale': [pixel, -pixel],
+                    # Sem isso o Django copia a rotação do arquivo (o HRC do
+                    # CBERS-2B corrigido tem) e o tile sai girado.
+                    'skew': [0, 0],
                     'resampling': resampling,
                 })
                 return [band.data() for band in window.bands]
@@ -397,25 +405,48 @@ def _cbers_stretch(scene, url):
     return stretch
 
 
-def cbers_tile(scene, z, x, y):
-    """(WEBP com transparência, content-type), ou None fora do zoom/cena."""
+def stretch_band(band, lo, hi):
+    """Banda esticada de `lo`–`hi` para 0–255 (uint8)."""
+    return np.clip((band.astype(np.float32) - lo) * 255.0 / max(hi - lo, 1.0), 0, 255).astype(np.uint8)
+
+
+def enhanced_read(url, z, x, y, source_res):
+    """(bandas com margem, raio, margem) para um tile realçado: interpolação
+    bicúbica e a margem que a nitidez de `image_enhance` precisa."""
+    radius = image_enhance.sharpen_radius(source_res, z, y)
+    buffer = image_enhance.sharpen_buffer(radius)
+    return _warp_tile(url, z, x, y, 'Cubic', buffer), radius, buffer
+
+
+def rgba_webp(rgba, radius=0, buffer=0):
+    """WEBP do RGBA (h×w×4); com `radius`, aplica a nitidez do realce e corta
+    a margem."""
+    if radius:
+        rgba = image_enhance.sharpen_rgba(rgba, radius, buffer)
+    rgba = np.ascontiguousarray(rgba)
+    out = io.BytesIO()
+    Image.frombytes('RGBA', (rgba.shape[1], rgba.shape[0]), rgba.tobytes()).save(out, format='WEBP', quality=82)
+    return out.getvalue()
+
+
+def cbers_tile(scene, z, x, y, enhance=False):
+    """(WEBP com transparência, content-type), ou None fora do zoom/cena.
+    `enhance`: interpolação bicúbica e nitidez na escala do pixel de 2 m."""
     url = cbers_scene_url(scene)
     if url is None or z < CBERS_MIN_ZOOM:
         return None
-    key = f'raster:cbers:{scene}:{z}:{x}:{y}'
+    key = f'raster:cbers:{scene}:{"realce" if enhance else "padrao"}:{z}:{x}:{y}'
     webp = cache.get(key)
     if webp is None:
-        bands = _warp_tile(url, z, x, y, 'Bilinear')[:3]
+        if enhance:
+            bands, radius, buffer = enhanced_read(url, z, x, y, CBERS_RES)
+        else:
+            bands, radius, buffer = _warp_tile(url, z, x, y, 'Bilinear'), 0, 0
+        bands = bands[:3]
         stretch = _cbers_stretch(scene, url)
-        rgb = np.dstack([
-            np.clip((band.astype(np.float32) - lo) * 255.0 / max(hi - lo, 1.0), 0, 255)
-            for band, (lo, hi) in zip(bands, stretch)
-        ]).astype(np.uint8)
+        rgb = np.dstack([stretch_band(band, lo, hi) for band, (lo, hi) in zip(bands, stretch)])
         # 0 nas três bandas = fora da faixa imageada.
         alpha = np.where((bands[0] == 0) & (bands[1] == 0) & (bands[2] == 0), 0, 255).astype(np.uint8)
-        out = io.BytesIO()
-        rgba = np.ascontiguousarray(np.dstack([rgb, alpha]))
-        Image.frombytes('RGBA', (TILE_SIZE, TILE_SIZE), rgba.tobytes()).save(out, format='WEBP', quality=82)
-        webp = out.getvalue()
+        webp = rgba_webp(np.dstack([rgb, alpha]), radius, buffer)
         cache.set(key, webp, TILE_TTL)
     return webp, 'image/webp'
