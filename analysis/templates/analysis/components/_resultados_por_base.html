@@ -7,6 +7,7 @@
         <p class="panel-description">
             Visualize as intersecções identificadas em cada fonte.
             As informações aparecem organizadas por base de dados.
+            Para levar uma base para outro programa, use o botão <strong>Baixar</strong> do card.
         </p>
 
         <div class="bases-overview">
@@ -69,9 +70,39 @@
                     {% endif %}
                 </div>
 
-                <span class="pill {% if base.areas_encontradas %}pill--{{ severity }}{% endif %}">
-                    {{ base.total_areas_com_sobreposicao }} sobreposições
-                </span>
+                <div class="base-card__actions">
+                    {% if base.areas_encontradas %}
+                    {% firstof historico.pk historico_id as analise_id %}
+                    <details class="base-download">
+                        <summary class="base-download__toggle" title="Baixar os recortes desta base">
+                            <svg class="ico" aria-hidden="true"><use href="#i-download"/></svg>
+                            <span>Baixar</span>
+                        </summary>
+                        <div class="base-download__menu">
+                            <p class="base-download__title">
+                                {{ base.areas_encontradas|length }} recorte{{ base.areas_encontradas|length|pluralize }} dentro da propriedade
+                            </p>
+                            <a class="base-download__option" href="{% url 'download_base' %}?base={{ base.nome_base|urlencode }}&amp;fmt=shp{% if analise_id %}&amp;historico={{ analise_id }}{% endif %}">
+                                <span class="format-badge format-badge--shp">SHP</span>
+                                <span class="base-download__text">
+                                    <strong>Shapefile</strong>
+                                    <small>QGIS, ArcGIS · arquivo .zip</small>
+                                </span>
+                            </a>
+                            <a class="base-download__option" href="{% url 'download_base' %}?base={{ base.nome_base|urlencode }}&amp;fmt=kml{% if analise_id %}&amp;historico={{ analise_id }}{% endif %}">
+                                <span class="format-badge format-badge--kml">KML</span>
+                                <span class="base-download__text">
+                                    <strong>KML</strong>
+                                    <small>Google Earth · arquivo .kml</small>
+                                </span>
+                            </a>
+                        </div>
+                    </details>
+                    {% endif %}
+                    <span class="pill {% if base.areas_encontradas %}pill--{{ severity }}{% endif %}">
+                        {{ base.total_areas_com_sobreposicao }} sobreposições
+                    </span>
+                </div>
             </header>
 
             {% if base.areas_encontradas %}
@@ -295,6 +326,24 @@
     [searchInput, severitySelect, minAreaInput].forEach(function (el) {
         if (!el) return;
         el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', refreshAll);
+    });
+
+    // Menus "Baixar": um aberto por vez; fecha ao clicar fora, com Esc ou ao escolher.
+    var downloads = Array.prototype.slice.call(grid.querySelectorAll('.base-download'));
+    downloads.forEach(function (d) {
+        d.addEventListener('toggle', function () {
+            if (!d.open) return;
+            downloads.forEach(function (o) { if (o !== d) o.open = false; });
+        });
+        d.querySelectorAll('.base-download__option').forEach(function (a) {
+            a.addEventListener('click', function () { d.open = false; });
+        });
+    });
+    document.addEventListener('click', function (e) {
+        downloads.forEach(function (d) { if (d.open && !d.contains(e.target)) d.open = false; });
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') downloads.forEach(function (d) { d.open = false; });
     });
 
     // Encaminha o clique em "Ver no mapa" para o mapa (delegação de evento)

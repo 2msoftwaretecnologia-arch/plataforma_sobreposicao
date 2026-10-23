@@ -18,6 +18,7 @@ urlpatterns = [
     path('historico/<int:pk>/', login_required(views.HistoricoDetalheView.as_view()), name='historico_detalhe'),
     path('download/property-kml/', login_required(views.DownloadPropertyKmlView.as_view()), name='download_property_kml'),
     path('download/property-shp/', login_required(views.DownloadPropertyShapefileView.as_view()), name='download_property_shp'),
+    path('download/base/', login_required(views.DownloadBaseView.as_view()), name='download_base'),
     path('bases-3d/tiles/<str:modelo>/<int:z>/<int:x>/<int:y>.pbf', login_required(views.BaseTileView.as_view()), name='base_tiles'),
     path('bases-3d/imovel/', login_required(views.PropertyOutlineView.as_view()), name='base_property_outline'),
     path('analise/<str:job_id>/progresso/', login_required(views.AnalysisProgressView.as_view()), name='analysis_progress'),

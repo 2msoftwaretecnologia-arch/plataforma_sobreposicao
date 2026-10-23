@@ -51,6 +51,14 @@ from analysis.services.view_services.bases_3d import (
     property_outline,
     render_tile,
 )
+from analysis.services.view_services.base_export_service import (
+    BaseExportError,
+    base_geodataframe,
+    export_filename,
+    find_base,
+    to_kml,
+    to_shapefile_zip,
+)
 from analysis.services.view_services.zip_upload_service import ZipUploadService
 from analysis.services.view_services.kml_upload_service import KmlUploadError, KmlUploadService
 from analysis.services.view_services.coordinates_input_service import (
@@ -372,6 +380,39 @@ class DownloadPropertyKmlView(View):
         response = HttpResponse(content, content_type='application/vnd.google-earth.kml+xml')
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
+
+class DownloadBaseView(View):
+    """Uma base do resultado (só os recortes dentro da propriedade) em SHP ou KML.
+    `?historico=` aponta a análise; sem ele, vale a última da sessão."""
+
+    def get(self, request):
+        pk = request.GET.get('historico', '')
+        if pk:
+            if not pk.isdigit():
+                raise Http404
+            _, data = _historico_data(request, int(pk))
+        else:
+            data = filter_result(request.session.get('last_analysis') or {}, request.user)
+
+        nome_base = request.GET.get('base', '')
+        fmt = request.GET.get('fmt', 'shp')
+        base = find_base(data.get('resultado'), nome_base)
+        if base is None or fmt not in ('shp', 'kml'):
+            raise Http404
+        try:
+            gdf = base_geodataframe(base)
+        except BaseExportError as e:
+            return HttpResponse(str(e), status=400)
+
+        name = export_filename(nome_base, data.get('car_input') or '')
+        if fmt == 'kml':
+            response = HttpResponse(to_kml(gdf, name), content_type='application/vnd.google-earth.kml+xml')
+            response['Content-Disposition'] = f'attachment; filename="{name}.kml"'
+        else:
+            response = HttpResponse(to_shapefile_zip(gdf, name), content_type='application/zip')
+            response['Content-Disposition'] = f'attachment; filename="{name}.zip"'
+        return response
+
 
 def _bases_3d_config(request):
     """Configuração do mapa 3D (camadas, tiles e cidades do tour)."""

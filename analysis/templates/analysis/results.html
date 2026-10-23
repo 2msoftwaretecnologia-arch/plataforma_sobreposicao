@@ -301,6 +301,7 @@
         <script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
         <script src="{% static 'analysis/js/maps.js' %}"></script>
         <script src="{% static 'analysis/js/map_thematic.js' %}"></script>
+        <script src="{% static 'analysis/js/image_export.js' %}"></script>
         {{ map_items|json_script:"map-items" }}
         {{ imagery|json_script:"map-imagery" }}
         <script>

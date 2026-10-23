@@ -1444,9 +1444,158 @@
         });
     }
 
+    var DOWNLOAD_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10.5M8 11l4 4.5 4-4.5"/><path d="M4.5 15.5v3A1.5 1.5 0 0 0 6 20h12a1.5 1.5 0 0 0 1.5-1.5v-3"/></svg>';
+
     /**
-     * Main entry point for initializing the map.
+     * Cartão "Baixar esta imagem" da aba Imagem: GeoTIFF do mapa base
+     * escolhido (com a data/cena/composição do seletor), no retângulo da
+     * propriedade. Um botão no mapa abre o painel direto nele.
+     * Ver image_export.js.
      */
+    function setupImageDownload(map, layersByFonte, imageryPanel, panel, mount) {
+        var card = L.DomUtil.create('div', 'image-download', mount);
+        card.innerHTML =
+            '<div class="image-download__head">' +
+                '<span class="format-badge format-badge--tif">TIF</span>' +
+                '<div>' +
+                    '<div class="image-download__title">Baixar esta imagem</div>' +
+                    '<div class="image-download__source"></div>' +
+                '</div>' +
+            '</div>' +
+            '<ul class="image-download__meta">' +
+                '<li>GeoTIFF georreferenciado</li><li>Área da propriedade + margem</li><li>QGIS · ArcGIS</li>' +
+            '</ul>' +
+            '<button type="button" class="image-download__btn">' + DOWNLOAD_ICON + '<span>Baixar imagem</span></button>' +
+            '<div class="image-download__progress" hidden><span></span></div>' +
+            '<p class="image-download__status" role="status"></p>';
+        var sourceEl = card.querySelector('.image-download__source');
+        var btn = card.querySelector('.image-download__btn');
+        var btnLabel = btn.querySelector('span');
+        var progress = card.querySelector('.image-download__progress');
+        var bar = progress.querySelector('span');
+        var status = card.querySelector('.image-download__status');
+        var base = null, baseName = '', busy = false;
+
+        // Atalho no mapa: abre o painel na aba Imagem, já no cartão.
+        var shortcut = L.control({ position: 'topleft' });
+        shortcut.onAdd = function () {
+            var b = L.DomUtil.create('button', 'map-download-shortcut');
+            b.type = 'button';
+            b.title = 'Baixar a imagem de satélite desta área';
+            b.innerHTML = DOWNLOAD_ICON + '<span>Baixar imagem</span>';
+            L.DomEvent.disableClickPropagation(b);
+            b.addEventListener('click', function () {
+                panel.open('imagem');
+                refresh();
+                card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                card.classList.remove('is-highlighted');
+                void card.offsetWidth;  // reinicia a animação
+                card.classList.add('is-highlighted');
+            });
+            return b;
+        };
+        shortcut.addTo(map);
+
+        function exportable(layer) {
+            // Termos do Google não permitem baixar a imagem; mapas de referência não são imagem.
+            return !!(layer && layer.imageryInfo && layer.imageryInfo.name !== 'Satélite (Google)' && global.exportBaseImage);
+        }
+
+        function areaBounds() {
+            var group = layersByFonte[PROPERTY_FONTE];
+            if (group && group.getLayers().length) return group.getBounds().pad(0.1);
+            group = layersByFonte[POINT_FONTE];
+            if (group && group.getLayers().length) return group.getBounds().getCenter().toBounds(1000);
+            return map.getBounds();
+        }
+
+        // Textos escolhidos nos seletores visíveis (data/cena e composição/ano).
+        function selectedTexts() {
+            if (imageryPanel.element.style.display === 'none') return [];
+            return ['#imagery-picker-select', '#imagery-picker-sub'].map(function (id) {
+                var sel = imageryPanel.element.querySelector(id);
+                if (!sel || sel.style.display === 'none' || sel.selectedIndex < 0 || !sel.options.length) return '';
+                return sel.options[sel.selectedIndex].text;
+            }).filter(Boolean);
+        }
+
+        function filename() {
+            var name = [baseName].concat(selectedTexts()).join(' ')
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                .replace(/[^\w.-]+/g, '_').replace(/^_+|_+$/g, '');
+            return (name || 'imagem') + '.tif';
+        }
+
+        function setProgress(fraction) {
+            progress.hidden = fraction === null;
+            bar.style.width = Math.round((fraction || 0) * 100) + '%';
+        }
+
+        function setStatus(text, kind) {
+            status.textContent = text || '';
+            status.className = 'image-download__status' + (kind ? ' is-' + kind : '');
+        }
+
+        function refresh() {
+            var ok = exportable(base);
+            card.classList.toggle('is-disabled', !ok);
+            btn.disabled = busy || !ok;
+            if (ok) {
+                sourceEl.textContent = [baseName].concat(selectedTexts()).join(' · ');
+            } else {
+                sourceEl.textContent = base && base.imageryInfo
+                    ? 'O Google não permite baixar a imagem. Escolha outra fonte acima.'
+                    : 'Escolha uma imagem de satélite acima para baixar.';
+            }
+        }
+
+        // Mudou a data/cena/composição: o cartão mostra o que vai ser baixado.
+        imageryPanel.element.addEventListener('change', function () {
+            setStatus('');
+            refresh();
+        });
+        card.addEventListener('mouseenter', refresh);
+
+        btn.addEventListener('click', function () {
+            if (busy || !exportable(base)) return;
+            busy = true;
+            refresh();
+            card.classList.add('is-busy');
+            btnLabel.textContent = 'Preparando…';
+            setStatus('');
+            setProgress(0);
+            var resolution = base.imageryInfo.kind === 'landsat' ? 30 : 10;
+            global.exportBaseImage(base, areaBounds(), {
+                filename: filename(),
+                resolution: resolution,
+                onProgress: function (text, fraction) {
+                    btnLabel.textContent = text;
+                    setProgress(fraction === undefined ? null : fraction);
+                }
+            }).then(function () {
+                setStatus('Imagem salva na pasta de downloads.', 'done');
+            }, function (err) {
+                setStatus((err && err.message) || 'Não foi possível baixar a imagem.', 'error');
+            }).then(function () {
+                busy = false;
+                card.classList.remove('is-busy');
+                btnLabel.textContent = 'Baixar imagem';
+                setProgress(null);
+                refresh();
+            });
+        });
+
+        refresh();
+        return {
+            setBase: function (layer, name) {
+                base = layer;
+                baseName = (name || '').trim();
+                setStatus('');
+                refresh();
+            }
+        };
+    }
+
     // Só um ponto (sem imóvel): limites de tamanho zero levariam ao zoom máximo.
     function fitToItems(map, group, opts) {
         var bounds = group.getBounds();
@@ -1454,6 +1603,9 @@
         map.fitBounds(bounds, opts);
     }
 
+    /**
+     * Main entry point for initializing the map.
+     */
     global.initImoveisMap = function (items, options) {
         options = options || {};
         var elementId = options.elementId || 'map-imoveis';
@@ -1515,9 +1667,11 @@
             var baseHeading = L.DomUtil.create('div', 'map-panel-heading', imagem);
             baseHeading.innerHTML = 'Mapa base<span class="map-panel-compare-only"> · lado esquerdo</span>';
             var imageryPanel = setupImageryPanel(map, baseLayersInfo, { mount: imagem });
+            var imageDownload = setupImageDownload(map, data.layersByFonte, imageryPanel, panel, imagem);
             setupBaseList(map, baseLayersInfo, imagem, function (layer, row) {
                 row.parentNode.insertBefore(imageryPanel.element, row.nextSibling);
                 imageryPanel.activate(layer);
+                imageDownload.setBase(layer, row.textContent);
             });
 
             // Camadas temáticas (MapBiomas, DETER, focos, relevo) num pane

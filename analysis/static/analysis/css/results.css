@@ -527,6 +527,131 @@ body { background: var(--cream-50); color: var(--ink-900); }
   gap: 10px;
 }
 
+.base-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Download dos recortes da base: botão "Baixar" com menu de formatos. */
+.base-download {
+  position: relative;
+}
+
+/* O card com o menu aberto fica por cima dos vizinhos (o reveal cria
+   um contexto de empilhamento por card). */
+.base-card:has(.base-download[open]) {
+  position: relative;
+  z-index: 20;
+}
+
+.base-download__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px 6px 10px;
+  border: 1px solid var(--cream-200);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--green-700);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  transition: background .2s, color .2s, border-color .2s, box-shadow .2s;
+}
+
+.base-download__toggle::-webkit-details-marker { display: none; }
+
+.base-download__toggle .ico {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2;
+}
+
+.base-download__toggle:hover,
+.base-download[open] .base-download__toggle {
+  background: var(--green-900);
+  border-color: var(--green-900);
+  color: var(--gold-400);
+  box-shadow: 0 4px 12px rgba(23, 48, 31, 0.18);
+}
+
+.base-download__toggle:focus-visible {
+  outline: 2px solid var(--gold-400);
+  outline-offset: 2px;
+}
+
+.base-download__menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 248px;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid var(--cream-200);
+  border-radius: 14px;
+  box-shadow: 0 16px 36px rgba(23, 48, 31, 0.18);
+  animation: base-download-in .16s ease-out;
+}
+
+@keyframes base-download-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.base-download__title {
+  margin: 4px 8px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--ink-500);
+}
+
+.base-download__option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 8px;
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--ink-900);
+  transition: background .15s;
+}
+
+.base-download__option:hover,
+.base-download__option:focus-visible {
+  background: var(--cream-100);
+  outline: none;
+}
+
+.base-download__text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+
+.base-download__text strong { font-size: 13.5px; color: var(--green-900); }
+.base-download__text small { font-size: 12px; color: var(--ink-500); }
+
+.format-badge {
+  flex: 0 0 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: .04em;
+}
+
+.format-badge--shp { background: var(--green-100); color: var(--green-800); }
+.format-badge--kml { background: var(--gold-100); color: #8a5a10; }
+.format-badge--tif { background: #e3ecf7; color: #1d4f8c; }
+
 .base-card__title {
   font-family: var(--serif);
   font-weight: 600;
@@ -941,6 +1066,160 @@ body { background: var(--cream-50); color: var(--ink-900); }
 }
 
 .map-panel-link:hover { background: var(--green-900); border-color: var(--green-900); color: var(--gold-400); }
+
+/* Aba Imagem: cartão "Baixar esta imagem" (maps.js, setupImageDownload). */
+.image-download {
+  margin-top: 18px;
+  padding: 14px;
+  background: linear-gradient(180deg, var(--cream-50), #fff);
+  border: 1px solid var(--cream-200);
+  border-radius: 14px;
+  scroll-margin: 12px;
+  transition: box-shadow .3s, border-color .3s;
+}
+
+.image-download.is-highlighted { animation: image-download-flash 1.6s ease-out; }
+
+@keyframes image-download-flash {
+  0%, 40% { border-color: var(--gold-400); box-shadow: 0 0 0 4px rgba(219, 166, 63, 0.35); }
+  100% { border-color: var(--cream-200); box-shadow: 0 0 0 0 rgba(219, 166, 63, 0); }
+}
+
+.image-download__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.image-download__title {
+  font-family: var(--serif);
+  font-size: 15.5px;
+  font-weight: 600;
+  color: var(--green-900);
+}
+
+.image-download__source {
+  margin-top: 2px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--ink-600);
+}
+
+.image-download__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 12px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.image-download__meta li {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--cream-100);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink-600);
+}
+
+.image-download__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--green-900);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--gold-400);
+  cursor: pointer;
+  transition: background .2s, transform .1s;
+}
+
+.image-download__btn svg,
+.map-download-shortcut svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.image-download__btn:hover:not(:disabled) { background: var(--green-700); }
+.image-download__btn:active:not(:disabled) { transform: scale(.98); }
+.image-download__btn:disabled { cursor: not-allowed; }
+
+.image-download.is-disabled .image-download__btn { background: var(--cream-200); color: var(--ink-500); }
+.image-download.is-disabled .image-download__meta { opacity: .5; }
+.image-download.is-busy .image-download__btn { cursor: progress; }
+.image-download.is-busy .image-download__btn svg { animation: image-download-bob 1s ease-in-out infinite; }
+
+@keyframes image-download-bob {
+  50% { transform: translateY(2px); }
+}
+
+.image-download__progress {
+  height: 5px;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: var(--cream-200);
+  overflow: hidden;
+}
+
+.image-download__progress[hidden] { display: none; }
+
+.image-download__progress span {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--green-600), var(--gold-400));
+  transition: width .25s ease;
+}
+
+.image-download__status {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.image-download__status:empty { display: none; }
+.image-download__status.is-done { color: var(--green-700); font-weight: 600; }
+.image-download__status.is-done::before { content: '✓ '; }
+.image-download__status.is-error { color: var(--critical); }
+
+/* Atalho no canto do mapa que abre o cartão acima. */
+.map-download-shortcut {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 13px;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(23, 48, 31, 0.25);
+  font: inherit;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--green-900);
+  cursor: pointer;
+  transition: background .2s, color .2s;
+}
+
+.map-download-shortcut:hover { background: var(--green-900); color: var(--gold-400); }
+
+@media (max-width: 640px) {
+  .map-download-shortcut span { display: none; }
+  .map-download-shortcut { padding: 9px; }
+}
 
 /* Na comparação o painel se duplica (maps.js, setupCompare): cada um com
    a borda dourada para mostrar que controla só o seu lado. */
