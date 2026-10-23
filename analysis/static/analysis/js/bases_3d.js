@@ -928,8 +928,99 @@
             .catch(function () { return { status: 'unreadable' }; });
     }
 
+    // Vértices digitados: mesmas regras de `coordinates_input_service.py`
+    // (decimal ou graus/min/seg, lat/lon em qualquer ordem, sem hemisfério =
+    // sul/oeste). O servidor valida de novo; aqui é só a pré-visualização.
+    var DMS_RE = /(-)?\s*(\d{1,3})\s*[°º]\s*(\d{1,2})\s*['’′]\s*(?:(\d{1,2}(?:[.,]\d+)?)\s*(?:"|''|”|″)?)?\s*([NSEWOL])?/gi;
+    var LAT_HEMI = /^[NS]$/, LON_HEMI = /^[EWOL]$/;
+
+    function coordValues(line) {
+        var out = [], m;
+        if (/[°º]/.test(line)) {
+            DMS_RE.lastIndex = 0;
+            while ((m = DMS_RE.exec(line))) {
+                var v = +m[2] + m[3] / 60 + parseFloat((m[4] || '0').replace(',', '.')) / 3600;
+                var h = (m[5] || '').toUpperCase();
+                out.push([m[1] || /^[SWO]$/.test(h) ? -v : v, h]);
+            }
+        } else {
+            (line.match(/-?\d+(?:[.,]\d+)?/g) || []).forEach(function (n) { out.push([parseFloat(n.replace(',', '.')), '']); });
+        }
+        return out;
+    }
+
+    function parseCoordinates(text) {
+        var ring = [], lines = String(text || '').split(/\r?\n/);
+        for (var i = 0; i < lines.length; i++) {
+            if (!lines[i].trim()) continue;
+            var vals = coordValues(lines[i]);
+            if (vals.length !== 2 && vals.length !== 3) return { error: 'Linha ' + (i + 1) + ': esperava latitude e longitude.' };
+            var a = vals[0], b = vals[1];
+            a = [a[1] ? a[0] : -Math.abs(a[0]), a[1]];
+            b = [b[1] ? b[0] : -Math.abs(b[0]), b[1]];
+            if (LON_HEMI.test(a[1]) || LAT_HEMI.test(b[1])
+                || (!LAT_HEMI.test(a[1]) && !LON_HEMI.test(b[1]) && Math.abs(a[0]) > Math.abs(b[0]))) {
+                var t = a; a = b; b = t;
+            }
+            if (Math.abs(a[0]) > 90 || Math.abs(b[0]) > 180) return { error: 'Linha ' + (i + 1) + ': coordenada fora do intervalo.' };
+            var last = ring[ring.length - 1];
+            if (!last || last[0] !== b[0] || last[1] !== a[0]) ring.push([b[0], a[0]]);
+        }
+        if (ring.length > 1 && ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1]) ring.pop();
+        if (ring.length === 1) return { point: ring[0] };
+        if (ring.length < 3) return { error: 'Informe 1 coordenada (para achar o imóvel do ponto) ou pelo menos 3 vértices (para uma área).' };
+        return { ring: ring.concat([ring[0]]) };
+    }
+
+    function segmentsCross(p, q, r, s) {
+        function side(a, b, c) { return Math.sign((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])); }
+        return side(p, q, r) * side(p, q, s) < 0 && side(r, s, p) * side(r, s, q) < 0;
+    }
+
+    function ringCrosses(ring) {
+        var n = ring.length - 1;
+        for (var i = 0; i < n; i++) {
+            for (var j = i + 2; j < n; j++) {
+                if (i === 0 && j === n - 1) continue;  // lados vizinhos pelo fechamento
+                if (segmentsCross(ring[i], ring[i + 1], ring[j], ring[j + 1])) return true;
+            }
+        }
+        return false;
+    }
+
+    // Um ponto só: o imóvel do SICAR onde ele cai (o mesmo que a análise usa).
+    function locatePoint(point) {
+        if (!cfg.propertyUrl) return Promise.resolve(null);
+        return fetch(cfg.propertyUrl + '?lon=' + point[0] + '&lat=' + point[1], { credentials: 'same-origin' })
+            .then(function (r) {
+                if (r.status === 404) return { status: 'no_property' };
+                if (!r.ok) return null;
+                return r.json().then(function (d) {
+                    return targetFrom([{ type: 'Feature', properties: {}, geometry: d.geometry }], {
+                        area_ha: d.area_ha,
+                        statusLabel: STATUS_LABEL[String(d.status || '').toUpperCase()] || '',
+                        city: cityOfCar(d.car),
+                        car: d.car,
+                        cars: d.cars
+                    });
+                });
+            });
+    }
+
+    function locateCoordinates(text) {
+        var parsed = parseCoordinates(text);
+        if (parsed.error) return Promise.resolve({ status: 'invalid', message: parsed.error });
+        if (parsed.point) return locatePoint(parsed.point);
+        if (ringCrosses(parsed.ring)) {
+            return Promise.resolve({ status: 'invalid', message: 'O contorno se cruza: confira se os vértices estão na ordem do perímetro.' });
+        }
+        var features = [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [parsed.ring] } }];
+        return Promise.resolve(targetFrom(features, { source: 'Coordenadas', vertices: parsed.ring.length - 1 }));
+    }
+
     function keyFor(req) {
         if (req.mode === 'car' && req.car) return 'car:' + req.car.toUpperCase();
+        if (req.mode === 'coord' && req.text && req.text.trim()) return 'coord:' + req.text.trim();
         if ((req.mode === 'zip' || req.mode === 'kml') && req.file) {
             return req.mode + ':' + [req.file.name, req.file.size, req.file.lastModified].join(':');
         }
@@ -944,7 +1035,8 @@
         if (!key) return Promise.resolve(null);
         if (!located[key]) {
             var locator = { car: function () { return locateCar(req.car); },
-                kml: function () { return locateKml(req.file); } }[req.mode] || function () { return locateZip(req.file); };
+                kml: function () { return locateKml(req.file); },
+                coord: function () { return locateCoordinates(req.text); } }[req.mode] || function () { return locateZip(req.file); };
             located[key] = locator()
                 .catch(function () { return null; })
                 .then(function (target) {
@@ -1090,7 +1182,8 @@
         setSearchCaption(step,
             target.city ? target.city.nome
                 : target.layer ? 'Shapefile · ' + target.layer
-                : target.source ? target.source + ' enviado' : 'Área enviada',
+                : target.source === 'KML' ? 'KML enviado'
+                : target.source ? target.source : 'Área enviada',
             parts.join(' · '));
     }
 

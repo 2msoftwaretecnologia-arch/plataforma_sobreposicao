@@ -342,6 +342,17 @@ body { background: var(--cream-50); color: var(--ink-900); }
   background: linear-gradient(180deg, #fff, var(--critical-bg));
 }
 
+.alert.alert-warn {
+  border-color: var(--warning-line);
+  border-left-color: var(--warning);
+  background: linear-gradient(180deg, #fff, var(--warning-bg));
+}
+
+.alert.alert-warn .alert-icon {
+  background: rgba(230, 81, 0, 0.12);
+  color: var(--warning);
+}
+
 .alert-icon {
   display: grid;
   place-items: center;

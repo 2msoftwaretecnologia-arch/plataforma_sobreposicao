@@ -260,6 +260,19 @@ def cities_summary():
     return cities
 
 
+def cars_at_point(lon, lat):
+    """CARs do SICAR que contêm o ponto, do maior para o menor (como em
+    `kmz_points_service.locate_cars`): imóveis declarados podem se sobrepor."""
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT numero_car
+            FROM tb_registro_sicar
+            WHERE ST_Intersects(geometria_util, ST_SetSRID(ST_MakePoint(%s, %s), 4674))
+            ORDER BY area_ha DESC NULLS LAST
+        """, [lon, lat])
+        return [row[0] for row in cursor.fetchall()]
+
+
 def property_outline(car_number):
     """Perímetro de um imóvel do SICAR, para a câmera do mapa 3D ir até ele
     enquanto a análise roda. Simplificado em ~2 m, como em `car_perimeters`."""

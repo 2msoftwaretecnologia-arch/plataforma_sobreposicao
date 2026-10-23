@@ -46,11 +46,17 @@ from analysis.services.view_services.bases_3d import (
     MUNICIPIOS_JSON,
     bases_summary,
     cities_summary,
+    cars_at_point,
     property_outline,
     render_tile,
 )
 from analysis.services.view_services.zip_upload_service import ZipUploadService
 from analysis.services.view_services.kml_upload_service import KmlUploadError, KmlUploadService
+from analysis.services.view_services.coordinates_input_service import (
+    CoordinatesInputError,
+    build_polygon,
+    parse_vertices,
+)
 from analysis.services.view_services.analysis_progress import (
     AnalysisCancelled,
     AnalysisProgress,
@@ -495,6 +501,9 @@ class UploadZipCarView(View):
         if mode == 'kml':
             return self._handle_kml_upload(request, request.FILES.get('kml_file'), car_input, context)
 
+        if mode == 'coord':
+            return self._handle_coordinates_input(request, request.POST.get('coord_input', ''), car_input, context)
+
         # --------------------------------------
         # 1) Busca pelo número do CAR (sem ZIP): o número é obrigatório e
         #    precisa seguir o formato oficial do CAR (ver `analysis/validators.py`).
@@ -616,8 +625,8 @@ class UploadZipCarView(View):
             context['erro'] = f'{error_prefix}: {str(e)}'
             return self._render_form(request, context)
 
-    def _handle_only_car(self, request, car_input, context):
-        """Processa requisição apenas com o CAR (sem ZIP)."""
+    def _handle_only_car(self, request, car_input, context, search_type=SearchHistory.SearchType.CAR, aviso=None):
+        """Processa requisição apenas com o CAR (sem ZIP); `aviso` aparece no topo do resultado."""
         try:
             resultado, municipality, state = self._get_car_data(car_input, request.user)
 
@@ -628,7 +637,9 @@ class UploadZipCarView(View):
                 'uf': state,
                 'sucesso': True
             }
-            _save_search_history(request, data, SearchHistory.SearchType.CAR)
+            if aviso:
+                data['aviso'] = aviso
+            _save_search_history(request, data, search_type)
             request.session['last_analysis'] = data
             return redirect('results')
 
@@ -660,6 +671,40 @@ class UploadZipCarView(View):
             return self._render_form(request, context)
 
         return self._process_coordinates(request, coordenadas_input, car_input, SearchHistory.SearchType.KML)
+
+    def _handle_coordinates_input(self, request, text, car_input, context):
+        """Coordenadas digitadas (uma por linha): um ponto leva ao imóvel do
+        SICAR que o contém; três ou mais vértices viram o polígono da análise."""
+        context['coord_input'] = text
+        if not text.strip():
+            context['erro'] = 'Por favor, informe as coordenadas.'
+            return self._render_form(request, context)
+        try:
+            vertices = parse_vertices(text)
+            if len(vertices) == 1:
+                return self._handle_point(request, vertices[0], context)
+            coordenadas_input = build_polygon(vertices)
+        except CoordinatesInputError as e:
+            context['erro'] = str(e)
+            return self._render_form(request, context)
+        return self._process_coordinates(request, coordenadas_input, car_input, SearchHistory.SearchType.COORDENADAS)
+
+    def _handle_point(self, request, point, context):
+        """Analisa o imóvel do SICAR onde o ponto cai, como na busca pelo CAR."""
+        require_layer('SicarRecord', request.user)
+        lon, lat = point
+        self.progress.stage('Localizando o imóvel do ponto')
+        cars = cars_at_point(lon, lat)
+        if not cars:
+            context['erro'] = (f'O ponto ({lat:.6f}, {lon:.6f}) não cai em nenhum imóvel do SICAR. '
+                               'Confira a coordenada ou informe os vértices da área.')
+            return self._render_form(request, context)
+        aviso = None
+        if len(cars) > 1:
+            aviso = (f'O ponto cai em {len(cars)} imóveis do SICAR (declarações sobrepostas); '
+                     f'foi analisado o maior. Os outros: {", ".join(cars[1:])}.')
+        context['car_input'] = cars[0]
+        return self._handle_only_car(request, cars[0], context, SearchHistory.SearchType.COORDENADAS, aviso)
 
     def _process_coordinates(self, request, coordenadas_input, car_input, search_type=SearchHistory.SearchType.SHAPEFILE):
         """Processa os dados extraídos do shapefile (ou do KML)."""
@@ -1133,14 +1178,24 @@ class BaseTileView(View):
 
 
 class PropertyOutlineView(View):
-    """Perímetro do imóvel buscado pelo CAR, para a animação de busca no
-    mapa 3D enquanto a análise roda no servidor."""
+    """Perímetro do imóvel buscado pelo CAR (ou pelo ponto `lon`/`lat`), para
+    a animação de busca no mapa 3D enquanto a análise roda no servidor."""
 
     def get(self, request):
         require_layer('SicarRecord', request.user)
-        outline = property_outline(request.GET.get('car', '').strip())
+        car = request.GET.get('car', '').strip()
+        cars = []
+        if not car and 'lon' in request.GET:
+            try:
+                cars = cars_at_point(float(request.GET['lon']), float(request.GET.get('lat', '')))
+            except ValueError:
+                return JsonResponse({}, status=400)
+            car = cars[0] if cars else ''
+        outline = property_outline(car) if car else None
         if not outline:
             return JsonResponse({}, status=404)
+        if cars:
+            outline.update(car=car, cars=len(cars))
         return JsonResponse(outline)
 
 

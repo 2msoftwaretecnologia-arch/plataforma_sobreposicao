@@ -500,3 +500,51 @@ class KmlUploadServiceTests(SimpleTestCase):
         from analysis.services.view_services.kml_upload_service import KmlUploadError
         with self.assertRaises(KmlUploadError):
             self._read(b'isto nao e xml')
+
+
+class CoordinatesInputTests(SimpleTestCase):
+
+    def _parse(self, text):
+        from analysis.services.view_services.coordinates_input_service import build_polygon, parse_vertices
+        return build_polygon(parse_vertices(text))
+
+    def test_formatos_do_google_maps(self):
+        from analysis.services.view_services.coordinates_input_service import parse_vertices
+        (lon, lat), = parse_vertices('9°35\'03.1"S 48°31\'33.0"W')
+        self.assertAlmostEqual(lat, -(9 + 35 / 60 + 3.1 / 3600))
+        self.assertAlmostEqual(lon, -(48 + 31 / 60 + 33 / 3600))
+        self.assertEqual(parse_vertices('-9.581852, -48.526588'), [(-48.526588, -9.581852)])
+
+    def _assert_square(self, geom):
+        self.assertEqual(geom.srid, 4674)
+        xs = sorted({round(x, 4) for x, _ in geom.coords[0]})
+        ys = sorted({round(y, 4) for _, y in geom.coords[0]})
+        self.assertEqual(xs, [-48.3, -48.29])
+        self.assertEqual(ys, [-10.2, -10.19])
+
+    def test_graus_decimais_lat_lon(self):
+        self._assert_square(self._parse('-10.20, -48.30\n-10.20, -48.29\n-10.19, -48.29\n-10.19, -48.30\n'))
+
+    def test_virgula_decimal_ordem_lon_lat_e_anel_fechado(self):
+        self._assert_square(self._parse(
+            '-48,30; -10,20\n-48,29; -10,20\n\n-48,29; -10,19\n-48,30; -10,19\n-48,30; -10,20'))
+
+    def test_sem_sinal_e_sul_oeste(self):
+        self._assert_square(self._parse('10.20 48.30\n10.20 48.29\n10.19 48.29\n10.19 48.30'))
+
+    def test_graus_minutos_segundos(self):
+        geom = self._parse(
+            '10°12\'00" S 48°18\'00" W\n10°12\'00" S 48°17\'24" O\n'
+            '10°11\'24,0" S 48°17\'24,0" W\n10°11\'24" S 48°18\'00" W')
+        self._assert_square(geom)
+
+    def test_erros(self):
+        from analysis.services.view_services.coordinates_input_service import CoordinatesInputError
+        for text, msg in [
+            ('-10.2, -48.3\n-10.2, -48.29', '3 vértices'),
+            ('   \n', 'ao menos uma'),
+            ('-10.2, -48.3\nabc', 'Linha 2'),
+            ('-10.20, -48.30\n-10.19, -48.29\n-10.20, -48.29\n-10.19, -48.30', 'se cruza'),
+        ]:
+            with self.assertRaisesRegex(CoordinatesInputError, msg):
+                self._parse(text)

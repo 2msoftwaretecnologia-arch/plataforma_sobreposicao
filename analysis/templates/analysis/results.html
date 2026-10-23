@@ -184,6 +184,18 @@
             {% include "analysis/components/_recibo_cards.html" %}
         {% endif %}
 
+        {% if aviso %}
+        <section class="alert alert-warn reveal">
+            <div class="alert-icon">
+                <svg class="ico" style="width:24px;height:24px"><use href="#i-alert"/></svg>
+            </div>
+            <div>
+                <p class="alert-title">Atenção</p>
+                <p class="alert-text">{{ aviso }}</p>
+            </div>
+        </section>
+        {% endif %}
+
         {% if erro %}
         <section class="alert reveal">
             <div class="alert-icon">

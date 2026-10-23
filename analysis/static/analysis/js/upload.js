@@ -13,6 +13,8 @@
     const groupKml = document.getElementById('group_kml');
     const kmlInput = document.getElementById('kml_file');
     const kmlLabelText = document.getElementById('kml_label_text');
+    const groupCoord = document.getElementById('group_coord');
+    const coordInput = document.getElementById('coord_input');
     const carInput = document.getElementById('car_input');
     const demoInput = document.getElementById('demo_file');
     const demoLabelText = document.getElementById('demo_label_text');
@@ -34,6 +36,7 @@
     const modeGroups = {
         zip: [groupZip, zipInput],
         kml: [groupKml, kmlInput],
+        coord: [groupCoord, coordInput],
         car: [groupCar, carInput],
         demostrativo: [groupDemo, demoInput],
         recibo: [groupRecibo, reciboInput],
@@ -53,7 +56,10 @@
     modeInputs.forEach((el) => el.addEventListener('change', applyMode));
 
     const carPrefilled = (carInput.value || '').trim().length > 0;
-    if (carPrefilled) {
+    const coordPrefilled = !!coordInput && coordInput.value.trim().length > 0;
+    if (coordPrefilled) {
+        document.getElementById('mode_coord').checked = true;
+    } else if (carPrefilled) {
         document.getElementById('mode_car').checked = true;
     } else {
         document.getElementById('mode_zip').checked = true;
@@ -75,6 +81,7 @@
     const carPreview = document.getElementById('car_preview');
     const zipPreview = document.getElementById('zip_preview');
     const kmlPreview = document.getElementById('kml_preview');
+    const coordPreview = document.getElementById('coord_preview');
     const canPreview = typeof window.previewPropertyOnMap === 'function';
 
     function fmtHa(n) {
@@ -126,6 +133,51 @@
             return ['warn', 'O arquivo não tem nenhum polígono: a análise precisa da área desenhada, não só de pontos ou linhas.'];
         }
         return ['warn', 'Não deu para ler o KML aqui no navegador; a análise ainda pode ser feita.'];
+    }
+
+    function coordNote(t) {
+        if (!t) return ['', ''];
+        if (t.status === 'found' && t.car) {
+            return ['ok', ['Ponto no imóvel ' + t.car, t.city && t.city.nome, t.area_ha ? fmtHa(t.area_ha) : '',
+                t.cars > 1 ? 'cai em ' + t.cars + ' CARs; será analisado o maior' : ''].filter(Boolean).join(' · ')];
+        }
+        if (t.status === 'found') {
+            return ['ok', 'Área dos vértices: ' + fmtHa(t.area_ha) + ' (' + t.vertices + ' vértices)'];
+        }
+        if (t.status === 'no_property') {
+            return ['warn', 'O ponto não cai em nenhum imóvel do SICAR. Confira a coordenada ou informe os vértices da área.'];
+        }
+        if (t.status === 'outside') {
+            return ['warn', 'A área fica fora do Tocantins: confira as coordenadas. As bases da análise cobrem só o estado.'];
+        }
+        return ['warn', t.message || 'Não deu para ler as coordenadas.'];
+    }
+
+    let coordPreviewTimer = null;
+
+    function scheduleCoordPreview() {
+        if (!canPreview || !coordInput) return;
+        clearTimeout(coordPreviewTimer);
+        const text = coordInput.value;
+        coordPreviewTimer = setTimeout(function () {
+            if (!text.trim()) {
+                showNote(coordPreview);
+                window.clearPropertyPreview();
+                return;
+            }
+            window.previewPropertyOnMap({ mode: 'coord', text: text }).then(function (t) {
+                if (coordInput.value !== text) return;
+                const note = coordNote(t);
+                showNote(coordPreview, note[0], note[1]);
+            });
+        }, 500);
+    }
+
+    if (coordInput) {
+        coordInput.addEventListener('input', function () {
+            clientError.style.display = 'none';
+            scheduleCoordPreview();
+        });
     }
 
     let carPreviewTimer = null;
@@ -436,17 +488,20 @@
         const carValue = carInput.value.trim();
         const zipSelectedEmpty = mode === 'zip' && (!zipInput.files || zipInput.files.length === 0);
         const kmlSelectedEmpty = mode === 'kml' && (!kmlInput.files || kmlInput.files.length === 0);
+        const coordEmpty = mode === 'coord' && coordInput.value.trim() === '';
         const carSelectedEmpty = mode === 'car' && carValue === '';
         const carHasDots = mode === 'car' && carInput.value.includes('.'); // Será false se limpo acima
         const carInvalidFormat = mode === 'car' && carValue !== '' && !CAR_REGEX.test(carValue);
         const demoInvalidPdf = mode === 'demostrativo' && demoInput && demoInput.files && demoInput.files.length > 0 && !isPdf(demoInput.files[0]);
         const reciboInvalidPdf = mode === 'recibo' && reciboInput && reciboInput.files && reciboInput.files.length > 0 && !isPdf(reciboInput.files[0]);
 
-        if (zipSelectedEmpty || kmlSelectedEmpty || carSelectedEmpty || demoInvalidPdf || reciboInvalidPdf || carHasDots || carInvalidFormat) {
+        if (zipSelectedEmpty || kmlSelectedEmpty || coordEmpty || carSelectedEmpty || demoInvalidPdf || reciboInvalidPdf || carHasDots || carInvalidFormat) {
             e.preventDefault();
             clientError.style.display = 'block';
             if (carHasDots) {
                 clientError.textContent = '❌ Não é permitido o uso de pontos no número do CAR.';
+            } else if (coordEmpty) {
+                clientError.textContent = '❌ Por favor, informe as coordenadas.';
             } else if (kmlSelectedEmpty) {
                 clientError.textContent = '❌ Por favor, envie um arquivo KML ou KMZ.';
             } else if (carSelectedEmpty) {
@@ -470,6 +525,7 @@
             window.searchPropertyOnMap({
                 mode: mode,
                 car: carValue,
+                text: coordInput ? coordInput.value : '',
                 file: mode === 'kml' ? kmlInput.files && kmlInput.files[0] : zipInput.files && zipInput.files[0],
                 jobId: jobId,
             });
@@ -497,7 +553,8 @@
     });
 
     // CAR já preenchido (a análise voltou com erro): mostra o imóvel de novo.
-    if (carPrefilled) scheduleCarPreview();
+    if (coordPrefilled) scheduleCoordPreview();
+    else if (carPrefilled) scheduleCarPreview();
 
     // Garante que o loader suma se o usuário clicar em "Voltar" (bfcache)
     window.addEventListener('pageshow', function (event) {
