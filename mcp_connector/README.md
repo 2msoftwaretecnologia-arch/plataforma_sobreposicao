@@ -75,27 +75,29 @@ válido e acessíveis pela internet. Pelo IP puro (`http://82.25.66.238:8020`)
 a conexão é recusada. Sem domínio, use o nome gratuito do sslip.io
 `sobreposicao.82-25-66-238.sslip.io` (resolve para o IP da VPS).
 
-1. **HTTPS no host.** Quem ocupa as portas 80/443 da VPS termina o TLS e
-   repassa para `127.0.0.1:8020`:
-   - Nginx do host: use `mcp_connector/deploy/nginx-host-sslip.conf` (os
-     comandos de instalação e do certbot estão no topo do arquivo).
-   - Caddy do CRM: acrescente um site `sobreposicao.82-25-66-238.sslip.io`
-     com `reverse_proxy` para a porta 8020 do host (o container do Caddy
-     precisa de `extra_hosts: ["host.docker.internal:host-gateway"]`).
+1. **HTTPS.** As portas 80/443 da VPS são do Caddy do CRM
+   (`crm-agropassos-caddy-1`, config em
+   `/var/www/projects/crm_Agropassos/docker/caddy/Caddyfile`), que tem um site
+   `sobreposicao.82-25-66-238.sslip.io` com `reverse_proxy overlay-nginx:80`
+   (`flush_interval -1`, `read_timeout 300s`). O Caddy tem `admin off`:
+   mudanças no Caddyfile só valem depois de `docker restart` do container.
+   (Sem o Caddy, `mcp_connector/deploy/nginx-host-sslip.conf` faz o mesmo
+   com o nginx do host.)
 2. **`.env` do servidor:**
-   `MCP_PUBLIC_BASE_URL=https://sobreposicao.82-25-66-238.sslip.io`
-3. **`docker-compose.override.yml` do servidor:** o serviço `mcp` precisa do
-   mesmo banco do `app` e do `worker` (`HOST_BD: postgis`), como os blocos
-   que já existem para eles.
+   `MCP_PUBLIC_BASE_URL=https://sobreposicao.82-25-66-238.sslip.io` e
+   `MCP_ALLOW_LOOPBACK_REDIRECTS=False` (o servidor roda com `DEBUG=True`).
+3. **`docker-compose.override.yml` do servidor:** o serviço `mcp` usa o mesmo
+   banco do `app` e do `worker` (`HOST_BD: postgis`), e o `nginx` entra
+   também na rede externa `crm-agropassos_default`, para o Caddy alcançá-lo.
 4. **Deploy.** Há dependências novas (`requirements.txt`), então a imagem
    precisa ser reconstruída **antes** de recriar os containers; sem isso o
    `app`, o `worker` e o `beat` não sobem (falta o `oauth2_provider`):
 
    ```bash
    git pull
-   docker compose build app worker
-   docker compose up -d --no-deps --force-recreate app worker beat mcp
-   docker compose exec -T nginx nginx -s reload
+   docker compose build app worker   # app e worker/beat/mcp usam imagens distintas
+   docker compose up -d --no-deps --force-recreate app
+   docker compose up -d --no-deps --force-recreate worker beat mcp nginx
    ```
 
    As migrações (`oauth2_provider` e `mcp_connector`) rodam no `migrate` do
