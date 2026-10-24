@@ -8,17 +8,20 @@ geometrias saem por link (KML/SHP) ou na imagem do mapa (`static_map`).
 """
 import json
 from copy import deepcopy
+from dataclasses import asdict
+from datetime import timedelta
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
 import shapely
 from django.conf import settings
-from django.contrib.gis.geos import GEOSGeometry
-from django.core.exceptions import ValidationError
+from django.contrib.gis.geos import GEOSException, GEOSGeometry
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.base import ContentFile
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.urls import reverse
+from django.utils import timezone
 from shapely import wkt as shapely_wkt
 from shapely.errors import ShapelyError
 from shapely.geometry import shape
@@ -28,6 +31,7 @@ from analysis.models import SearchHistory
 from analysis.services.analyze_coordinates.search_all import SearchAll
 from analysis.services.analyze_coordinates.search_for_car import SearchForCar
 from analysis.services.analyze_coordinates.search_for_sigef import SearchForSigef
+from analysis.services.view_services.analysis_progress import AnalysisProgress
 from analysis.services.view_services.base_export_service import SKIPPED_KEYS
 from analysis.services.view_services.bases_3d import cars_at_point
 from analysis.services.view_services.coordinates_input_service import (
@@ -44,10 +48,19 @@ from analysis.services.view_services.report_service import (
     build_report_context,
     limite_residual,
 )
+from analysis.services.view_services.zip_upload_service import ZipUploadService
 from analysis.validators import validate_car_number
 from car_system.models import SicarRecord
 from control_panel.access_service import denied_layers, filter_result, require_layer
+from control_panel.bases_config import BASES_CONFIG
+from control_panel.layer_updates import latest_layer_update, layer_update_dates
+from doc_extractor.services.parsers.constants import TypeDocument
+from doc_extractor.services.parsers.context.extract_data_context import DocumentDataContext
+from doc_extractor.services.parsers.factory.documents_parser_factory import DocumentsParserFactory
+from doc_extractor.services.parsers.implement.extract_text.extract_pdf_plumber import ExtractDocumentPdfPlumber
 from kernel.utils import calculate_area_ha, extract_geometry, locate_city_state
+
+from . import limits
 
 LOCAL_TZ = ZoneInfo('America/Sao_Paulo')
 # Itens listados por base no resumo da análise (o total sempre vem).
@@ -62,6 +75,17 @@ MAX_GEOMETRY_CHARS = 5_000_000
 # inteiro) travariam o banco do site.
 MAX_AREA_HA = 300_000
 HISTORY_PAGE_SIZE = 20
+# Análises de área desenhada: candidatas a reaproveitar, achadas pela área
+# (±1 %) e conferidas pela geometria.
+GEOMETRY_SEARCH_TYPES = (
+    SearchHistory.SearchType.KML, SearchHistory.SearchType.COORDENADAS, SearchHistory.SearchType.SHAPEFILE,
+)
+REUSE_AREA_TOLERANCE = 0.01
+MAX_REUSE_CANDIDATES = 5
+DOCUMENTS = {
+    'demonstrativo': (TypeDocument.STATEMENT, SearchHistory.SearchType.DEMONSTRATIVO),
+    'recibo': (TypeDocument.RECEIPT, SearchHistory.SearchType.RECIBO),
+}
 
 VEREDITOS = {
     'alerta': 'Há pontos de alerta',
@@ -225,27 +249,142 @@ def _finish(user, data, search_type):
     return analysis_summary(historico, data)
 
 
+def _run(owner, engine, /, *args, **kwargs):
+    """Roda o motor da análise dentro dos limites de uso (ver `limits`)."""
+    try:
+        with limits.analysis_slot(owner.pk):
+            return engine(*args, **kwargs)
+    except limits.LimitExceeded as exc:
+        raise QueryError(str(exc)) from None
+
+
+class ToolProgress(AnalysisProgress):
+    """Andamento da análise repassado ao assistente (notificações de progresso
+    do MCP) em vez do cache da tela: `report(feitas, total, mensagem)`."""
+
+    def __init__(self, report):
+        super().__init__()
+        self._report = report
+        self._last = None
+
+    def __bool__(self):
+        return True
+
+    def _save(self):
+        state = self.state
+        message = state.get('stage') or ''
+        if state.get('current') and state.get('stage') == 'Consultando as bases':
+            message = f"Consultando as bases: {state['current']}"
+        update = (state.get('done') or 0, state.get('total') or 0, message)
+        if update != self._last:
+            self._last = update
+            self._report(*update)
+
+
+# ---------------------------------------------------------------------------
+# Reaproveitamento de análises recentes
+# ---------------------------------------------------------------------------
+
+def _reuse_since():
+    """Desde quando uma análise ainda vale: dentro de `MCP_REUSE_DAYS` e depois
+    da última atualização de qualquer base. None = não reaproveitar."""
+    if settings.MCP_REUSE_DAYS <= 0:
+        return None
+    since = timezone.now() - timedelta(days=settings.MCP_REUSE_DAYS)
+    latest = latest_layer_update()
+    return max(since, latest) if latest else since
+
+
+def _reused_summary(user, historico, aviso=None):
+    try:
+        historico, data = load_analysis(user, historico.pk)
+    except (QueryError, PermissionDenied):
+        return None
+    if not data.get('sucesso') or not (data.get('resultado') or {}).get('resultados_por_base'):
+        return None
+    summary = analysis_summary(historico, data)
+    summary['reaproveitada'] = True
+    note = (f"Análise nº {historico.pk} de {summary['data']} reaproveitada: nenhuma base foi atualizada desde "
+            'então, então o resultado seria o mesmo. Para refazer mesmo assim, use forcar_nova=true.')
+    summary['aviso'] = ' '.join(p for p in (aviso, summary.get('aviso'), note) if p)
+    return summary
+
+
+def find_reusable(user, search_type, code, aviso=None):
+    """Análise recente do mesmo CAR ou parcela (`code`), já como resumo."""
+    since = _reuse_since()
+    if since is None:
+        return None
+    historico = (
+        SearchHistory.objects
+        .filter(user=user, search_type=search_type, car_input__iexact=code, sucesso=True, created_at__gt=since)
+        .only('pk').first()
+    )
+    return _reused_summary(user, historico, aviso) if historico else None
+
+
+def _same_area(a, b):
+    try:
+        return a.symmetric_difference(b).area <= a.area * 1e-6
+    except ShapelyError:
+        return False
+
+
+def find_reusable_geometry(user, geometry):
+    """Análise recente da mesma área desenhada (KML, coordenadas, shapefile)."""
+    since = _reuse_since()
+    if since is None:
+        return None
+    area = calculate_area_ha(geometry.wkt)
+    candidates = (
+        SearchHistory.objects
+        .filter(user=user, search_type__in=GEOMETRY_SEARCH_TYPES, sucesso=True, created_at__gt=since,
+                area_ha__gte=area * (1 - REUSE_AREA_TOLERANCE), area_ha__lte=area * (1 + REUSE_AREA_TOLERANCE))
+        .only('pk', 'result_data')[:MAX_REUSE_CANDIDATES]
+    )
+    target = shapely_wkt.loads(geometry.wkt)
+    for candidate in candidates:
+        received = (candidate.result_data or {}).get('coordenadas_recebidas')
+        try:
+            other = shapely_wkt.loads(GEOSGeometry(received).wkt) if received else None
+        except (GEOSException, ValueError, TypeError, ShapelyError):
+            other = None
+        if other is not None and _same_area(target, other):
+            return _reused_summary(user, candidate)
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Análises
 # ---------------------------------------------------------------------------
 
-def analyze_car(user, car_number, aviso=None, search_type=SearchHistory.SearchType.CAR):
+def analyze_car(user, car_number, aviso=None, search_type=SearchHistory.SearchType.CAR, forcar_nova=False,
+                progress=None, extra=None):
+    """`extra`: dados que vão junto no histórico (o recibo/demonstrativo lido do PDF)."""
     try:
         car = validate_car_number(car_number or '')
     except ValidationError as exc:
         raise QueryError(' '.join(exc.messages)) from None
-    resultado = SearchForCar().execute(car, save_debug_files=False, user=user)
+    if not forcar_nova and not extra:
+        reused = find_reusable(user, SearchHistory.SearchType.CAR, car, aviso)
+        if reused:
+            return reused
+    resultado = _run(user, SearchForCar().execute, car, save_debug_files=False, user=user, progress=progress)
     if not resultado:
         raise QueryError(f'O CAR {car} não está na base do SICAR da plataforma (só há imóveis do Tocantins).')
     municipio, uf = _locate(user, resultado.get('alvo_wkt'))
-    data = {'resultado': resultado, 'car_input': car, 'municipio': municipio, 'uf': uf, 'sucesso': True}
+    data = {'resultado': resultado, 'car_input': car, 'municipio': municipio, 'uf': uf, 'sucesso': True, **(extra or {})}
     if aviso:
         data['aviso'] = aviso
     return _finish(user, data, search_type)
 
 
-def _analyze_geometry(user, geometry, label, search_type):
-    resultado = SearchAll(user=user).execute(geometry, save_debug_files=False)
+def _analyze_geometry(user, geometry, label, search_type, forcar_nova=False, progress=None):
+    if not forcar_nova:
+        reused = find_reusable_geometry(user, geometry)
+        if reused:
+            return reused
+    resultado = _run(user, SearchAll(user=user, progress=progress).execute, geometry, save_debug_files=False)
     municipio, uf = _locate(user, geometry.wkt)
     data = {
         'resultado': resultado,
@@ -266,7 +405,7 @@ def _point_municipality(user, lon, lat):
     return point.municipality
 
 
-def _analyze_point(user, lon, lat):
+def _analyze_point(user, lon, lat, forcar_nova=False, progress=None):
     """Um ponto só: analisa o imóvel do SICAR onde ele cai, como a tela faz."""
     require_layer('SicarRecord', user)
     cars = cars_at_point(lon, lat)
@@ -284,19 +423,20 @@ def _analyze_point(user, lon, lat):
     if len(cars) > 1:
         aviso = (f'O ponto cai em {len(cars)} imóveis do SICAR (declarações sobrepostas); '
                  f'foi analisado o maior. Os outros: {", ".join(cars[1:])}.')
-    return analyze_car(user, cars[0], aviso=aviso, search_type=SearchHistory.SearchType.COORDENADAS)
+    return analyze_car(user, cars[0], aviso=aviso, search_type=SearchHistory.SearchType.COORDENADAS,
+                       forcar_nova=forcar_nova, progress=progress)
 
 
-def analyze_coordinates(user, coordinates, label=None):
+def analyze_coordinates(user, coordinates, label=None, forcar_nova=False, progress=None):
     try:
         vertices = parse_vertices(coordinates)
         if len(vertices) == 1:
-            return _analyze_point(user, *vertices[0])
+            return _analyze_point(user, *vertices[0], forcar_nova=forcar_nova, progress=progress)
         geometry = build_polygon(vertices)
     except CoordinatesInputError as exc:
         raise QueryError(str(exc)) from None
     _check_area(geometry.wkt)
-    return _analyze_geometry(user, geometry, label, SearchHistory.SearchType.COORDENADAS)
+    return _analyze_geometry(user, geometry, label, SearchHistory.SearchType.COORDENADAS, forcar_nova, progress)
 
 
 def _geojson_geometries(obj):
@@ -366,16 +506,21 @@ def parse_geometry(text):
     return GEOSGeometry(geom.wkt, srid=4674), SearchHistory.SearchType.COORDENADAS
 
 
-def analyze_geometry(user, geometry_text, label=None):
+def analyze_geometry(user, geometry_text, label=None, forcar_nova=False, progress=None):
     geometry, search_type = parse_geometry(geometry_text)
-    return _analyze_geometry(user, geometry, label, search_type)
+    return _analyze_geometry(user, geometry, label, search_type, forcar_nova, progress)
 
 
-def analyze_sigef(user, parcel_code):
+def analyze_sigef(user, parcel_code, forcar_nova=False, progress=None):
     code = (parcel_code or '').strip()
     if not code:
         raise QueryError('Informe o código da parcela do SIGEF.')
-    resultado = SearchForSigef().execute(code, save_debug_files=False, user=user)
+    require_layer('Sigef', user)
+    if not forcar_nova:
+        reused = find_reusable(user, SearchHistory.SearchType.SIGEF, code)
+        if reused:
+            return reused
+    resultado = _run(user, SearchForSigef().execute, code, save_debug_files=False, user=user, progress=progress)
     if not resultado:
         raise QueryError(f'Parcela {code} não encontrada no SIGEF da plataforma.')
     municipio, uf = _locate(user, resultado.get('alvo_wkt'))
@@ -384,6 +529,51 @@ def analyze_sigef(user, parcel_code):
         'municipio': municipio, 'uf': uf, 'sucesso': True,
     }
     return _finish(user, data, SearchHistory.SearchType.SIGEF)
+
+
+def analyze_area_file(user, file_obj, label=None):
+    """Área num arquivo enviado pelo link de envio: shapefile (ZIP), KML/KMZ ou GeoJSON."""
+    name = (file_obj.name or '').lower()
+    if name.endswith(('.geojson', '.json')):
+        try:
+            text = file_obj.read().decode('utf-8-sig')
+        except UnicodeDecodeError:
+            raise QueryError('O GeoJSON precisa estar em UTF-8.') from None
+        geometry, search_type = parse_geometry(text)
+        return _analyze_geometry(user, geometry, label, search_type, forcar_nova=True)
+    if name.endswith('.zip'):
+        reader, search_type = ZipUploadService(), SearchHistory.SearchType.SHAPEFILE
+    elif name.endswith(('.kml', '.kmz')):
+        reader, search_type = KmlUploadService(), SearchHistory.SearchType.KML
+    else:
+        raise QueryError('Envie um shapefile compactado (.zip), um KML/KMZ ou um GeoJSON.')
+    try:
+        gdf = reader.extract_geodataframe(file_obj)
+    except KmlUploadError as exc:
+        raise QueryError(str(exc)) from None
+    except Exception as exc:
+        raise QueryError(f'Não consegui ler o arquivo: {exc}') from None
+    geometry = extract_geometry(gdf)
+    if geometry is None:
+        raise QueryError('O arquivo não tem nenhum polígono: é preciso o perímetro da área (não só pontos ou linhas).')
+    _check_area(geometry.wkt)
+    return _analyze_geometry(user, geometry, label, search_type, forcar_nova=True)
+
+
+def analyze_document(user, file_obj, kind, car_input=None):
+    """PDF do Demonstrativo ou do Recibo do CAR: lê o documento e analisa o CAR dele, como a tela."""
+    doc_type, search_type = DOCUMENTS[kind]
+    if not (file_obj.name or '').lower().endswith('.pdf'):
+        raise QueryError('Envie o PDF do documento.')
+    try:
+        context = DocumentDataContext(ExtractDocumentPdfPlumber(), DocumentsParserFactory.create_parser(doc_type))
+        info = context.extract_data(file_obj)
+    except Exception as exc:
+        raise QueryError(f'Não consegui ler o PDF: {exc}') from None
+    car = (info.car or car_input or '').strip()
+    if not car:
+        raise QueryError('Não achei o número do CAR no PDF. Informe o CAR junto com o envio.')
+    return analyze_car(user, car, search_type=search_type, extra={kind: asdict(info)})
 
 
 # ---------------------------------------------------------------------------
@@ -513,13 +703,52 @@ def analysis_details(user, analise_id, base=None):
     return result
 
 
+def bases_update_info(bases, analysis_date):
+    """(quando cada base da análise foi atualizada, bases atualizadas depois da análise)."""
+    dates = layer_update_dates()
+    configs = {b['nome_base']: b for b in BASES_CONFIG}
+    rows, newer = [], []
+    for nome in bases:
+        cfg = configs.get(nome)
+        if cfg is None:
+            continue
+        when, origin = dates.get(cfg['modelo'], (None, None))
+        row = {
+            'base': nome,
+            'atualizada_em': _local_time(when) if when else None,
+            'fonte': cfg.get('fonte_api') or 'Arquivo enviado no painel da plataforma',
+        }
+        if when is None:
+            row['observacao'] = 'Data de atualização não registrada.'
+        elif origin == 'arquivo':
+            row['observacao'] = 'Data do envio do arquivo no painel.'
+        if when and when > analysis_date:
+            newer.append(nome)
+        rows.append(row)
+    return rows, newer
+
+
+def _location(ctx):
+    loc = ctx.get('localizacao') or {}
+    try:
+        lat, lon = (float(loc[k].replace(',', '.')) for k in ('lat', 'lon'))
+    except (KeyError, AttributeError, ValueError):
+        return None
+    return {'latitude': lat, 'longitude': lon, 'google_maps': loc.get('maps_url')}
+
+
 def analysis_report(user, analise_id):
     """O mesmo conteúdo do relatório impresso: semáforo, bases com ocorrência,
-    Reserva Legal, vegetação e comparativo de uso do solo (MapBiomas)."""
+    Reserva Legal, vegetação e comparativo de uso do solo (MapBiomas), mais a
+    localização e a data de atualização de cada base."""
+    from .exports import file_url
+
     historico, data = load_analysis(user, analise_id)
     _require_result(historico, data)
     ctx = build_report_context(deepcopy(data))
     tamanho = _num((ctx.get('resultado') or {}).get('tamanho_area'))
+    atualizacoes, newer = bases_update_info(
+        [b.get('nome_base') for b in data['resultado']['resultados_por_base']], historico.created_at)
 
     bases = [
         {
@@ -558,7 +787,7 @@ def analysis_report(user, analise_id):
     else:
         uso_solo = {'erro': (uso or {}).get('erro') or 'Comparativo indisponível.'}
 
-    return {
+    report = {
         'analise_id': historico.pk,
         'data': _local_time(historico.created_at),
         'car': ctx.get('numero_car') or data.get('car_input') or None,
@@ -566,6 +795,7 @@ def analysis_report(user, analise_id):
         'proprietarios': ctx.get('proprietarios') or [],
         'municipio': data.get('municipio') or None,
         'uf': data.get('uf') or None,
+        'localizacao': _location(ctx),
         'area_imovel_ha': tamanho,
         'veredito': VEREDITOS[ctx['veredito']],
         'alertas': ctx['n_alertas'],
@@ -584,5 +814,11 @@ def analysis_report(user, analise_id):
         'vegetacao_natural': [{'tipo': b['nome'], 'area_ha': _num(b['area'], 2)} for b in ctx['biomas']],
         'municipios': ctx['municipios_encontrados'],
         'uso_do_solo_mapbiomas': uso_solo,
-        'links': analysis_links(historico.pk),
+        'atualizacao_das_bases': atualizacoes,
+        'links': {**analysis_links(historico.pk), 'relatorio_pdf': file_url(user, historico.pk, 'relatorio', 'pdf')},
     }
+    if newer:
+        report['aviso_bases_atualizadas'] = (
+            f'Depois desta análise foram atualizadas: {", ".join(newer)}. Para o resultado com os dados novos, '
+            'faça a análise de novo (forcar_nova=true).')
+    return report

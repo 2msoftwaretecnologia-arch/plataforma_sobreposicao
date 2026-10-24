@@ -6,6 +6,7 @@ from django.contrib.gis.geos import GEOSGeometry
 from django.core.cache import cache
 from django.db import connection, transaction
 
+from control_panel.layer_updates import record_layer_update
 from control_panel.utils import get_file_management
 from kernel.utils import model_count_cache_key, reset_db
 
@@ -153,6 +154,7 @@ class BulkShapefileImporter:
         # O painel pode ter recolocado a contagem antiga no cache enquanto a
         # transação ainda não tinha sido confirmada.
         cache.delete(model_count_cache_key(self.model))
+        record_layer_update(self.model.__name__, total)
         return total
 
     def _clip_to_tocantins(self, df):

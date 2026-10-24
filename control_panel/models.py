@@ -264,3 +264,22 @@ class LayerAccessPolicy(models.Model):
 
     class Meta:
         db_table = 'tb_layer_access_policy'
+
+
+class LayerUpdate(models.Model):
+    """Uma importação concluída de uma base (`modelo` = chave do
+    `LAYER_REGISTRY`). A mais recente de cada base é a data de atualização
+    mostrada no relatório e usada para saber se uma análise antiga ainda
+    reflete as bases atuais (ver `layer_updates.py`)."""
+    modelo = models.CharField(max_length=100, db_index=True)
+    total = models.PositiveIntegerField(default=0)
+    finished_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = 'tb_atualizacao_base'
+        verbose_name = "Atualização de base"
+        verbose_name_plural = "Atualizações de bases"
+        ordering = ['-finished_at']
+
+    def __str__(self):
+        return f"{self.modelo} ({self.finished_at:%d/%m/%Y %H:%M})"

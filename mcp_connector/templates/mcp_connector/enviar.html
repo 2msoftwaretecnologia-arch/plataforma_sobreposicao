@@ -1,0 +1,44 @@
+{% extends 'authentication/base_auth.html' %}
+
+{% block title %}Enviar arquivo ao assistente | TerraView Tocantins{% endblock %}
+
+{% block content %}
+<div class="auth-card">
+    <p class="auth-eyebrow">Envio de arquivo para o assistente de IA</p>
+    {% if upload and upload.status == 'concluido' %}
+    <h1 class="auth-title">Arquivo analisado</h1>
+    <p class="auth-subtitle">A análise nº <strong>{{ upload.analysis_id }}</strong> de <strong>{{ upload.filename }}</strong> está pronta e já entrou no seu histórico. Volte à conversa e avise o assistente que enviou o arquivo.</p>
+    <p class="auth-footer"><a href="{% url 'historico_detalhe' upload.analysis_id %}">Ver o resultado na plataforma</a></p>
+    {% elif upload %}
+    <h1 class="auth-title">Enviar {{ upload.get_kind_display|lower }}</h1>
+    <p class="auth-subtitle">O arquivo é analisado na conta de <strong>{{ upload.user.get_username }}</strong> e o resultado vai para o assistente e para o histórico da plataforma. A análise leva até um minuto.</p>
+    <form method="post" enctype="multipart/form-data" class="auth-form" id="uploadForm">
+        {% csrf_token %}
+        {% if erro %}<div class="auth-alert">{{ erro }}</div>{% endif %}
+        <div class="form-group">
+            <label for="arquivo">Arquivo</label>
+            <input type="file" name="arquivo" id="arquivo" accept="{{ aceita }}" required>
+            <p class="field-hint">Aceita {{ descricao }}.</p>
+        </div>
+        {% if upload.kind != 'area' %}
+        <div class="form-group">
+            <label for="car">Número do CAR (opcional)</label>
+            <input type="text" name="car" id="car" value="{{ upload.label }}" placeholder="TO-0000000-…">
+            <p class="field-hint">Só se o PDF não trouxer o número do CAR.</p>
+        </div>
+        {% endif %}
+        <button type="submit" class="btn btn-gold" id="uploadButton">Enviar e analisar</button>
+    </form>
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', function () {
+            var button = document.getElementById('uploadButton');
+            button.disabled = true;
+            button.textContent = 'Analisando… não feche esta página';
+        });
+    </script>
+    {% else %}
+    <h1 class="auth-title">Link indisponível</h1>
+    <p class="auth-subtitle">Este link de envio venceu, já foi usado ou não existe. Peça um novo ao assistente na conversa.</p>
+    {% endif %}
+</div>
+{% endblock %}

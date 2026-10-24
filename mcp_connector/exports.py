@@ -26,14 +26,15 @@ from analysis.services.view_services.base_export_service import (
     to_shapefile_zip,
 )
 from analysis.services.view_services.cross_batch_service import _is_neutral
+from analysis.services.view_services.land_use_service import ano_atual
 from analysis.services.view_services.report_service import ALERTA, ATENCAO, INFO, MAPA_CORES, base_guide
 from analysis.validators import validate_car_number
 from car_system.utils import get_sicar_record
 from control_panel.access_service import require_layer
 from control_panel.bases_config import BASES_CONFIG
 
-from . import static_map
-from .queries import QueryError, _num, _require_result, find_base, item_attributes, load_analysis
+from . import imagery, pdf_report, static_map
+from .queries import QueryError, _num, _require_result, analysis_report, find_base, item_attributes, load_analysis
 
 SIGNING_SALT = 'mcp_connector.arquivos'
 FORMATS = {'kml', 'shp'}
@@ -50,6 +51,7 @@ DRAW_ORDER = {INFO: 0, ATENCAO: 1, ALERTA: 2}
 # ---------------------------------------------------------------------------
 
 def file_url(user, analise_id, kind, fmt, base='', fundo=''):
+    """`fundo`: 'satelite', 'mapa' ou o dict de `imagery.basemap_for` (imagem de um ano, uso do solo)."""
     payload = {'u': user.pk, 'a': analise_id, 'k': kind, 'f': fmt, 'b': base or '', 'm': fundo or ''}
     token = signing.dumps(payload, salt=SIGNING_SALT, compress=True)
     return settings.MCP_PUBLIC_BASE_URL + reverse('mcp_connector:arquivo', args=[token])
@@ -73,6 +75,7 @@ def download_links(user, analise_id):
     links = {
         'analise_id': pk,
         'validade': f'Os links valem {hours} horas e abrem sem login; não os compartilhe com quem não deve ver a análise.',
+        'relatorio_pdf': file_url(user, pk, 'relatorio', 'pdf'),
         'imovel': {fmt: file_url(user, pk, 'imovel', fmt) for fmt in ('kml', 'shp')},
         'mapa_png': file_url(user, pk, 'mapa', 'png'),
     }
@@ -265,40 +268,58 @@ def map_layers(resultado, base=None):
     return layers, 'Todas as bases com sobreposição' if everything else 'Bases de alerta e atenção', notes
 
 
-def render_analysis_map(historico, data, base=None, fundo='satelite'):
-    resultado = data['resultado']
-    layers, showing, notes = map_layers(resultado, base)
+def map_title(historico, data):
     car = data.get('car_input') or ''
     if historico.search_type == SearchHistory.SearchType.SIGEF:
-        title = f'Parcela SIGEF {car}'
-    elif car:
+        return f'Parcela SIGEF {car}'
+    if car:
         try:
-            title = f'CAR {validate_car_number(car)}'
+            return f'CAR {validate_car_number(car)}'
         except ValidationError:
-            title = car
-    else:
-        title = f'Análise nº {historico.pk}'
+            return car
+    return f'Análise nº {historico.pk}'
+
+
+def _render(historico, data, layers, showing, notes, fundo):
+    """(PNG, fonte_imagem) do mapa da análise sobre o fundo `fundo` (ver `imagery.basemap_for`)."""
+    resultado = data['resultado']
     place = '/'.join(p for p in (data.get('municipio'), data.get('uf')) if p)
-    subtitle = ' · '.join(p for p in (
-        place, _ha(_num(resultado.get('tamanho_area'))), showing,
-        f'Análise nº {historico.pk} de {historico.created_at:%d/%m/%Y}',
-    ) if p)
     try:
-        png = static_map.render_map(resultado.get('alvo_geojson'), layers, title, subtitle, fundo, notes=notes)
+        geom = static_map._geometry(resultado.get('alvo_geojson'))
+        if geom is None:
+            raise static_map.MapRenderError('A análise não tem o contorno da área analisada.')
+        basemap = imagery.basemap_for(fundo, geom, _num(resultado.get('tamanho_area')))
+        image = imagery.image_label(basemap)
+        subtitle = ' · '.join(p for p in (
+            place, _ha(_num(resultado.get('tamanho_area'))), image, showing if layers or not image else '',
+            f'Análise nº {historico.pk} de {historico.created_at:%d/%m/%Y}',
+        ) if p)
+        return static_map.render_map(resultado.get('alvo_geojson'), layers, map_title(historico, data),
+                                     subtitle, basemap, notes=notes)
     except static_map.MapRenderError as exc:
         raise QueryError(str(exc)) from None
-    return png, layers, showing, notes
+
+
+def render_analysis_map(historico, data, base=None, fundo='satelite'):
+    layers, showing, notes = map_layers(data['resultado'], base)
+    png, fonte = _render(historico, data, layers, showing, notes, fundo)
+    return png, layers, showing, notes, fonte
+
+
+def _layers_info(layers):
+    return [{'nome': layer['label'], 'cor': layer['color'], 'detalhe': layer['detail']} for layer in layers]
 
 
 def analysis_map(user, analise_id, base=None, fundo='satelite'):
     """PNG do mapa e o resumo do que foi desenhado (para o texto da resposta)."""
     historico, data = load_analysis(user, analise_id)
     _require_result(historico, data)
-    png, layers, showing, notes = render_analysis_map(historico, data, base, fundo)
+    png, layers, showing, notes, fonte = render_analysis_map(historico, data, base, fundo)
     info = {
         'analise_id': historico.pk,
         'mostrando': showing,
-        'camadas': [{'nome': layer['label'], 'cor': layer['color'], 'detalhe': layer['detail']} for layer in layers],
+        'fonte_imagem': fonte,
+        'camadas': _layers_info(layers),
         'link_png': file_url(user, historico.pk, 'mapa', 'png', base=base or '', fundo=fundo),
     }
     if notes:
@@ -306,6 +327,62 @@ def analysis_map(user, analise_id, base=None, fundo='satelite'):
     if not layers:
         info['observacao'] = 'Nada a pintar nessas bases: o mapa mostra só o contorno da área.'
     return png, info
+
+
+# ---------------------------------------------------------------------------
+# Imagem de um ano e uso do solo
+# ---------------------------------------------------------------------------
+
+def overlay_layers(resultado, base=None):
+    """Sobreposições por cima da imagem de um ano: nenhuma (padrão, para ver
+    a vegetação), "alertas", "todas" ou o nome de uma base."""
+    wanted = (base or '').strip().lower()
+    if wanted in ('', 'nenhuma', 'contorno'):
+        return [], 'Contorno do imóvel', []
+    if wanted in ('alertas', 'alerta'):
+        return map_layers(resultado)
+    return map_layers(resultado, base)
+
+
+def _image(user, historico, data, fundo, base=None):
+    """(PNG, resumo) da imagem `fundo` com as sobreposições de `base`."""
+    layers, showing, notes = overlay_layers(data['resultado'], base)
+    png, fonte = _render(historico, data, layers, showing, notes, fundo)
+    info = {
+        'analise_id': historico.pk,
+        'mostrando': showing,
+        'fonte_imagem': fonte,
+        'camadas': _layers_info(layers),
+        'link_png': file_url(user, historico.pk, 'imagem', 'png', base=base or '', fundo=fundo),
+    }
+    if notes:
+        info['notas'] = notes
+    if fonte.get('observacao'):
+        info['observacao'] = fonte['observacao']
+    return png, info
+
+
+def historical_images(user, analise_id, ano=2008, composicao='natural', cena=None, base=None,
+                      comparar_com_atual=True):
+    """Imagem de satélite de `ano` e, por padrão, a atual, com o contorno do imóvel."""
+    historico, data = load_analysis(user, analise_id)
+    _require_result(historico, data)
+    fundo = {'tipo': 'historica', 'ano': int(ano), 'composicao': composicao or 'natural'}
+    if cena and cena.strip():
+        fundo['cena'] = cena.strip()
+    images = [_image(user, historico, data, fundo, base)]
+    if comparar_com_atual:
+        images.append(_image(user, historico, data, 'satelite', base))
+    return images
+
+
+def land_use_maps(user, analise_id, ano=None, comparar_com_2008=True):
+    """Classes do MapBiomas no imóvel em `ano` (padrão: o mais recente) e em 2008."""
+    historico, data = load_analysis(user, analise_id)
+    _require_result(historico, data)
+    ano = int(ano or ano_atual())
+    years = [2008, ano] if comparar_com_2008 and ano != 2008 else [ano]
+    return [_image(user, historico, data, {'tipo': 'uso_solo', 'ano': year}) for year in years]
 
 
 # ---------------------------------------------------------------------------
@@ -322,6 +399,20 @@ def _car_status(data, user):
     return status
 
 
+def report_pdf(user, historico, data):
+    """(PDF, nome, content type) do relatório, com o mapa das bases de alerta e atenção."""
+    report = analysis_report(user, historico.pk)
+    png = fonte = error = None
+    try:
+        png, _, _, _, fonte = render_analysis_map(historico, data)
+    except QueryError as exc:
+        # Sem imagem de satélite (servidor fora do ar), o PDF sai sem o mapa.
+        error = str(exc)
+    car = data.get('car_input') or ''
+    name = export_filename('relatorio', car) if car else f'relatorio_analise_{historico.pk}'
+    return pdf_report.build_pdf(report, map_title(historico, data), png, fonte, error), f'{name}.pdf', 'application/pdf'
+
+
 def build_file(user, payload):
     """(conteúdo, nome do arquivo, content type) do link `payload` (ver `file_url`)."""
     historico, data = load_analysis(user, payload['a'])
@@ -334,6 +425,13 @@ def build_file(user, payload):
         png = render_analysis_map(historico, data, base or None, payload.get('m') or 'satelite')[0]
         suffix = slugify(base) if base else 'alertas'
         return png, f'mapa_{slugify(car) or historico.pk}_{suffix}.png', 'image/png'
+    if kind == 'imagem':
+        fundo = payload.get('m') or 'satelite'
+        png = _image(user, historico, data, fundo, base or None)[0]
+        suffix = slugify(f"{fundo['tipo']}-{fundo['ano']}") if isinstance(fundo, dict) else 'atual'
+        return png, f'imagem_{slugify(car) or historico.pk}_{suffix}.png', 'image/png'
+    if kind == 'relatorio':
+        return report_pdf(user, historico, data)
     if fmt not in FORMATS:
         raise QueryError('Formato inválido.')
 

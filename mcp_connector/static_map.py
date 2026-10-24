@@ -1,9 +1,10 @@
 """Imagem estática do mapa de uma análise (o "print do mapa" do conector).
 
-Desenha, sobre a imagem de satélite da Esri (a mesma camada pública do mapa
-de resultados), o contorno do imóvel e os recortes das bases, com título,
-legenda e escala. Roda no servidor, sem navegador: os tiles são baixados e
-montados com o Pillow.
+Desenha, sobre um fundo (`Basemap`: o satélite atual da Esri, o mapa
+topográfico ou, em `imagery.py`, a imagem de um ano e o uso do solo do
+MapBiomas), o contorno do imóvel e os recortes das bases, com título,
+legenda, escala e a fonte da imagem. Roda no servidor, sem navegador: os
+tiles são baixados e montados com o Pillow.
 """
 import io
 import json
@@ -28,16 +29,8 @@ PADDING = 60
 MAX_LEGEND_ROWS = 14
 PROPERTY_COLOR = '#FFD400'
 FILL_ALPHA = 105
-BASEMAPS = {
-    'satelite': (
-        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        'Imagens: Esri, Maxar, Earthstar Geographics',
-    ),
-    'mapa': (
-        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
-        'Mapa: Esri, HERE, Garmin, OpenStreetMap',
-    ),
-}
+ESRI_IMAGERY_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+ESRI_TOPO_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}'
 # Cores para os itens de uma base só (cada zona, cada CAR vizinho...).
 ITEM_PALETTE = (
     '#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4', '#42d4f4',
@@ -47,6 +40,81 @@ ITEM_PALETTE = (
 
 class MapRenderError(Exception):
     pass
+
+
+class Basemap:
+    """Fundo do mapa: de onde vêm os tiles e o que dizer sobre a imagem.
+
+    `describe` devolve a `fonte_imagem` (satélite/sensor, data, resolução,
+    provedor) que acompanha toda imagem do conector; `source_lines` são as
+    mesmas informações impressas no rodapé da legenda.
+    """
+    min_zoom = MIN_ZOOM
+    max_zoom = MAX_ZOOM
+    resample = Image.LANCZOS
+    attribution = ''
+    unavailable = 'O servidor de imagens de satélite não respondeu. Tente de novo em alguns minutos.'
+
+    def tile(self, session, zoom, x, y):
+        """Tile XYZ (PIL, RGB ou RGBA) ou None."""
+        return None
+
+    def window(self, zoom, left, top, width, height):
+        """Recorte do mundo Web Mercator no `zoom`, em pixels, a partir dos tiles."""
+        image = Image.new('RGBA', (width, height), (205, 205, 200, 255))
+        tiles = [
+            (tx, ty)
+            for tx in range(math.floor(left / TILE_SIZE), math.floor((left + width - 1) / TILE_SIZE) + 1)
+            for ty in range(math.floor(top / TILE_SIZE), math.floor((top + height - 1) / TILE_SIZE) + 1)
+        ]
+        with requests.Session() as session, ThreadPoolExecutor(max_workers=8) as pool:
+            session.headers['User-Agent'] = 'TerraView-Tocantins/1.0 (mapa do conector)'
+            fetched = list(pool.map(lambda t: self.tile(session, zoom, *t), tiles))
+        if not any(tile is not None for tile in fetched):
+            raise MapRenderError(self.unavailable)
+        for (tx, ty), tile in zip(tiles, fetched):
+            if tile is not None:
+                tile = tile.convert('RGBA')
+                image.alpha_composite(tile, (round(tx * TILE_SIZE - left), round(ty * TILE_SIZE - top)))
+        return image
+
+    def describe(self, geom, zoom, left, top):
+        return {}
+
+    def source_lines(self, fonte):
+        return []
+
+    def legend_rows(self, fonte):
+        return []
+
+
+class UrlBasemap(Basemap):
+    """Tiles XYZ públicos ({z}/{x}/{y} na URL)."""
+
+    def __init__(self, url, attribution, fonte=None, max_zoom=MAX_ZOOM):
+        self.url, self.attribution, self.fonte, self.max_zoom = url, attribution, fonte or {}, max_zoom
+
+    def tile(self, session, zoom, x, y):
+        return _fetch_tile(session, self.url, zoom, x, y)
+
+    def describe(self, geom, zoom, left, top):
+        return dict(self.fonte)
+
+    def source_lines(self, fonte):
+        return [fonte['descricao']] if fonte.get('descricao') else []
+
+
+BASEMAPS = {
+    # Sem os metadados da Esri (ver `mcp_connector.imagery`), que dizem o satélite e a data.
+    'satelite': lambda: UrlBasemap(ESRI_IMAGERY_URL, 'Imagens: Esri, Maxar, Earthstar Geographics', {
+        'tipo': 'satelite', 'provedor': 'Esri World Imagery',
+        'descricao': 'Esri World Imagery (mosaico de satélites; data da captura não informada)',
+    }),
+    'mapa': lambda: UrlBasemap(ESRI_TOPO_URL, 'Mapa: Esri, HERE, Garmin, OpenStreetMap', {
+        'tipo': 'mapa', 'provedor': 'Esri World Topographic Map',
+        'descricao': 'Mapa topográfico da Esri (não é imagem de satélite)',
+    }),
+}
 
 
 def _font(size, bold=False):
@@ -114,24 +182,6 @@ def _fetch_tile(session, url, zoom, x, y):
         return Image.open(io.BytesIO(response.content)).convert('RGB')
     except Exception:
         return None
-
-
-def _basemap(url, zoom, left, top, width, height):
-    image = Image.new('RGB', (width, height), (205, 205, 200))
-    tiles = [
-        (tx, ty)
-        for tx in range(math.floor(left / TILE_SIZE), math.floor((left + width - 1) / TILE_SIZE) + 1)
-        for ty in range(math.floor(top / TILE_SIZE), math.floor((top + height - 1) / TILE_SIZE) + 1)
-    ]
-    with requests.Session() as session, ThreadPoolExecutor(max_workers=8) as pool:
-        session.headers['User-Agent'] = 'TerraView-Tocantins/1.0 (mapa do conector)'
-        fetched = list(pool.map(lambda t: _fetch_tile(session, url, zoom, *t), tiles))
-    if not any(fetched):
-        raise MapRenderError('O servidor de imagens de satélite não respondeu. Tente de novo em alguns minutos.')
-    for (tx, ty), tile in zip(tiles, fetched):
-        if tile is not None:
-            image.paste(tile, (round(tx * TILE_SIZE - left), round(ty * TILE_SIZE - top)))
-    return image
 
 
 def _parts(geom, kind):
@@ -202,8 +252,8 @@ def _wrap(draw, text, font, width, max_lines=2):
     return lines
 
 
-def _panel(draw, rows, notes, attribution):
-    """Legenda, notas e créditos no painel à direita do mapa."""
+def _panel(draw, rows, notes, attribution, source_lines=()):
+    """Legenda, notas, fonte da imagem e créditos no painel à direita do mapa."""
     x0, x1 = MAP_WIDTH + 22, WIDTH - 20
     text_x, text_width = x0 + 36, x1 - x0 - 36
     label_font, detail_font = _font(16), _font(14)
@@ -228,10 +278,19 @@ def _panel(draw, rows, notes, attribution):
 
     small = _font(13)
     note_lines = [line for note in notes for line in _wrap(draw, note, small, x1 - x0, max_lines=4)]
-    y = max(y + 6, HEIGHT - 34 - 17 * len(note_lines))
+    source = [line for text in source_lines for line in _wrap(draw, text, small, x1 - x0, max_lines=3)]
+    bottom = 17 * len(note_lines) + (24 + 17 * len(source) if source else 0)
+    y = max(y + 6, HEIGHT - 34 - bottom)
     for line in note_lines:
         draw.text((x0, y), line, fill=(70, 70, 70), font=small)
         y += 17
+    if source:
+        y += 6
+        draw.text((x0, y), 'Fonte da imagem', fill=(25, 25, 25), font=_font(13, bold=True))
+        y += 18
+        for line in source:
+            draw.text((x0, y), line, fill=(45, 45, 45), font=small)
+            y += 17
     draw.text((x0, HEIGHT - 14), attribution, fill=(120, 120, 120), font=_font(12), anchor='ls')
 
 
@@ -247,13 +306,16 @@ def _geometry(value):
 
 def render_map(property_geojson, layers, title, subtitle='', basemap='satelite',
                property_label='Imóvel analisado', notes=()):
-    """PNG do mapa.
+    """(PNG do mapa, `fonte_imagem`).
 
     `layers`: [{'label', 'color', 'detail', 'geometries': [GeoJSON (dict ou texto)]}],
-    desenhadas na ordem (a última fica por cima). `notes`: frases no rodapé da legenda.
+    desenhadas na ordem (a última fica por cima). `notes`: frases no rodapé da
+    legenda. `basemap`: um `Basemap` ou o nome de um de `BASEMAPS`.
     """
-    if basemap not in BASEMAPS:
-        raise MapRenderError(f'Fundo inválido. Use um destes: {", ".join(BASEMAPS)}.')
+    if isinstance(basemap, str):
+        if basemap not in BASEMAPS:
+            raise MapRenderError(f'Fundo inválido. Use um destes: {", ".join(BASEMAPS)}.')
+        basemap = BASEMAPS[basemap]()
     prop = _geometry(property_geojson)
     if prop is None:
         raise MapRenderError('A análise não tem o contorno da área analisada.')
@@ -264,18 +326,23 @@ def render_map(property_geojson, layers, title, subtitle='', basemap='satelite',
     layers = [layer for layer in layers if layer['shapes']]
 
     zoom, scale = frame(prop.bounds)
+    if zoom > basemap.max_zoom:
+        # Imagem sem esse detalhe (Landsat de 30 m): tiles de um zoom menor, ampliados.
+        scale *= 2 ** (zoom - basemap.max_zoom)
+        zoom = basemap.max_zoom
+    if zoom < basemap.min_zoom:
+        raise MapRenderError('A área é grande demais para esta imagem; use o mapa de satélite atual.')
     minx, miny, maxx, maxy = prop.bounds
     x0, y1 = world_pixel(minx, miny, zoom)
     x1, y0 = world_pixel(maxx, maxy, zoom)
-    # Recorte no zoom dos tiles, reduzido depois para o tamanho do mapa.
+    # Recorte no zoom dos tiles, redimensionado depois para o tamanho do mapa.
     source_width, source_height = math.ceil(MAP_WIDTH / scale), math.ceil(MAP_HEIGHT / scale)
     left = round((x0 + x1) / 2 - source_width / 2)
     top = round((y0 + y1) / 2 - source_height / 2)
-    url, attribution = BASEMAPS[basemap]
-    map_image = _basemap(url, zoom, left, top, source_width, source_height)
+    map_image = basemap.window(zoom, left, top, source_width, source_height).convert('RGBA')
+    fonte = basemap.describe(prop, zoom, left, top)
     if map_image.size != (MAP_WIDTH, MAP_HEIGHT):
-        map_image = map_image.resize((MAP_WIDTH, MAP_HEIGHT), Image.LANCZOS)
-    map_image = map_image.convert('RGBA')
+        map_image = map_image.resize((MAP_WIDTH, MAP_HEIGHT), basemap.resample)
     project = _Projector(zoom, left, top, MAP_WIDTH / source_width)
 
     fill_layer = Image.new('RGBA', map_image.size, (0, 0, 0, 0))
@@ -308,11 +375,12 @@ def render_map(property_geojson, layers, title, subtitle='', basemap='satelite',
         draw.text((20, 46), subtitle, fill=(215, 225, 218), font=_font(17))
     draw.line((MAP_WIDTH, HEADER_HEIGHT, MAP_WIDTH, HEIGHT), fill=(210, 210, 210), width=1)
     rows = [('imovel', property_label, '')] + [(layer['color'], layer['label'], layer.get('detail') or '') for layer in layers]
-    _panel(draw, rows, notes, attribution)
+    rows += basemap.legend_rows(fonte)
+    _panel(draw, rows, notes, basemap.attribution, basemap.source_lines(fonte))
 
     buffer = io.BytesIO()
     image.save(buffer, format='PNG', optimize=True)
-    return buffer.getvalue()
+    return buffer.getvalue(), fonte
 
 
 def to_jpeg(png_bytes, quality=85):

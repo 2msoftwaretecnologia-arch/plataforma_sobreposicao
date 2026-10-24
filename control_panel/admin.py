@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import FileManagement
+from .models import FileManagement, LayerUpdate
 
 class FileManagementAdmin(admin.ModelAdmin):
     list_display = (
@@ -63,3 +63,13 @@ class FileManagementAdmin(admin.ModelAdmin):
 admin.site.register(FileManagement, FileManagementAdmin)
     
     
+
+
+@admin.register(LayerUpdate)
+class LayerUpdateAdmin(admin.ModelAdmin):
+    list_display = ('modelo', 'total', 'finished_at')
+    list_filter = ('modelo',)
+    readonly_fields = ('modelo', 'total', 'finished_at')
+
+    def has_add_permission(self, request):
+        return False

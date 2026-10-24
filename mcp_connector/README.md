@@ -35,16 +35,61 @@ Assistente (nuvem da Anthropic / OpenAI)
 | `analisar_coordenadas` | Coordenadas digitadas (uma por linha): 1 ponto acha o imóvel do SICAR que o contém; 3+ vértices formam o polígono |
 | `analisar_geometria` | Conteúdo de um KML, GeoJSON ou WKT (ex.: arquivo anexado na conversa) |
 | `analisar_parcela_sigef` | Cruza uma parcela do SIGEF com as bases |
+| `link_envio` | Link de uso único (1 h) para o usuário enviar um shapefile (.zip), KML/KMZ, GeoJSON ou o PDF do Demonstrativo/Recibo do CAR pela página `conector/enviar/<código>/` |
+| `resultado_envio` | Situação do envio (aguardando, processando, concluído, erro, expirado) e, quando pronto, o resumo da análise |
 | `localizar_ponto` | Município, CARs e parcelas SIGEF de uma coordenada, sem análise |
 | `listar_analises` | Histórico do usuário (plataforma e assistente juntos) |
 | `detalhes_analise` | Resumo de uma análise ou todos os itens/atributos de uma base |
-| `relatorio_analise` | Conteúdo do relatório impresso: veredito, semáforo de perguntas, bases com ocorrência explicadas, Reserva Legal, vegetação e comparativo MapBiomas 2008 × atual |
-| `mapa_analise` | Imagem do mapa (print) com o imóvel e as sobreposições, legenda e escala; padrão = bases de alerta/atenção, `todas`, ou uma base com cada item numa cor |
-| `arquivos_analise` | Links de KML/SHP do imóvel, de cada base e de todas as sobreposições (KML com uma pasta colorida por base) e o PNG do mapa |
+| `relatorio_analise` | Conteúdo do relatório impresso: veredito, semáforo de perguntas, bases com ocorrência explicadas, Reserva Legal, vegetação, comparativo MapBiomas 2008 × atual, coordenada central, data de atualização de cada base e link do PDF |
+| `mapa_analise` | Imagem do mapa (print) com o imóvel e as sobreposições, legenda e escala; padrão = bases de alerta/atenção, `todas`, ou uma base com cada item numa cor; fundo `satelite` ou `mapa` |
+| `imagem_historica` | Imagem de um ano (padrão 2008, o marco do Código Florestal) com o contorno do imóvel e, por padrão, a imagem atual para comparar |
+| `mapa_uso_solo` | Uso do solo do MapBiomas (Coleção 11) de um ano, com o % de cada classe no imóvel; por padrão também o de 2008 |
+| `arquivos_analise` | Links do relatório em PDF, de KML/SHP do imóvel, de cada base e de todas as sobreposições (KML com uma pasta colorida por base) e o PNG do mapa |
 
 Cada análise feita pelo assistente entra no histórico do usuário como as da
 tela; o `analise_id` é o id do histórico, e os links "resultado" e "relatório
 para imprimir" abrem a análise na plataforma.
+
+As ferramentas declaram o formato da resposta (`outputSchema`, em
+`schemas.py`) e o servidor tem prompts prontos (`prompts.py`), que aparecem no
+menu do conector: parecer para crédito rural, due diligence de compra,
+checklist do Código Florestal e resumo para o cliente.
+
+### Fonte das imagens
+
+Toda imagem diz de onde veio, no painel do PNG ("Fonte da imagem") e no campo
+`fonte_imagem` da resposta:
+
+- **Satélite atual** (Esri World Imagery): satélite (WorldView-2, GeoEye-1,
+  Pléiades…), provedor, data da captura e resolução de cada imagem que cobre o
+  imóvel, lidos do serviço de metadados da Esri Wayback, e a versão do mosaico.
+- **Anos até 2012** (`imagem_historica`): Landsat 4/5/7 (30 m) do Microsoft
+  Planetary Computer, com satélite, sensor, cena, data e % de nuvens; a cena é
+  a mais limpa do ano, de preferência perto de julho (o assistente pode
+  escolher outra pelo `cena`). Composições `natural`, `falsa_cor` e
+  `infravermelho`.
+- **Anos de 2014 em diante**: a versão da Esri Wayback daquele ano, com a data
+  real da captura (que pode ser de outro ano; nesse caso a resposta avisa).
+  2013 não tem imagem.
+- **Uso do solo**: MapBiomas Coleção 11, 30 m.
+- **Mapa** topográfico: Esri World Topo Map.
+
+### Reaproveitamento, limites e andamento
+
+- Pedir de novo a análise da mesma área (mesmo CAR, parcela ou polígono, com
+  1 % de tolerância na área) reaproveita a análise feita há até
+  `MCP_REUSE_DAYS` dias (padrão 7), desde que nenhuma base tenha sido
+  atualizada depois dela. A resposta vem com `reaproveitada: true`; com
+  `forcar_nova=true` o assistente faz uma nova.
+- Limites por usuário: `MCP_ANALYSES_PER_MINUTE` (5) e `MCP_ANALYSES_PER_HOUR`
+  (60) análises, `MCP_MAX_CONCURRENT_PER_USER` (2) ao mesmo tempo, e
+  `MCP_MAX_CONCURRENT_TOTAL` (4) no servidor. Zero desliga o limite. A
+  contagem por tempo usa o cache (Redis no servidor).
+- As respostas do `/mcp` saem em SSE, e as análises mandam notificações de
+  andamento (base que está sendo consultada) quando o assistente pede.
+- A data de atualização de cada base vem da tabela `tb_atualizacao_base`
+  (gravada pela importação do painel e pelo `import_declared_theme`); antes da
+  primeira importação, usa a data do arquivo enviado no painel.
 
 Exemplos de pedidos:
 - "Analisa o CAR TO-1721000-… e me diz se tem algum problema."
@@ -67,6 +112,10 @@ Exemplos de pedidos:
 - Os links de download são assinados, valem 24 h (`MCP_FILE_LINK_MAX_AGE`) e
   abrem sem login: quem tiver o link baixa o arquivo. O arquivo é gerado na
   hora, com as bases que o dono do link pode ver naquele momento.
+- Os links de envio (`link_envio`) também abrem sem login: valem
+  `MCP_UPLOAD_LINK_MAX_AGE` (1 h), recebem um arquivo só (até 150 MB) e a
+  análise fica no histórico do dono do link. Ficam em **Admin → Envios de
+  arquivo pelo assistente** (`tb_envio_mcp`).
 
 ## Implantação (VPS 82.25.66.238)
 
@@ -100,8 +149,10 @@ a conexão é recusada. Sem domínio, use o nome gratuito do sslip.io
    docker compose up -d --no-deps --force-recreate worker beat mcp nginx
    ```
 
-   As migrações (`oauth2_provider` e `mcp_connector`) rodam no `migrate` do
-   `app`. Conferir: `https://sobreposicao.82-25-66-238.sslip.io/.well-known/oauth-protected-resource/mcp`
+   As migrações (`oauth2_provider`, `mcp_connector` e `control_panel`) rodam
+   no `migrate` do `app`. O `reportlab` (PDF do relatório) também é
+   dependência nova: qualquer atualização do `requirements.txt` pede o
+   `docker compose build` acima. Conferir: `https://sobreposicao.82-25-66-238.sslip.io/.well-known/oauth-protected-resource/mcp`
    deve devolver um JSON.
 
 ## Adicionar o conector

@@ -308,8 +308,18 @@ MCP_ALLOWED_REDIRECT_URIS = [
     ).split(',')
     if uri.strip()
 ]
-# Validade dos links de download (KML, SHP, imagem do mapa) entregues pelo conector.
+# Validade dos links de download (KML, SHP, imagem do mapa, PDF) entregues pelo conector.
 MCP_FILE_LINK_MAX_AGE = config('MCP_FILE_LINK_MAX_AGE', default=24 * 60 * 60, cast=int)
+# Validade dos links de envio de arquivo (shapefile, KMZ, PDF do CAR) para o assistente.
+MCP_UPLOAD_LINK_MAX_AGE = config('MCP_UPLOAD_LINK_MAX_AGE', default=60 * 60, cast=int)
+# Uma análise do mesmo CAR, parcela ou área feita há menos disso é reaproveitada
+# (se nenhuma base foi atualizada depois dela); 0 desliga.
+MCP_REUSE_DAYS = config('MCP_REUSE_DAYS', default=7, cast=int)
+# Limites das análises pedidas pelo assistente (ver mcp_connector/limits.py); 0 desliga o por minuto/hora.
+MCP_ANALYSES_PER_MINUTE = config('MCP_ANALYSES_PER_MINUTE', default=5, cast=int)
+MCP_ANALYSES_PER_HOUR = config('MCP_ANALYSES_PER_HOUR', default=60, cast=int)
+MCP_MAX_CONCURRENT_PER_USER = config('MCP_MAX_CONCURRENT_PER_USER', default=2, cast=int)
+MCP_MAX_CONCURRENT_TOTAL = config('MCP_MAX_CONCURRENT_TOTAL', default=4, cast=int)
 
 OAUTH2_PROVIDER = {
     'PKCE_REQUIRED': True,

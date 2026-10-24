@@ -6,6 +6,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import connection, reset_queries, transaction
 
 from control_panel.layer_registry import LAYER_REGISTRY
+from control_panel.layer_updates import record_layer_update
 from kernel.service.bulk_shapefile_importer import SRID
 from kernel.utils import model_count_cache_key, reset_db
 
@@ -81,4 +82,6 @@ class Command(BaseCommand):
             )
 
         cache.delete(model_count_cache_key(model))
-        self.stdout.write(self.style.SUCCESS(f"{modelo}: {model.objects.count()} registros no banco."))
+        total = model.objects.count()
+        record_layer_update(modelo, total)
+        self.stdout.write(self.style.SUCCESS(f"{modelo}: {total} registros no banco."))
