@@ -53,6 +53,26 @@ class SearchHistory(models.Model):
         alvo = self.car_input or self.municipio or 'busca'
         return f"{alvo} — {self.created_at:%d/%m/%Y %H:%M}"
 
+    @classmethod
+    def record(cls, user, data, search_type):
+        """Grava a busca (`data` no formato de `last_analysis`) e põe o id em
+        `data['historico_id']`: o relatório é aberto por este id."""
+        resultado = data.get('resultado') or {}
+        historico = cls.objects.create(
+            user=user if user is not None and user.is_authenticated else None,
+            search_type=search_type,
+            car_input=data.get('car_input') or '',
+            municipio=data.get('municipio') or '',
+            uf=data.get('uf') or '',
+            area_ha=resultado.get('tamanho_area'),
+            conflitos_count=resultado.get('total_areas_com_sobreposicao') or 0,
+            sucesso=bool(data.get('sucesso')),
+            erro=data.get('erro') or '',
+            result_data=data,
+        )
+        data['historico_id'] = historico.pk
+        return historico
+
 
 class CrossBatch(models.Model):
     """Lote de cruzamento: vários CARs (os encontrados na tela de Localizações)

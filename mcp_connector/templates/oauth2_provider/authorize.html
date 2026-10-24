@@ -1,0 +1,29 @@
+{% extends 'authentication/base_auth.html' %}
+
+{% block title %}Conectar assistente de IA | TerraView Tocantins{% endblock %}
+
+{% block content %}
+<div class="auth-card">
+    <p class="auth-eyebrow">Conexão com assistente de IA</p>
+    {% if not error %}
+    <h1 class="auth-title">Permitir acesso?</h1>
+    <p class="auth-subtitle"><strong>{{ application.name }}</strong> quer usar a plataforma em nome de <strong>{{ request.user.get_username }}</strong>.</p>
+
+    <form id="authorizationForm" method="post" class="auth-form">
+        {% csrf_token %}
+        {% for field in form %}{% if field.is_hidden %}{{ field }}{% endif %}{% endfor %}
+        <p>O assistente poderá:</p>
+        <ul>
+            {% for scope in scopes_descriptions %}<li>{{ scope }}</li>{% endfor %}
+        </ul>
+        <p class="auth-subtitle">Ele usa só as bases liberadas para a sua conta. As análises feitas por ele aparecem no seu histórico, e cada chamada fica registrada.</p>
+        {% if form.errors %}<div class="auth-alert">{{ form.errors }}</div>{% endif %}
+        <button type="submit" class="btn btn-gold" name="allow" value="Autorizar">Autorizar</button>
+        <p class="auth-footer"><button type="submit" style="background:none;border:0;padding:0;cursor:pointer;font:inherit;text-decoration:underline">Cancelar</button></p>
+    </form>
+    {% else %}
+    <h1 class="auth-title">{{ error.error }}</h1>
+    <p class="auth-subtitle">{{ error.description }}</p>
+    {% endif %}
+</div>
+{% endblock %}

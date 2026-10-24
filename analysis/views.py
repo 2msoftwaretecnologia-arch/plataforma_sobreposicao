@@ -18,9 +18,6 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views import View
 
-import geopandas as gpd
-from shapely import wkt as shapely_wkt
-
 from control_panel.access_service import denied_layers, require_layer, filter_result, filter_batch_item
 
 logger = logging.getLogger(__name__)
@@ -67,6 +64,7 @@ from analysis.services.view_services.base_export_service import (
     base_geodataframe,
     export_filename,
     find_base,
+    property_geodataframe,
     to_kml,
     to_shapefile_zip,
 )
@@ -115,22 +113,10 @@ def _save_search_history(request, data, search_type):
     para que o painel administrativo possa listar o que os usuários
     pesquisaram. Não deve nunca quebrar o fluxo de busca do usuário."""
     try:
-        resultado = data.get('resultado') or {}
-        historico = SearchHistory.objects.create(
-            user=request.user if request.user.is_authenticated else None,
-            search_type=search_type,
-            car_input=data.get('car_input') or '',
-            municipio=data.get('municipio') or '',
-            uf=data.get('uf') or '',
-            area_ha=resultado.get('tamanho_area'),
-            conflitos_count=resultado.get('total_areas_com_sobreposicao') or 0,
-            sucesso=bool(data.get('sucesso')),
-            erro=data.get('erro') or '',
-            result_data=data,
-        )
-        # Vai junto para a sessão: o relatório é aberto por este id, e não pela
-        # "última análise", para não trocar de análise se houver duas abas abertas.
-        data['historico_id'] = historico.pk
+        # `historico_id` vai junto para a sessão: o relatório é aberto por este
+        # id, e não pela "última análise", para não trocar de análise se houver
+        # duas abas abertas.
+        SearchHistory.record(request.user, data, search_type)
     except Exception:
         pass
 
@@ -294,33 +280,21 @@ class DownloadPropertyShapefileView(View):
     def get(self, request):
         data = filter_result(request.session.get('last_analysis') or {}, request.user)
         resultado = data.get('resultado') or {}
-        alvo_wkt = resultado.get('alvo_wkt')
-
-        if not alvo_wkt:
-            return HttpResponse('Nenhuma geometria da propriedade foi encontrada para exportação.', status=400)
-
-        try:
-            geom = shapely_wkt.loads(alvo_wkt)
-        except Exception:
-            return HttpResponse('Geometria da propriedade inválida.', status=400)
-
         car_value = data.get('car_input') or ''
-        status_car = ''
 
         demonstrativo = data.get('demonstrativo') or {}
         status_car = demonstrativo.get('registration_status') or ''
 
-        if not status_car and car_value:
+        if not status_car and car_value and resultado.get('alvo_wkt'):
             require_layer('SicarRecord', request.user)
             qs = get_sicar_record(car_number__iexact=car_value)
             if qs.exists():
                 status_car = getattr(qs.first(), 'status', '') or ''
 
-        gdf = gpd.GeoDataFrame(
-            [{'car': car_value, 'status_car': status_car}],
-            geometry=[geom],
-            crs='EPSG:4674',
-        )
+        try:
+            gdf = property_geodataframe(resultado.get('alvo_wkt'), car_value, status_car)
+        except BaseExportError as e:
+            return HttpResponse(str(e), status=400)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             shp_path = os.path.join(tmpdir, 'propriedade.shp')
@@ -349,33 +323,21 @@ class DownloadPropertyKmlView(View):
     def get(self, request):
         data = filter_result(request.session.get('last_analysis') or {}, request.user)
         resultado = data.get('resultado') or {}
-        alvo_wkt = resultado.get('alvo_wkt')
-
-        if not alvo_wkt:
-            return HttpResponse('Nenhuma geometria da propriedade foi encontrada para exportação.', status=400)
-
-        try:
-            geom = shapely_wkt.loads(alvo_wkt)
-        except Exception:
-            return HttpResponse('Geometria da propriedade inválida.', status=400)
-
         car_value = data.get('car_input') or ''
-        status_car = ''
 
         demonstrativo = data.get('demonstrativo') or {}
         status_car = demonstrativo.get('registration_status') or ''
 
-        if not status_car and car_value:
+        if not status_car and car_value and resultado.get('alvo_wkt'):
             require_layer('SicarRecord', request.user)
             qs = get_sicar_record(car_number__iexact=car_value)
             if qs.exists():
                 status_car = getattr(qs.first(), 'status', '') or ''
 
-        gdf = gpd.GeoDataFrame(
-            [{'car': car_value, 'status_car': status_car}],
-            geometry=[geom],
-            crs='EPSG:4674',
-        )
+        try:
+            gdf = property_geodataframe(resultado.get('alvo_wkt'), car_value, status_car)
+        except BaseExportError as e:
+            return HttpResponse(str(e), status=400)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             kml_path = os.path.join(tmpdir, 'propriedade.kml')

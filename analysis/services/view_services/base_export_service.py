@@ -79,6 +79,17 @@ def base_geodataframe(base):
     return gpd.GeoDataFrame(rows, geometry=geometries, crs='EPSG:4674')
 
 
+def property_geodataframe(alvo_wkt, car='', status_car=''):
+    """O contorno da área analisada, com o CAR e a situação dele."""
+    if not alvo_wkt:
+        raise BaseExportError('Nenhuma geometria da propriedade foi encontrada para exportação.')
+    try:
+        geom = shapely_wkt.loads(alvo_wkt)
+    except Exception:
+        raise BaseExportError('Geometria da propriedade inválida.')
+    return gpd.GeoDataFrame([{'car': car, 'status_car': status_car}], geometry=[geom], crs='EPSG:4674')
+
+
 def to_shapefile_zip(gdf, name):
     with tempfile.TemporaryDirectory() as tmpdir:
         for family, suffix in GEOMETRY_FAMILIES:

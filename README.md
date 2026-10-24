@@ -12,6 +12,7 @@ Aplicação Django para análise geoespacial de imóveis rurais. Ela recebe uma 
 - Exibe resultados por base, polígonos no mapa, tabelas, relatório para impressão e downloads em KML/SHP.
 - Importa bases geográficas a partir de arquivos ZIP cadastrados no painel administrativo.
 - Executa importações também por Celery/RabbitMQ.
+- Conector MCP para o Claude e o ChatGPT: análises, relatórios, mapa e downloads pela conversa (ver `mcp_connector/README.md`).
 
 ## Stack principal
 

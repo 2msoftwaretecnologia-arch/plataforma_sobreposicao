@@ -17,9 +17,17 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 
+from mcp_connector.oauth_views import authorization_server_metadata
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('auth/', include('authentication.urls')),
     path('painel/', include('control_panel.urls')),
+    # Conector MCP (Claude e ChatGPT): OAuth e links de download. O /mcp em si
+    # é o processo `run_mcp_server` (ver mcp_connector/README.md).
+    path('o/', include('mcp_connector.oauth_urls', namespace='oauth2_provider')),
+    path('.well-known/oauth-authorization-server', authorization_server_metadata,
+         name='oauth_authorization_server_metadata'),
+    path('conector/', include('mcp_connector.urls')),
     path('', include('analysis.urls')),
 ]

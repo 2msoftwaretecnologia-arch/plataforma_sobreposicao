@@ -16,6 +16,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 from decouple import config
 import os
 import sys
+from urllib.parse import urlsplit
 
 # Servidor de desenvolvimento (`manage.py runserver`), que atende em threads.
 RUNSERVER = len(sys.argv) > 1 and sys.argv[1] == 'runserver'
@@ -53,6 +54,14 @@ ALLOWED_HOSTS = [
     "overlay-nginx",
 ]
 
+# Endereço HTTPS público da plataforma, usado pelo conector MCP (Claude e
+# ChatGPT só aceitam conectores em HTTPS). Ex.:
+# https://sobreposicao.82-25-66-238.sslip.io — ver mcp_connector/README.md.
+MCP_PUBLIC_BASE_URL = config('MCP_PUBLIC_BASE_URL', default='').strip().rstrip('/')
+_mcp_public_host = urlsplit(MCP_PUBLIC_BASE_URL).hostname if MCP_PUBLIC_BASE_URL else None
+if _mcp_public_host and _mcp_public_host not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(_mcp_public_host)
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -79,6 +88,9 @@ INSTALLED_APPS = [
     'deforestation_fires',
     'doc_extractor',
     'seplan',
+    # Antes do oauth2_provider: a tela de autorização do conector substitui a dele.
+    'mcp_connector',
+    'oauth2_provider',
 ]
 
 MIDDLEWARE = [
@@ -225,6 +237,9 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:8000",
     "http://82.25.66.238",
 ]
+if MCP_PUBLIC_BASE_URL:
+    # Login e tela "Permitir acesso?" do conector, abertos pelo endereço HTTPS.
+    CSRF_TRUSTED_ORIGINS.append(MCP_PUBLIC_BASE_URL)
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
@@ -256,3 +271,52 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
+
+
+# Conector MCP (Claude e ChatGPT)
+#
+# O assistente chama o servidor MCP a partir da nuvem, autenticando cada
+# pessoa pelo login da própria plataforma: o Django é o servidor de
+# autorização OAuth (django-oauth-toolkit) e o processo `run_mcp_server` é o
+# servidor de recursos. Passo a passo em mcp_connector/README.md.
+MCP_SERVER_HOST = config('MCP_SERVER_HOST', default='127.0.0.1')
+MCP_SERVER_PORT = config('MCP_SERVER_PORT', default=8002, cast=int)
+# Sem endereço público (desenvolvimento), o runserver (8000) e o servidor MCP
+# ficam em portas diferentes e os metadados apontam para cada um direto.
+if not MCP_PUBLIC_BASE_URL:
+    MCP_PUBLIC_BASE_URL = 'http://localhost:8000'
+    _mcp_default_resource = f'http://localhost:{MCP_SERVER_PORT}/mcp'
+else:
+    _mcp_default_resource = f'{MCP_PUBLIC_BASE_URL}/mcp'
+MCP_RESOURCE_URL = (config('MCP_RESOURCE_URL', default='').strip() or _mcp_default_resource).rstrip('/')
+MCP_OAUTH_SCOPE = 'analises'
+# Callbacks em localhost (RFC 8252), usados pelo Claude Code e pelo MCP
+# Inspector na máquina do desenvolvedor. Desligado em produção.
+MCP_ALLOW_LOOPBACK_REDIRECTS = config_bool('MCP_ALLOW_LOOPBACK_REDIRECTS', default=DEBUG)
+# Somente estes callbacks podem registrar clientes OAuth pelo /o/register/.
+# Sem essa trava, qualquer site poderia se registrar e pedir o login da
+# plataforma. Um item terminado em * aceita qualquer callback com esse
+# prefixo: o ChatGPT usa um id diferente por conexão.
+MCP_ALLOWED_REDIRECT_URIS = [
+    uri.strip()
+    for uri in (
+        config('MCP_ALLOWED_REDIRECT_URIS', default='').strip()
+        or 'https://claude.ai/api/mcp/auth_callback,'
+        'https://claude.com/api/mcp/auth_callback,'
+        'https://chatgpt.com/connector_platform_oauth_redirect,'
+        'https://chatgpt.com/connector/oauth/*'
+    ).split(',')
+    if uri.strip()
+]
+# Validade dos links de download (KML, SHP, imagem do mapa) entregues pelo conector.
+MCP_FILE_LINK_MAX_AGE = config('MCP_FILE_LINK_MAX_AGE', default=24 * 60 * 60, cast=int)
+
+OAUTH2_PROVIDER = {
+    'PKCE_REQUIRED': True,
+    'SCOPES': {MCP_OAUTH_SCOPE: 'Fazer análises de sobreposição e consultar o seu histórico'},
+    'DEFAULT_SCOPES': [MCP_OAUTH_SCOPE],
+    'ACCESS_TOKEN_EXPIRE_SECONDS': 60 * 60,
+    'REFRESH_TOKEN_EXPIRE_SECONDS': 60 * 60 * 24 * 30,
+    'ROTATE_REFRESH_TOKEN': True,
+    'ALLOWED_REDIRECT_URI_SCHEMES': ['https', 'http'] if MCP_ALLOW_LOOPBACK_REDIRECTS else ['https'],
+}

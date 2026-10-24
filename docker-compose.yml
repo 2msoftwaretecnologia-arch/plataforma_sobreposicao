@@ -145,6 +145,40 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # Conector MCP (Claude e ChatGPT), ver mcp_connector/README.md. O nginx
+  # encaminha /mcp e os metadados OAuth do recurso para cá; login e tokens
+  # continuam no app.
+  mcp:
+    build: .
+    image: overlay-app:latest
+    container_name: overlay-mcp
+    working_dir: /app
+    volumes:
+      - ./:/app
+    command: python manage.py run_mcp_server
+    environment:
+      - DJANGO_SETTINGS_MODULE=kernel.settings
+      - HOST_BD=db
+      - PORT_BD=5432
+      - REDIS_URL=redis://redis:6379/1
+      - GDAL_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/libgdal.so
+      - GEOS_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/libgeos_c.so
+      - MCP_SERVER_HOST=0.0.0.0
+      - MCP_SERVER_PORT=8002
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8002/.well-known/oauth-protected-resource/mcp"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      # O app roda as migrações (tabelas do OAuth e da auditoria).
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+
   nginx:
     image: nginx:stable
     container_name: overlay-nginx

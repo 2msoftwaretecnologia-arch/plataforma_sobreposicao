@@ -1,3 +1,5 @@
+from urllib.parse import urlencode
+
 from django.shortcuts import redirect
 from django.urls import reverse
 
@@ -7,7 +9,8 @@ EXEMPT_URL_NAMES = (
     'authentication:onboarding',
     'authentication:logout',
 )
-EXEMPT_PATH_PREFIXES = ('/static/', '/media/', '/admin/')
+# `/conector/` são os links de download entregues pelo assistente (sem login).
+EXEMPT_PATH_PREFIXES = ('/static/', '/media/', '/admin/', '/conector/')
 
 
 class OnboardingRequiredMiddleware:
@@ -32,6 +35,8 @@ class OnboardingRequiredMiddleware:
                 profile, _ = UserProfile.objects.get_or_create(user=user)
                 if not profile.onboarding_completo:
                     onboarding_url = reverse('authentication:onboarding')
-                    return redirect(f'{onboarding_url}?next={path}')
+                    # Caminho completo: a autorização do conector (/o/authorize/)
+                    # precisa voltar com os parâmetros do OAuth.
+                    return redirect(f"{onboarding_url}?{urlencode({'next': request.get_full_path()})}")
 
         return self.get_response(request)
