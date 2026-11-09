@@ -1,0 +1,145 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analisar propriedade | TerraView Tocantins</title>
+    <link rel="icon" type="image/svg+xml" href="{% static 'analysis/images/icon_page.svg' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
+    <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/landing_page.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/upload.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/loader.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/interface_simples.css' %}">
+</head>
+
+<body class="simples-page">
+
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <defs>
+            <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+            <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15.5V5M8 9l4-4 4 4"/><path d="M4.5 15.5v3A1.5 1.5 0 0 0 6 20h12a1.5 1.5 0 0 0 1.5-1.5v-3"/></symbol>
+            <symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 3H7a1.5 1.5 0 0 0-1.5 1.5v15A1.5 1.5 0 0 0 7 21h10a1.5 1.5 0 0 0 1.5-1.5V7.5z"/><path d="M14 3v4.5h4.5M9 12.5h6M9 16h6"/></symbol>
+            <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 6.5A1.5 1.5 0 0 1 5 5h4.5l2 2.5H19a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 19.5H5A1.5 1.5 0 0 1 3.5 18z"/></symbol>
+            <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.2 12.4 2.5 2.5 5-5.4"/></symbol>
+            <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4 2.8 19.6h18.4z"/><path d="M12 10v4.4M12 17.1v.1"/></symbol>
+            <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/></symbol>
+            <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4.5 12h15M14 6.5l5.5 5.5-5.5 5.5"/></symbol>
+            <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></symbol>
+            <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/></symbol>
+            <symbol id="i-close" viewBox="0 0 24 24"><path d="m6.5 6.5 11 11M17.5 6.5l-11 11"/></symbol>
+        </defs>
+    </svg>
+
+    <header class="s-top">
+        <a class="s-brand" href="{% url 'upload_zip_car' %}">TerraView <span>Tocantins</span></a>
+
+        <form class="s-search" id="s_search" role="search" autocomplete="off">
+            <svg class="ico" aria-hidden="true"><use href="#i-search"/></svg>
+            <input type="search" id="s_search_input" list="s_cities"
+                aria-label="Buscar município ou número do CAR"
+                placeholder="Buscar município ou número do CAR" />
+            <datalist id="s_cities"></datalist>
+            <button type="submit">Buscar</button>
+            <p id="s_search_msg" class="s-search-msg" role="status" hidden></p>
+        </form>
+
+        <nav class="s-nav" aria-label="Navegação">
+            <a href="{% url 'localizacoes_kmz' %}">Localizações (KMZ)</a>
+            <a href="{% url 'historico' %}">Meu histórico</a>
+            <a href="{% url 'upload_zip_car' %}?interface=3d" title="Mapa 3D com o tour de cidade em cidade">Ver em 3D</a>
+            <form method="post" action="{% url 'authentication:logout' %}">
+                {% csrf_token %}
+                <button type="submit">Sair</button>
+            </form>
+        </nav>
+    </header>
+
+    <main class="s-main">
+        <aside class="s-side" aria-label="Análise de propriedade">
+            <div class="s-side-head">
+                <h1>Analisar imóvel</h1>
+                <ol class="s-steps">
+                    <li>Escolha como informar a área (arquivo, coordenadas ou CAR).</li>
+                    <li>Confira o imóvel destacado no mapa.</li>
+                    <li>Clique em <strong>Analisar propriedade</strong>.</li>
+                </ol>
+                <p class="s-tip">Dica: clique em qualquer imóvel do mapa para analisá-lo direto.</p>
+            </div>
+            <div class="form-body">
+                {% include 'analysis/components/_entry_form.html' %}
+            </div>
+        </aside>
+
+        <section class="s-map-wrap" aria-label="Mapa dos imóveis do CAR">
+            <div id="map"></div>
+
+            <div class="s-basemap" role="radiogroup" aria-label="Fundo do mapa">
+                <input type="radio" name="s_basemap" id="s_basemap_sat" value="satellite" checked />
+                <label for="s_basemap_sat">Satélite</label>
+                <input type="radio" name="s_basemap" id="s_basemap_map" value="streets" />
+                <label for="s_basemap_map">Mapa</label>
+            </div>
+
+            <div class="s-legend" id="s_legend">
+                <label class="s-legend-toggle">
+                    <input type="checkbox" id="s_toggle_car" checked />
+                    Imóveis do CAR
+                </label>
+                <ul class="s-legend-list" aria-label="Situação do CAR">
+                    <li><span class="s-swatch" style="--c:#22c55e"></span>Ativo</li>
+                    <li><span class="s-swatch" style="--c:#f5b400"></span>Pendente</li>
+                    <li><span class="s-swatch" style="--c:#f0532d"></span>Suspenso</li>
+                    <li><span class="s-swatch" style="--c:#a3a3a3"></span>Cancelado</li>
+                    <li><span class="s-swatch s-swatch-target"></span>Área informada</li>
+                </ul>
+            </div>
+
+            <div id="s_hint" class="s-hint" hidden>Aproxime o mapa ou busque um município para ver os imóveis do CAR.</div>
+
+            <div id="s_card" class="s-card" role="dialog" aria-labelledby="s_card_title" hidden>
+                <div class="s-card-head">
+                    <span id="s_card_title" class="s-card-kicker">Imóvel do CAR</span>
+                    <button type="button" id="s_card_close" class="s-icon-btn" aria-label="Fechar">
+                        <svg class="ico"><use href="#i-close"/></svg>
+                    </button>
+                </div>
+                <div class="s-card-car">
+                    <code id="s_card_car"></code>
+                    <button type="button" id="s_card_copy" class="s-icon-btn" aria-label="Copiar número do CAR" title="Copiar número do CAR">
+                        <svg class="ico"><use href="#i-copy"/></svg>
+                    </button>
+                </div>
+                <dl class="s-card-facts">
+                    <div><dt>Situação</dt><dd><span id="s_card_status" class="s-badge"></span></dd></div>
+                    <div><dt>Área</dt><dd id="s_card_area"></dd></div>
+                    <div><dt>Município</dt><dd id="s_card_city"></dd></div>
+                </dl>
+                <p id="s_card_note" class="s-card-note" hidden></p>
+                <button type="button" id="s_card_analyze" class="btn btn-gold s-card-analyze">
+                    Analisar este imóvel
+                    <svg class="ico"><use href="#i-arrow"/></svg>
+                </button>
+            </div>
+        </section>
+    </main>
+
+    {% include 'analysis/loader.html' %}
+
+    {{ bases_3d_config|json_script:"bases-3d-config" }}
+    <script>
+        window.TOCANTINS_GEOJSON_URL = "{% static 'analysis/data/tocantins.geojson' %}";
+    </script>
+    <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
+    <script src="https://unpkg.com/shpjs@4.0.4/dist/shp.min.js" defer></script>
+    <script src="{% static 'analysis/js/property_locate.js' %}"></script>
+    <script src="{% static 'analysis/js/interface_simples.js' %}"></script>
+    <script src="{% static 'analysis/js/upload.js' %}" defer></script>
+</body>
+
+</html>

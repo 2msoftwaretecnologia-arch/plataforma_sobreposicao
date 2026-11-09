@@ -1,0 +1,516 @@
+/* Interface simples da página inicial (mapa 2D do CAR) — estende o design
+   system da landing page; o formulário vem de upload.css. */
+
+html, body.simples-page {
+  height: 100%;
+  overflow: hidden;
+  background: var(--cream-100);
+  color: var(--ink-900);
+}
+
+.simples-page [hidden] { display: none !important; }
+
+.simples-page {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== Barra do topo ===== */
+.s-top {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 10px 20px;
+  background: var(--green-900);
+  color: var(--cream-50);
+  box-shadow: 0 2px 12px rgba(18, 39, 26, 0.25);
+}
+
+.s-brand {
+  flex-shrink: 0;
+  font-family: var(--serif);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--cream-50);
+  text-decoration: none;
+}
+
+.s-brand span { color: var(--gold-400); }
+
+.s-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  max-width: 560px;
+  margin: 0 auto;
+  border-radius: 999px;
+  background: var(--cream-50);
+  box-shadow: inset 0 0 0 1.5px transparent;
+  transition: box-shadow .2s ease;
+}
+
+.s-search:focus-within { box-shadow: inset 0 0 0 2px var(--gold-400), 0 0 0 4px rgba(219, 166, 63, 0.25); }
+
+.s-search > .ico {
+  width: 18px;
+  height: 18px;
+  margin-left: 16px;
+  color: var(--ink-500);
+}
+
+.s-search input {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 12px;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 15px;
+  color: var(--ink-900);
+  outline: none;
+}
+
+.s-search input::placeholder { color: var(--ink-500); opacity: .8; }
+
+.s-search button {
+  margin: 4px;
+  padding: 8px 18px;
+  border: none;
+  border-radius: 999px;
+  background: var(--green-700);
+  color: var(--cream-50);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.s-search button:hover { background: var(--green-600); }
+
+.s-search-msg {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 12px;
+  right: 12px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: var(--cream-50);
+  color: var(--ink-600);
+  font-size: 13px;
+  box-shadow: 0 10px 24px rgba(18, 39, 26, 0.2);
+}
+
+.s-search-msg.is-warn { background: #fff4dc; color: #7a5514; }
+.s-search-msg.is-loading { font-style: italic; }
+
+.s-nav {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-shrink: 0;
+}
+
+.s-nav a,
+.s-nav button {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--gold-400);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.s-nav a:hover,
+.s-nav button:hover { text-decoration: underline; }
+
+/* ===== Corpo: painel + mapa ===== */
+.s-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.s-side {
+  width: 400px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  background: var(--cream-50);
+  border-right: 1px solid var(--paper-line);
+}
+
+.s-side-head {
+  padding: 22px 24px 4px;
+}
+
+.s-side-head h1 {
+  font-family: var(--serif);
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--green-900);
+  margin-bottom: 10px;
+}
+
+.s-steps {
+  margin: 0 0 10px;
+  padding-left: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.s-steps li {
+  position: relative;
+  padding: 4px 0 4px 32px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--ink-600);
+  counter-increment: step;
+}
+
+.s-steps li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 3px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--green-100);
+  color: var(--green-800);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.s-tip {
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--green-100);
+  color: var(--green-800);
+  font-size: 12.5px;
+}
+
+.s-side .form-body { padding: 16px 24px 28px; }
+.s-side .mode-switch { grid-template-columns: repeat(3, 1fr); }
+.s-side .drop-zone { padding: 22px 18px 20px; }
+.s-side .drop-icon { width: 48px; height: 48px; margin-bottom: 6px; }
+.s-side .drop-zone strong { font-size: 16px; }
+
+/* Pré-visualização do imóvel (upload.js) */
+.s-side .preview-note {
+  margin-top: 8px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  background: var(--cream-100);
+  color: var(--ink-600);
+}
+
+.s-side .preview-note.is-ok { background: var(--green-100); color: var(--green-800); }
+.s-side .preview-note.is-warn { background: #fff4dc; color: #7a5514; }
+.s-side .preview-note.is-loading { font-style: italic; }
+
+/* Buscas recentes */
+.s-side .recent-searches {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--paper-line);
+}
+
+.s-side .recent-list { list-style: none; margin: 0; padding: 0; }
+
+.s-side .recent-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.s-side .recent-use {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: var(--ink-900);
+  cursor: pointer;
+}
+
+.s-side .recent-use:hover { background: var(--cream-100); }
+.s-side .recent-use:focus-visible { outline: 2px solid var(--gold-500); outline-offset: -2px; }
+.s-side .recent-car { font-size: 13.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.s-side .recent-meta { font-size: 12px; color: var(--ink-500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.s-side .recent-open {
+  flex-shrink: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--green-700);
+  text-decoration: none;
+}
+
+.s-side .recent-open:hover { text-decoration: underline; }
+
+/* ===== Mapa ===== */
+.s-map-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+#map {
+  position: absolute;
+  inset: 0;
+}
+
+.s-basemap,
+.s-legend,
+.s-hint,
+.s-card {
+  position: absolute;
+  z-index: 2;
+  background: var(--cream-50);
+  box-shadow: 0 8px 24px rgba(18, 39, 26, 0.22);
+}
+
+/* Fundo do mapa: Satélite / Mapa */
+.s-basemap {
+  top: 14px;
+  right: 14px;
+  display: flex;
+  padding: 4px;
+  border-radius: 999px;
+}
+
+.s-basemap input { position: absolute; opacity: 0; pointer-events: none; }
+
+.s-basemap label {
+  padding: 7px 16px;
+  border-radius: 999px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink-600);
+  cursor: pointer;
+}
+
+.s-basemap label:hover { color: var(--green-800); }
+.s-basemap input:checked + label { background: var(--green-900); color: var(--gold-400); }
+.s-basemap input:focus-visible + label { outline: 2px solid var(--gold-500); outline-offset: 1px; }
+
+/* Legenda */
+.s-legend {
+  left: 14px;
+  bottom: 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-size: 13px;
+}
+
+.s-legend-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  color: var(--green-900);
+  cursor: pointer;
+}
+
+.s-legend-toggle input { width: 16px; height: 16px; accent-color: var(--green-700); }
+
+.s-legend-list {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 6px 16px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ink-600);
+}
+
+.s-legend-list li { display: flex; align-items: center; gap: 7px; }
+
+.s-swatch {
+  width: 16px;
+  height: 12px;
+  border-radius: 3px;
+  border: 2px solid var(--c);
+  background: color-mix(in srgb, var(--c) 25%, transparent);
+}
+
+.s-swatch-target {
+  --c: #dba63f;
+  box-shadow: 0 0 0 1.5px #fff, 0 0 0 2.5px rgba(0, 0, 0, 0.15);
+}
+
+/* Aviso de zoom */
+.s-hint {
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 9px 16px;
+  border-radius: 999px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--green-800);
+  white-space: nowrap;
+}
+
+/* Cartão do imóvel */
+.s-card {
+  top: 14px;
+  left: 14px;
+  width: 340px;
+  padding: 16px 18px 18px;
+  border-radius: var(--radius-md);
+}
+
+.s-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.s-card-kicker {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  color: var(--green-700);
+}
+
+.s-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--ink-500);
+  cursor: pointer;
+}
+
+.s-icon-btn .ico { width: 18px; height: 18px; }
+.s-icon-btn:hover { background: var(--cream-100); color: var(--green-800); }
+.s-icon-btn.is-done,
+.s-icon-btn.is-done:hover { background: var(--green-100); color: var(--green-700); }
+
+.s-card-car {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 6px 8px 12px;
+  border-radius: 10px;
+  background: var(--cream-100);
+}
+
+.s-card-car code {
+  flex: 1;
+  min-width: 0;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 12.5px;
+  color: var(--ink-900);
+  overflow-wrap: anywhere;
+}
+
+.s-card-facts {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.s-card-facts dt {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink-500);
+  margin-bottom: 3px;
+}
+
+.s-card-facts dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-900);
+}
+
+.s-badge {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  background: #e8e8e8;
+  color: #4a4a4a;
+}
+
+.s-badge--AT { background: #dcf5e4; color: #166534; }
+.s-badge--PE { background: #fff1c2; color: #7a5a00; }
+.s-badge--SU { background: #ffe0d6; color: #9a2c0d; }
+.s-badge--CA { background: #ececec; color: #555; }
+
+.s-card-note {
+  margin: -4px 0 12px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #fff4dc;
+  color: #7a5514;
+  font-size: 12.5px;
+}
+
+.s-card-analyze {
+  width: 100%;
+  border: none;
+  cursor: pointer;
+  font-family: var(--sans);
+}
+
+.s-card-analyze .ico { width: 18px; height: 18px; }
+
+/* Controles do MapLibre um pouco maiores (mais fáceis de acertar) */
+.simples-page .maplibregl-ctrl-group button { width: 36px; height: 36px; }
+
+/* ===== Telas menores ===== */
+@media (max-width: 1100px) {
+  .s-nav { gap: 12px; }
+  .s-nav a, .s-nav button { font-size: 12.5px; }
+  .s-side { width: 340px; }
+}
+
+@media (max-width: 900px) {
+  html, body.simples-page { height: auto; overflow: auto; }
+  .simples-page { display: block; }
+
+  .s-top { flex-wrap: wrap; gap: 10px 16px; padding: 10px 16px; }
+  .s-nav { margin-left: auto; }
+  .s-search { order: 3; flex-basis: 100%; max-width: none; }
+
+  .s-main { flex-direction: column-reverse; }
+  .s-map-wrap { flex: none; height: 62vh; }
+  .s-side { width: auto; border-right: none; overflow: visible; }
+  .s-side-head, .s-side .form-body { padding-left: 16px; padding-right: 16px; }
+
+  .s-card { top: auto; left: 10px; right: 10px; bottom: 10px; width: auto; }
+  .s-legend { left: 10px; bottom: 10px; padding: 10px 12px; }
+  .s-legend-list { grid-template-columns: repeat(3, auto); gap: 4px 12px; font-size: 12px; }
+  .s-hint { white-space: normal; width: calc(100% - 140px); left: 10px; transform: none; text-align: center; }
+}
+
+@media (max-width: 480px) {
+  .s-nav { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+  .s-side .mode-switch { grid-template-columns: repeat(2, 1fr); }
+}

@@ -451,15 +451,33 @@ class AnalysisCancelView(View):
         return HttpResponse(status=204)
 
 
+# Interfaces da página inicial: o mapa 3D com o tour (padrão) ou a interface
+# simples, um mapa 2D do CAR. A escolha fica num cookie e vale até ser trocada.
+INTERFACE_COOKIE = 'interface'
+INTERFACE_TEMPLATES = {
+    '3d': 'analysis/bases_3d.html',
+    'simples': 'analysis/interface_simples.html',
+}
+
+
+def _interface_of(request):
+    choice = request.COOKIES.get(INTERFACE_COOKIE)
+    return choice if choice in INTERFACE_TEMPLATES else '3d'
+
+
 class UploadZipCarView(View):
-    """Página inicial depois do login: mapa 3D do SICAR com o tour de cidade
-    em cidade e o formulário de análise no canto."""
-    template_upload = 'analysis/bases_3d.html'
+    """Página inicial depois do login: o formulário de análise sobre o mapa,
+    na interface escolhida pelo usuário (`?interface=3d|simples`)."""
     template_index = 'analysis/results.html'
     # Trocado em `post` pelo andamento da análise pedida; este é no-op.
     progress = AnalysisProgress()
 
     def get(self, request):
+        choice = request.GET.get('interface')
+        if choice in INTERFACE_TEMPLATES:
+            response = redirect('upload_zip_car')
+            response.set_cookie(INTERFACE_COOKIE, choice, max_age=60 * 60 * 24 * 365, samesite='Lax')
+            return response
         return self._render_form(request, {})
 
     def _render_form(self, request, context):
@@ -468,7 +486,7 @@ class UploadZipCarView(View):
         config['searchError'] = bool(context.get('erro'))
         context['bases_3d_config'] = config
         context['recent_searches'] = _recent_searches(request.user)
-        return render(request, self.template_upload, context)
+        return render(request, INTERFACE_TEMPLATES[_interface_of(request)], context)
 
     def post(self, request):
         # Andamento para a tela (ver `analysis_progress`): a página consulta
