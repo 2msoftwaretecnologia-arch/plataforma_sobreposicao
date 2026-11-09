@@ -192,8 +192,9 @@ class ImageryServiceTests(SimpleTestCase):
     def test_config_without_keys_only_offers_public_sources(self):
         config = svc.imagery_config()
         self.assertEqual(config['providers'], [])
-        self.assertEqual(set(config), {'wayback_tile_url', 'wayback_releases_url', 'providers', 'mapbiomas', 'cbers',
-                                       'landsat_legacy', 'cbers2b'})
+        self.assertEqual(set(config), {'wayback_tile_url', 'wayback_releases_url', 'download_area_url', 'providers',
+                                       'mapbiomas', 'cbers', 'landsat_legacy', 'cbers2b'})
+        self.assertTrue(config['download_area_url'].endswith('/imagens/area-download/'))
         self.assertTrue(config['landsat_legacy']['tile_url'].endswith('/imagens/landsat-antigo/{scene}/{comp}/{z}/{x}/{y}.png'))
         self.assertEqual(config['landsat_legacy']['enhanced_max_zoom'], 17)
         self.assertTrue(config['cbers2b']['tile_url'].endswith('/imagens/cbers2b/{scene}/{comp}/{z}/{x}/{y}.webp'))
@@ -855,6 +856,96 @@ class KmlUploadServiceTests(SimpleTestCase):
         from analysis.services.view_services.kml_upload_service import KmlUploadError
         with self.assertRaises(KmlUploadError):
             self._read(b'isto nao e xml')
+
+
+class DownloadAreaServiceTests(SimpleTestCase):
+    """Arquivo enviado como área do download de imagem (aba Imagem do mapa)."""
+
+    def _read(self, content, name):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from analysis.services.view_services.download_area_service import read_download_area
+        return read_download_area(SimpleUploadedFile(name, content))
+
+    def _shapefile_zip(self, crs, polygons):
+        import geopandas as gpd
+        import zipfile
+        with tempfile.TemporaryDirectory() as tmp:
+            gpd.GeoDataFrame({'id': list(range(len(polygons)))}, geometry=polygons, crs=crs).to_file(
+                Path(tmp) / 'reserva.shp')
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, 'w') as zf:
+                for f in Path(tmp).iterdir():
+                    zf.write(f, f.name)
+            return buf.getvalue()
+
+    def test_kml_vira_geojson_com_o_nome_do_arquivo(self):
+        result = self._read(KML_TWO_PARCELS, 'Glebas do Zé.kml')
+        self.assertEqual(result['nome'], 'Glebas do Zé')
+        self.assertEqual(result['geometry']['type'], 'MultiPolygon')
+        self.assertEqual(len(result['geometry']['coordinates']), 2)
+
+    def test_shapefile_em_utm_volta_em_graus(self):
+        from shapely.geometry import box
+        # SIRGAS 2000 / UTM 22S: ~1 km² perto de Palmas (TO).
+        data = self._shapefile_zip('EPSG:31982', [box(790000, 8870000, 791000, 8871000)])
+        geom = self._read(data, 'reserva.zip')['geometry']
+        self.assertEqual(geom['type'], 'Polygon')
+        lon, lat = geom['coordinates'][0][0][:2]
+        self.assertTrue(-49 < lon < -48 and -11 < lat < -10, (lon, lat))
+
+    def test_shapefile_junta_os_poligonos(self):
+        from shapely.geometry import box
+        data = self._shapefile_zip('EPSG:4674', [box(-48.3, -10.2, -48.29, -10.19), box(-48.28, -10.2, -48.27, -10.19)])
+        self.assertEqual(self._read(data, 'app.zip')['geometry']['type'], 'MultiPolygon')
+
+    def test_geojson_feature_collection(self):
+        fc = {'type': 'FeatureCollection', 'features': [
+            {'type': 'Feature', 'properties': {}, 'geometry': {'type': 'Point', 'coordinates': [-48.3, -10.2]}},
+            {'type': 'Feature', 'properties': {}, 'geometry': {'type': 'Polygon', 'coordinates': [
+                [[-48.3, -10.2], [-48.29, -10.2], [-48.29, -10.19], [-48.3, -10.2]]]}},
+        ]}
+        geom = self._read(json.dumps(fc).encode(), 'area.geojson')['geometry']
+        self.assertEqual(geom['type'], 'Polygon')
+
+    def test_geojson_em_metros_e_recusado(self):
+        from analysis.services.view_services.download_area_service import DownloadAreaError
+        poly = {'type': 'Polygon', 'coordinates': [[[790000, 8870000], [791000, 8870000], [791000, 8871000], [790000, 8870000]]]}
+        with self.assertRaisesMessage(DownloadAreaError, 'graus'):
+            self._read(json.dumps(poly).encode(), 'area.json')
+
+    def test_so_pontos_e_recusado(self):
+        from analysis.services.view_services.download_area_service import DownloadAreaError
+        kml = b'<kml xmlns="http://www.opengis.net/kml/2.2"><Placemark><Point><coordinates>-48.3,-10.2</coordinates></Point></Placemark></kml>'
+        with self.assertRaisesMessage(DownloadAreaError, 'nenhum polígono'):
+            self._read(kml, 'ponto.kml')
+
+    def test_extensao_desconhecida(self):
+        from analysis.services.view_services.download_area_service import DownloadAreaError
+        with self.assertRaises(DownloadAreaError):
+            self._read(b'x', 'area.dwg')
+
+    def test_muitos_vertices_sao_simplificados(self):
+        import math
+        from analysis.services.view_services import download_area_service as das
+        ring = [[-48.3 + 0.01 * math.cos(t / 30000 * 2 * math.pi), -10.2 + 0.01 * math.sin(t / 30000 * 2 * math.pi)]
+                for t in range(30000)]
+        ring.append(ring[0])
+        geom = self._read(json.dumps({'type': 'Polygon', 'coordinates': [ring]}).encode(), 'circulo.geojson')['geometry']
+        self.assertLessEqual(len(geom['coordinates'][0]), das.MAX_VERTICES)
+
+    def test_view_devolve_erro_legivel(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from django.test import RequestFactory
+        from analysis.views import ImageDownloadAreaView
+        view = ImageDownloadAreaView.as_view()
+        ok = RequestFactory().post('/', {'arquivo': SimpleUploadedFile('area.kml', KML_TWO_PARCELS)})
+        ok._dont_enforce_csrf_checks = True
+        self.assertEqual(json.loads(view(ok).content)['geometry']['type'], 'MultiPolygon')
+        bad = RequestFactory().post('/', {'arquivo': SimpleUploadedFile('area.kml', b'nao e xml')})
+        bad._dont_enforce_csrf_checks = True
+        response = view(bad)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('erro', json.loads(response.content))
 
 
 class CoordinatesInputTests(SimpleTestCase):

@@ -1597,8 +1597,13 @@
                 .join('<br> Área: ');
 
             // Bind tooltip and hover effects
+            // Nome do polígono quando ele é escolhido como área do download de imagem.
+            var plainLabel = String(lbl).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+            var downloadLabel = plainLabel && plainLabel !== f ? f + ' · ' + plainLabel : f;
+
             (function (l, tooltipText, isOutline, opacity, weight) {
                 l.eachLayer(function (fl) {
+                    fl.downloadLabel = downloadLabel;
                     if (tooltipText) { fl.bindTooltip(tooltipText, { sticky: true }); }
                     fl.on('mouseover', function (e) {
                         e.target.setStyle({ weight: 3, fillOpacity: isOutline ? 0.1 : 0.5 });
@@ -1748,11 +1753,12 @@
 
     /**
      * Cartão "Baixar esta imagem" da aba Imagem: GeoTIFF do mapa base
-     * escolhido (com a data/cena/composição do seletor), no retângulo da
-     * propriedade. Um botão no mapa abre o painel direto nele.
-     * Ver image_export.js.
+     * escolhido (com a data/cena/composição do seletor), na área escolhida
+     * no próprio cartão — imóvel, tela, desenho, polígono do mapa ou arquivo,
+     * com ou sem recorte no contorno (download_area.js). Um botão no mapa
+     * abre o painel direto nele. Ver image_export.js.
      */
-    function setupImageDownload(map, layersByFonte, imageryPanel, panel, mount) {
+    function setupImageDownload(map, layersByFonte, imageryPanel, panel, mount, imagery) {
         var card = L.DomUtil.create('div', 'image-download', mount);
         card.innerHTML =
             '<div class="image-download__head">' +
@@ -1763,8 +1769,9 @@
                 '</div>' +
             '</div>' +
             '<ul class="image-download__meta">' +
-                '<li>GeoTIFF georreferenciado</li><li>Área da propriedade + margem</li><li>QGIS · ArcGIS</li>' +
+                '<li>GeoTIFF georreferenciado</li><li class="image-download__area-chip">Área + margem</li><li>QGIS · ArcGIS</li>' +
             '</ul>' +
+            '<div class="image-download__area"></div>' +
             '<button type="button" class="image-download__btn">' + DOWNLOAD_ICON + '<span>Baixar imagem</span></button>' +
             '<div class="image-download__progress" hidden><span></span></div>' +
             '<p class="image-download__status" role="status"></p>';
@@ -1774,6 +1781,7 @@
         var progress = card.querySelector('.image-download__progress');
         var bar = progress.querySelector('span');
         var status = card.querySelector('.image-download__status');
+        var areaChip = card.querySelector('.image-download__area-chip');
         var base = null, baseName = '', busy = false;
 
         // Atalho no mapa: abre o painel na aba Imagem, já no cartão.
@@ -1809,6 +1817,49 @@
             return map.getBounds();
         }
 
+        // Polígonos do imóvel numa geometria só (calculada uma vez).
+        var propertyGeometry;
+        function property() {
+            if (propertyGeometry !== undefined) return propertyGeometry;
+            var polys = [];
+            var group = layersByFonte[PROPERTY_FONTE];
+            (function walk(l) {
+                if (l.feature && l.feature.geometry) polys = polys.concat(global.exportBaseImage.polygonsOf(l.feature.geometry));
+                else if (l.eachLayer) l.eachLayer(walk);
+            })(group || L.layerGroup());
+            propertyGeometry = !polys.length ? null
+                : polys.length === 1 ? { type: 'Polygon', coordinates: polys[0] }
+                : { type: 'MultiPolygon', coordinates: polys };
+            return propertyGeometry;
+        }
+
+        // Seletor da área; sem download_area.js, fica o retângulo do imóvel.
+        var area = null;
+        if (global.setupDownloadArea && global.exportBaseImage && imagery && imagery.download_area_url) {
+            area = global.setupDownloadArea(map, {
+                mount: card.querySelector('.image-download__area'),
+                property: property,
+                point: function () {
+                    var group = layersByFonte[POINT_FONTE];
+                    return group && group.getLayers().length ? group.getBounds().getCenter() : null;
+                },
+                groups: function () {
+                    return Object.keys(layersByFonte).map(function (name) { return { name: name, group: layersByFonte[name] }; });
+                },
+                uploadUrl: imagery.download_area_url,
+                csrfToken: csrfToken,
+                panel: panel,
+                onChange: function () {
+                    setStatus('');
+                    refresh();
+                }
+            });
+        }
+
+        function currentArea() {
+            return area ? area.current() : { bounds: areaBounds(), clip: null, slug: '' };
+        }
+
         // Textos escolhidos nos seletores visíveis (data/cena e composição/ano).
         function selectedTexts() {
             if (imageryPanel.element.style.display === 'none') return [];
@@ -1819,8 +1870,8 @@
             }).filter(Boolean);
         }
 
-        function filename() {
-            var name = [baseName].concat(selectedTexts()).join(' ')
+        function filename(slug) {
+            var name = [baseName].concat(selectedTexts(), slug ? [slug] : []).join(' ')
                 .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
                 .replace(/[^\w.-]+/g, '_').replace(/^_+|_+$/g, '');
             return (name || 'imagem') + '.tif';
@@ -1838,8 +1889,12 @@
 
         function refresh() {
             var ok = exportable(base);
+            var a = currentArea();
             card.classList.toggle('is-disabled', !ok);
-            btn.disabled = busy || !ok;
+            btn.disabled = busy || !ok || !!a.error;
+            // Falta escolher a área: o botão diz o que fazer.
+            if (!busy) btnLabel.textContent = ok && a.error ? a.error : 'Baixar imagem';
+            areaChip.textContent = a.clip ? 'Recortada no contorno' : 'Retângulo da área' + (a.slug === 'tela' ? '' : ' + margem');
             if (ok) {
                 sourceEl.textContent = [baseName].concat(selectedTexts()).join(' · ');
             } else {
@@ -1857,7 +1912,8 @@
         card.addEventListener('mouseenter', refresh);
 
         btn.addEventListener('click', function () {
-            if (busy || !exportable(base)) return;
+            var a = currentArea();
+            if (busy || !exportable(base) || a.error) return;
             busy = true;
             refresh();
             card.classList.add('is-busy');
@@ -1865,8 +1921,8 @@
             setStatus('');
             setProgress(0);
             var resolution = base.imageryInfo.kind === 'landsat' ? 30 : 10;
-            global.exportBaseImage(base, areaBounds(), {
-                filename: filename(),
+            global.exportBaseImage(base, { bounds: a.bounds, clip: a.clip }, {
+                filename: filename(a.slug),
                 resolution: resolution,
                 onProgress: function (text, fraction) {
                     btnLabel.textContent = text;
@@ -1879,11 +1935,13 @@
             }).then(function () {
                 busy = false;
                 card.classList.remove('is-busy');
-                btnLabel.textContent = 'Baixar imagem';
                 setProgress(null);
                 refresh();
             });
         });
+
+        // Na área "Tela", o que vai ser baixado acompanha o mapa.
+        map.on('moveend', function () { if (!busy) refresh(); });
 
         refresh();
         return {
@@ -1967,7 +2025,7 @@
             var baseHeading = L.DomUtil.create('div', 'map-panel-heading', imagem);
             baseHeading.innerHTML = 'Mapa base<span class="map-panel-compare-only"> · lado esquerdo</span>';
             var imageryPanel = setupImageryPanel(map, baseLayersInfo, { mount: imagem });
-            var imageDownload = setupImageDownload(map, data.layersByFonte, imageryPanel, panel, imagem);
+            var imageDownload = setupImageDownload(map, data.layersByFonte, imageryPanel, panel, imagem, options.imagery);
             setupBaseList(map, baseLayersInfo, imagem, function (layer, row) {
                 row.parentNode.insertBefore(imageryPanel.element, row.nextSibling);
                 imageryPanel.activate(layer);

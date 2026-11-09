@@ -70,6 +70,7 @@ from analysis.services.view_services.base_export_service import (
 )
 from analysis.services.view_services.zip_upload_service import ZipUploadService
 from analysis.services.view_services.kml_upload_service import KmlUploadError, KmlUploadService
+from analysis.services.view_services.download_area_service import DownloadAreaError, read_download_area
 from analysis.services.view_services.coordinates_input_service import (
     CoordinatesInputError,
     build_polygon,
@@ -1365,6 +1366,23 @@ class Cbers2bProgressView(View):
 class Cbers2bTileView(View):
     def get(self, request, scene, comp, z, x, y):
         return _image_tile_response(lambda: hrc_tile(scene, comp, z, x, y, _enhance(request)))
+
+
+class ImageDownloadAreaView(View):
+    """Converte o arquivo enviado na aba Imagem (shapefile ZIP, KML/KMZ ou
+    GeoJSON) no polígono, em lon/lat, que recorta o download da imagem."""
+
+    def post(self, request):
+        uploaded = request.FILES.get('arquivo')
+        if not uploaded:
+            return JsonResponse({'erro': 'Nenhum arquivo enviado.'}, status=400)
+        try:
+            return JsonResponse(read_download_area(uploaded))
+        except DownloadAreaError as e:
+            return JsonResponse({'erro': str(e)}, status=400)
+        except Exception as e:  # noqa: BLE001 - o painel mostra a mensagem em vez de travar
+            logger.exception('Falha ao ler a área de download %s', uploaded.name)
+            return JsonResponse({'erro': f'Não foi possível ler o arquivo ({type(e).__name__}).'}, status=400)
 
 
 class LandsatLegacyScenesView(View):

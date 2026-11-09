@@ -26,6 +26,8 @@ urlpatterns = [
     # Imagens de satélite do mapa de resultados (proxy para não expor as chaves).
     path('imagens/google/<int:z>/<int:x>/<int:y>', login_required(views.GoogleTileView.as_view()), name='imagery_google_tile'),
     path('imagens/wayback/datas/', login_required(views.WaybackReleasesView.as_view()), name='imagery_wayback_releases'),
+    # Polígono (shapefile/KML/GeoJSON) que recorta o download da imagem.
+    path('imagens/area-download/', login_required(views.ImageDownloadAreaView.as_view()), name='imagery_download_area'),
     # Gerados no servidor a partir de GeoTIFFs públicos (raster_tiles.py).
     path('imagens/mapbiomas/<str:product>/<int:year>/<int:z>/<int:x>/<int:y>.png', login_required(views.MapbiomasTileView.as_view()), name='imagery_mapbiomas_tile'),
     path('imagens/cbers/cenas/', login_required(views.CbersScenesView.as_view()), name='imagery_cbers_scenes'),

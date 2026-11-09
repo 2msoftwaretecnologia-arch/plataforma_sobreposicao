@@ -106,6 +106,7 @@ def imagery_config():
     config = {
         'wayback_tile_url': WAYBACK_TILE_URL,
         'wayback_releases_url': reverse('imagery_wayback_releases'),
+        'download_area_url': reverse('imagery_download_area'),
         'providers': [],
     }
     for provider, meta in OGC_PROVIDERS.items():

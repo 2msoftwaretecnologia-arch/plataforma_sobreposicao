@@ -1195,6 +1195,160 @@ body { background: var(--cream-50); color: var(--ink-900); }
 .image-download__status.is-done::before { content: '✓ '; }
 .image-download__status.is-error { color: var(--critical); }
 
+/* Área do download (download_area.js): imóvel, tela, desenho, polígono do
+   mapa ou arquivo, com recorte opcional no contorno. */
+.download-area {
+  margin: 0 0 12px;
+  padding: 10px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid var(--cream-200);
+}
+
+.download-area__label {
+  margin-bottom: 7px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--ink-600);
+}
+
+.download-area__modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.download-area__mode {
+  padding: 5px 10px;
+  border: 1px solid var(--cream-200);
+  border-radius: 999px;
+  background: var(--cream-50);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-600);
+  cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
+}
+
+.download-area__mode:hover { border-color: var(--green-700); color: var(--green-900); }
+
+.download-area__mode.is-active {
+  border-color: var(--green-900);
+  background: var(--green-900);
+  color: var(--gold-400);
+}
+
+.download-area__info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  min-height: 22px;
+}
+
+.download-area__desc {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--ink-900);
+  /* Nome do polígono + hectares: até duas linhas. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
+}
+
+.download-area__desc.is-error { color: var(--critical); -webkit-line-clamp: unset; }
+
+.download-area__action {
+  flex: none;
+  padding: 3px 9px;
+  border: 1px solid var(--green-700);
+  border-radius: 7px;
+  background: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--green-900);
+  cursor: pointer;
+}
+
+.download-area__action:hover { background: var(--green-100); }
+.download-area__action[hidden] { display: none; }
+
+.download-area__clip {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin-top: 8px;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--ink-900);
+  cursor: pointer;
+}
+
+.download-area__clip[hidden] { display: none; }
+.download-area__clip input { margin: 2px 0 0; accent-color: var(--green-700); cursor: pointer; }
+.download-area__clip small { color: var(--ink-600); font-size: 11.5px; }
+
+/* Desenhando ou escolhendo um polígono no mapa. */
+.leaflet-container.is-selecting-area,
+.leaflet-container.is-selecting-area .leaflet-interactive { cursor: crosshair; }
+
+.map-area-hint {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  z-index: 1000;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 12px;
+  width: max-content;
+  max-width: min(560px, calc(100% - 24px));
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: var(--green-900);
+  box-shadow: 0 4px 16px rgba(23, 48, 31, 0.35);
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.4;
+  color: #fff;
+  transform: translateX(-50%);
+  transition: background .2s;
+}
+
+.map-area-hint[hidden] { display: none; }
+.map-area-hint.is-warning { background: var(--critical); }
+.map-area-hint__text { flex: 1 1 240px; }
+.map-area-hint__actions { display: flex; gap: 6px; }
+
+.map-area-hint__btn {
+  padding: 5px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+}
+
+.map-area-hint__btn:hover { background: rgba(255, 255, 255, 0.12); }
+.map-area-hint__btn.is-primary { border-color: var(--gold-400); background: var(--gold-400); color: var(--green-900); }
+
+/* No celular, embaixo: em cima cobriria os botões do mapa. */
+@media (max-width: 640px) {
+  .map-area-hint { top: auto; bottom: 28px; }
+}
+
 /* Atalho no canto do mapa que abre o cartão acima. */
 .map-download-shortcut {
   display: inline-flex;
