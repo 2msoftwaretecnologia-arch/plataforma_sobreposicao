@@ -1,0 +1,51 @@
+/* Seletor de interface da página inicial (3D com tour | 2D simples), usado
+   no painel do mapa 3D e no topo da interface simples — ambos em fundo verde. */
+
+.view-switch {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  border: 1px solid rgba(251, 248, 240, 0.18);
+  background: rgba(251, 248, 240, 0.07);
+}
+
+.view-opt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  color: rgba(251, 248, 240, 0.78);
+  text-decoration: none;
+  transition: background .2s ease, color .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+
+.view-opt .ico { width: 16px; height: 16px; }
+
+a.view-opt:hover {
+  background: rgba(251, 248, 240, 0.12);
+  color: var(--cream-50);
+  text-decoration: none;
+}
+
+a.view-opt:hover .ico { transform: translateY(-1px); }
+
+a.view-opt:focus-visible {
+  outline: 2px solid var(--gold-400);
+  outline-offset: 2px;
+}
+
+.view-opt.is-active {
+  background: linear-gradient(180deg, var(--gold-400), var(--gold-500));
+  color: var(--green-950);
+  box-shadow: 0 4px 12px rgba(201, 143, 45, 0.35);
+  cursor: default;
+}

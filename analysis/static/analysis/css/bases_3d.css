@@ -728,3 +728,10 @@ html, body.bases3d-page {
   .search-hud-list { display: none; }
   .search-hud-status { min-height: 0; }
 }
+
+/* Seletor 3D | 2D simples (view_switch.css): ocupa a largura do painel */
+.panel-view-switch {
+  display: grid;
+  width: 100%;
+  margin-bottom: 14px;
+}

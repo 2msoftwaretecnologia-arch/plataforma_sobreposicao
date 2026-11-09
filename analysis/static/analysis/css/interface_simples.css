@@ -106,6 +106,9 @@ html, body.simples-page {
 .s-search-msg.is-warn { background: #fff4dc; color: #7a5514; }
 .s-search-msg.is-loading { font-style: italic; }
 
+/* Seletor 3D | 2D simples (view_switch.css) */
+.s-top > .view-switch { flex-shrink: 0; }
+
 .s-nav {
   display: flex;
   align-items: center;
@@ -496,7 +499,8 @@ html, body.simples-page {
   .simples-page { display: block; }
 
   .s-top { flex-wrap: wrap; gap: 10px 16px; padding: 10px 16px; }
-  .s-nav { margin-left: auto; }
+  .s-top > .view-switch { margin-left: auto; }
+  .s-nav { flex-basis: 100%; order: 4; }
   .s-search { order: 3; flex-basis: 100%; max-width: none; }
 
   .s-main { flex-direction: column-reverse; }

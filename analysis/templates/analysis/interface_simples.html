@@ -14,6 +14,7 @@
     <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/landing_page.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/upload.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/loader.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/view_switch.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/interface_simples.css' %}">
 </head>
 
@@ -29,6 +30,8 @@
             <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4 2.8 19.6h18.4z"/><path d="M12 10v4.4M12 17.1v.1"/></symbol>
             <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/></symbol>
             <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4.5 12h15M14 6.5l5.5 5.5-5.5 5.5"/></symbol>
+            <symbol id="i-cube" viewBox="0 0 24 24"><path d="M12 2.8 20 7.2v9.6L12 21.2 4 16.8V7.2z"/><path d="M4 7.2 12 11.6l8-4.4M12 11.6v9.6"/></symbol>
+            <symbol id="i-map" viewBox="0 0 24 24"><path d="M9 4.5 3.5 6.5v13l5.5-2 6 2 5.5-2v-13l-5.5 2z"/><path d="M9 4.5v13M15 6.5v13"/></symbol>
             <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></symbol>
             <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/></symbol>
             <symbol id="i-close" viewBox="0 0 24 24"><path d="m6.5 6.5 11 11M17.5 6.5l-11 11"/></symbol>
@@ -48,10 +51,14 @@
             <p id="s_search_msg" class="s-search-msg" role="status" hidden></p>
         </form>
 
+        <div class="view-switch" role="group" aria-label="Tipo de visualização">
+            <a class="view-opt" href="{% url 'upload_zip_car' %}?interface=3d" title="Mapa 3D com o tour de cidade em cidade"><svg class="ico"><use href="#i-cube"/></svg>3D</a>
+            <span class="view-opt is-active" aria-current="page"><svg class="ico"><use href="#i-map"/></svg>2D simples</span>
+        </div>
+
         <nav class="s-nav" aria-label="Navegação">
             <a href="{% url 'localizacoes_kmz' %}">Localizações (KMZ)</a>
             <a href="{% url 'historico' %}">Meu histórico</a>
-            <a href="{% url 'upload_zip_car' %}?interface=3d" title="Mapa 3D com o tour de cidade em cidade">Ver em 3D</a>
             <form method="post" action="{% url 'authentication:logout' %}">
                 {% csrf_token %}
                 <button type="submit">Sair</button>
