@@ -563,7 +563,7 @@ html, body.bases3d-page {
   cursor: progress;
 }
 
-.loader-overlay.on-map .wheel-and-hamster,
+.loader-overlay.on-map .loader-anim,
 .loader-overlay.on-map .loader-status { display: none; }
 
 /* ===== Andamento da análise (no lugar do painel lateral) ===== */
