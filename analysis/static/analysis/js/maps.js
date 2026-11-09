@@ -1604,6 +1604,12 @@
             (function (l, tooltipText, isOutline, opacity, weight) {
                 l.eachLayer(function (fl) {
                     fl.downloadLabel = downloadLabel;
+                    // Vai junto no toGeoJSON (visão 3D, ver getMapOverlays).
+                    if (fl.feature) {
+                        fl.feature.properties = Object.assign({}, fl.feature.properties, {
+                            _fonte: f, _label: plainLabel, _area: String(area || '')
+                        });
+                    }
                     if (tooltipText) { fl.bindTooltip(tooltipText, { sticky: true }); }
                     fl.on('mouseover', function (e) {
                         e.target.setStyle({ weight: 3, fillOpacity: isOutline ? 0.1 : 0.5 });
@@ -2053,9 +2059,42 @@
         mapState = {
             map: map,
             layersByFonte: data.layersByFonte,
+            legend: data.legend,
             legendEl: (!isStatic) ? document.getElementById('legend-imoveis') : null,
             panel: (!isStatic) ? panel : null
         };
+    };
+
+    /**
+     * Bases do mapa interativo para a visão 3D (map_3d_view.js): cada uma com
+     * a mesma cor da legenda, se está ligada agora e as geometrias em GeoJSON
+     * (com `_fonte`, `_label` e `_area` nas propriedades).
+     */
+    global.getMapOverlays = function () {
+        if (!mapState) return [];
+        return Object.keys(mapState.layersByFonte).map(function (f) {
+            var grp = mapState.layersByFonte[f];
+            return {
+                fonte: f,
+                color: mapState.legend[f] || '#ffffff',
+                visible: mapState.map.hasLayer(grp),
+                isProperty: f === PROPERTY_FONTE,
+                isPoint: f === POINT_FONTE,
+                geojson: grp.toGeoJSON()
+            };
+        });
+    };
+
+    /** Instância Leaflet do mapa interativo (para controles extras, ex.: botão 3D). */
+    global.getImoveisMap = function () {
+        return mapState ? mapState.map : null;
+    };
+
+    /** Centro e zoom atuais do mapa interativo (a visão 3D abre no mesmo lugar). */
+    global.getMapView = function () {
+        if (!mapState) return null;
+        var c = mapState.map.getCenter();
+        return { center: [c.lng, c.lat], zoom: mapState.map.getZoom() };
     };
 
     /**
