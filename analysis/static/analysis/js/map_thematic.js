@@ -139,6 +139,13 @@
         }, extra || {}));
     }
 
+    // GetMap com {bbox-epsg-3857}, para a visão 3D (MapLibre troca pelo tile).
+    function wmsTileUrl(url, layer, time) {
+        return url + '?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=' + encodeURIComponent(layer) +
+            '&STYLES=&FORMAT=image%2Fpng&TRANSPARENT=true&CRS=EPSG%3A3857&WIDTH=512&HEIGHT=512' +
+            '&BBOX={bbox-epsg-3857}' + (time ? '&TIME=' + encodeURIComponent(time) : '');
+    }
+
     function legendGraphic(url, layer) {
         return url + '?SERVICE=WMS&REQUEST=GetLegendGraphic&VERSION=1.3.0&FORMAT=image/png&LAYER=' + encodeURIComponent(layer);
     }
@@ -147,6 +154,10 @@
      * Itens do painel. Cada um: `name`, `create()` (a camada), `options` e
      * `select(layer, value)` (período/ano), `opacity`, `legend` (lista de
      * {color, label} ou {img}), `note`, `minZoom`.
+     *
+     * `gl(valor)` descreve a mesma camada para a visão 3D (map_3d_view.js):
+     * lista de fontes raster do MapLibre ({tiles, tileSize, minzoom,
+     * maxzoom}) ou `[{ hillshade: true }]` para o relevo sombreado.
      */
     function buildItems(imagery, pane) {
         var items = [];
@@ -168,7 +179,11 @@
                         maxZoom: 19, maxNativeZoom: 15, pane: pane, attribution: 'MapBiomas'
                     });
                 },
-                select: function (layer, value) { layer.options.year = value; layer.redraw(); }
+                select: function (layer, value) { layer.options.year = value; layer.redraw(); },
+                gl: function (value) {
+                    return [{ tiles: [mb.tile_url.replace('{product}', 'cobertura').replace('{year}', value)],
+                        minzoom: mb.min_zoom, maxzoom: 15 }];
+                }
             });
             items.push({
                 key: 'fogo',
@@ -184,7 +199,11 @@
                         maxZoom: 19, maxNativeZoom: 15, pane: pane, attribution: 'MapBiomas Fogo'
                     });
                 },
-                select: function (layer, value) { layer.options.year = value; layer.redraw(); }
+                select: function (layer, value) { layer.options.year = value; layer.redraw(); },
+                gl: function (value) {
+                    return [{ tiles: [mb.tile_url.replace('{product}', 'fogo').replace('{year}', value)],
+                        minzoom: mb.min_zoom, maxzoom: 15 }];
+                }
             });
         }
 
@@ -212,6 +231,12 @@
             select: function (group, value) {
                 var opt = deterOptions.find(function (o) { return o.value === value; });
                 group.eachLayer(function (l) { l.setParams({ time: opt.time }); });
+            },
+            gl: function (value) {
+                var opt = deterOptions.find(function (o) { return o.value === value; });
+                return DETER_WMS.map(function (d) {
+                    return { tiles: [wmsTileUrl(d.url, d.layer, opt.time)], tileSize: 512 };
+                });
             }
         });
 
@@ -246,6 +271,10 @@
                     delete layer.wmsParams.time;
                 }
                 layer.setParams({ layers: o.layer });
+            },
+            gl: function (value) {
+                var o = focosOptions.find(function (x) { return x.value === value; });
+                return [{ tiles: [wmsTileUrl(QUEIMADAS_WMS, o.layer, o.time)], tileSize: 512 }];
             }
         });
 
@@ -258,6 +287,11 @@
             legend: SLOPE_CLASSES.map(function (s) { return { color: s.color ? hexToCss(s.color) : null, label: s.label }; }),
             create: function () {
                 return new SlopeLayer({ pane: pane, maxNativeZoom: SLOPE_NATIVE_ZOOM, maxZoom: 19, attribution: 'Elevação: AWS Terrain Tiles (SRTM)' });
+            },
+            // Tiles calculados no navegador (protocolo `slope://` registrado na visão 3D).
+            gl: function () {
+                return [{ tiles: ['slope://{z}/{x}/{y}'], minzoom: SLOPE_MIN_ZOOM, maxzoom: SLOPE_NATIVE_ZOOM,
+                    attribution: 'Elevação: AWS Terrain Tiles (SRTM)' }];
             }
         });
 
@@ -268,7 +302,9 @@
             note: 'Sombras do relevo sobre a imagem (Esri World Hillshade).',
             create: function () {
                 return L.tileLayer(HILLSHADE_URL, { pane: RELIEF_PANE, maxZoom: 19, maxNativeZoom: 16, attribution: 'Relevo &copy; Esri' });
-            }
+            },
+            // No 3D o MapLibre sombreia o próprio relevo usado no terreno.
+            gl: function () { return [{ hillshade: true }]; }
         });
 
         return items;
@@ -381,5 +417,10 @@
     }
 
     global.setupThematicLayers = setupThematicLayers;
+    // Visão 3D (map_3d_view.js): os mesmos itens (nomes, períodos, legendas,
+    // `gl`) e o cálculo da declividade num tile de elevação Terrarium.
+    global.getThematicItems = function (imagery) { return buildItems(imagery || {}, null); };
+    global.TERRARIUM_URL = TERRARIUM_URL;
+    global.drawSlopeTile = drawSlope;
     global.THEMATIC_RELIEF_PANE = RELIEF_PANE;
 })(window);

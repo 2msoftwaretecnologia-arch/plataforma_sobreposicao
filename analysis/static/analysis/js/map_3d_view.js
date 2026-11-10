@@ -58,6 +58,7 @@
         lastFrame: 0
     };
     var el = {};
+    var trackers = {};
     var maplibrePromise = null;
 
     // =====================================================================
@@ -159,7 +160,12 @@
         var bar = create('header', 'm3d-bar', root);
         var title = create('div', 'm3d-title', bar);
         create('strong', '', title, 'Visão 3D');
-        el.subtitle = create('span', '', title, 'Imagem de satélite sobre o relevo');
+        var note = create('div', 'm3d-note', title);
+        el.subtitle = create('span', '', note, 'Imagem de satélite sobre o relevo');
+        el.imgRetry = create('button', 'm3d-retry m3d-retry-inline', note, 'Tentar de novo');
+        el.imgRetry.type = 'button';
+        el.imgRetry.hidden = true;
+        el.imgRetry.addEventListener('click', retryImagery);
 
         var controls = create('div', 'm3d-controls', bar);
 
@@ -211,10 +217,7 @@
         el.close.innerHTML = 'Fechar <span aria-hidden="true">&times;</span>';
 
         el.bar = bar;
-        var legend = el.legendBox = create('aside', 'm3d-legend', root);
-        legend.setAttribute('aria-label', 'Bases no mapa 3D');
-        create('div', 'm3d-legend-title', legend, 'Bases no mapa');
-        el.legend = create('ul', 'm3d-legend-list', legend);
+        buildPanel(root);
 
         el.hint = create('div', 'm3d-hint', root,
             'Clique direito e arraste (ou Ctrl + arrastar) para girar e inclinar · roda do mouse para aproximar');
@@ -257,22 +260,102 @@
         placeLegend();
     }
 
+    // =====================================================================
+    // Painel lateral: bases da análise e camadas temáticas
+    // =====================================================================
+
+    var LAYERS_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2.5 8 12 13l9.5-5L12 3Z"/>' +
+        '<path d="m2.5 12 9.5 5 9.5-5"/><path d="m2.5 16 9.5 5 9.5-5"/></svg>';
+
+    function buildPanel(root) {
+        var panel = el.legendBox = create('aside', 'm3d-panel', root);
+        panel.setAttribute('aria-label', 'Bases e camadas temáticas no mapa 3D');
+
+        el.panelToggle = create('button', 'm3d-panel-toggle', panel);
+        el.panelToggle.type = 'button';
+        el.panelToggle.innerHTML = LAYERS_ICON + '<span class="m3d-panel-label">Camadas</span>';
+        el.panelCount = create('span', 'm3d-badge', el.panelToggle);
+        create('span', 'm3d-chev', el.panelToggle).setAttribute('aria-hidden', 'true');
+        el.panelToggle.addEventListener('click', function () {
+            setPanelOpen(panel.classList.contains('is-collapsed'));
+        });
+
+        el.panelBody = create('div', 'm3d-panel-body', panel);
+        el.panelBody.id = 'm3d-panel-body';
+        el.panelToggle.setAttribute('aria-controls', el.panelBody.id);
+
+        var bases = panelSection('Bases da análise', 'Ligue e desligue o que aparece sobre o relevo.');
+        el.legend = bases.list;
+        el.basesCount = bases.count;
+
+        var th = panelSection('Camadas temáticas', 'Uso do solo, desmatamento, fogo e relevo, com o período e a opacidade.');
+        el.thematicsSection = th.root;
+        el.thematics = th.list;
+        el.thematicsCount = th.count;
+
+        // No celular o painel cobriria o mapa: começa recolhido.
+        setPanelOpen(!(global.matchMedia && global.matchMedia('(max-width: 760px)').matches));
+    }
+
+    function panelSection(title, hint) {
+        // <div>, não <section>: o landing_page.css põe 92px de padding em todo <section>.
+        var sec = create('div', 'm3d-sec', el.panelBody);
+        var head = create('button', 'm3d-sec-head', sec);
+        head.type = 'button';
+        head.setAttribute('aria-expanded', 'true');
+        create('span', 'm3d-chev', head).setAttribute('aria-hidden', 'true');
+        create('span', 'm3d-sec-title', head, title);
+        var count = create('span', 'm3d-badge', head);
+        var body = create('div', 'm3d-sec-body', sec);
+        if (hint) create('p', 'm3d-sec-hint', body, hint);
+        var list = create('ul', 'm3d-list', body);
+        head.addEventListener('click', function () {
+            var open = head.getAttribute('aria-expanded') !== 'true';
+            head.setAttribute('aria-expanded', String(open));
+            body.hidden = !open;
+        });
+        return { root: sec, count: count, list: list };
+    }
+
+    function setPanelOpen(open) {
+        el.legendBox.classList.toggle('is-collapsed', !open);
+        el.panelToggle.setAttribute('aria-expanded', String(open));
+        el.panelToggle.title = open ? 'Recolher o painel de camadas' : 'Mostrar o painel de camadas';
+    }
+
+    // Uma chave liga/desliga (checkbox com cara de interruptor).
+    function switchRow(parent, name, checked, color) {
+        var label = create('label', 'm3d-row', parent);
+        var input = create('input', 'm3d-switch', label);
+        input.type = 'checkbox';
+        input.checked = checked;
+        if (color) create('span', 'm3d-swatch', label).style.setProperty('--c', color);
+        create('span', 'm3d-row-name', label, name);
+        return input;
+    }
+
+    function updateCounts() {
+        var bases = state.overlays.filter(function (ov) { return ov.visible; }).length;
+        var ths = (state.thematics || []).filter(function (t) { return t.on; }).length;
+        el.basesCount.textContent = bases + '/' + state.overlays.length;
+        el.thematicsCount.textContent = ths ? ths + ' ligada' + (ths > 1 ? 's' : '') : '';
+        el.thematicsCount.hidden = !ths;
+        el.panelCount.textContent = String(bases + ths);
+        el.panelCount.title = (bases + ths) + ' camada(s) ligada(s)';
+    }
+
     function buildLegend() {
         el.legend.innerHTML = '';
         state.overlays.forEach(function (ov, i) {
-            var li = create('li', '', el.legend);
-            var label = create('label', 'm3d-legend-item', li);
-            var check = create('input', '', label);
-            check.type = 'checkbox';
-            check.checked = ov.visible;
-            var sw = create('span', 'm3d-swatch', label);
-            sw.style.setProperty('--c', ov.isProperty ? PROPERTY_COLOR : ov.color);
-            create('span', 'm3d-legend-name', label, ov.fonte);
+            var li = create('li', 'm3d-item', el.legend);
+            var check = switchRow(li, ov.fonte, ov.visible, ov.isProperty ? PROPERTY_COLOR : ov.color);
             check.addEventListener('change', function () {
                 ov.visible = check.checked;
                 setOverlayVisible(i, ov.visible);
+                updateCounts();
             });
         });
+        updateCounts();
     }
 
     // =====================================================================
@@ -452,17 +535,101 @@
         el.imgSelect.hidden = state.catalog.length < 2;
     }
 
-    function setNote(text, isError) {
+    // Subtítulo da barra: qual imagem está na tela, ou o aviso de erro dela
+    // (`kind`: 'error' | 'warn'), com o botão "Tentar de novo" se `retry`.
+    function setNote(text, kind, retry) {
         el.subtitle.textContent = text;
-        el.subtitle.classList.toggle('is-error', !!isError);
+        el.subtitle.classList.toggle('is-error', kind === 'error' || kind === true);
+        el.subtitle.classList.toggle('is-warn', kind === 'warn');
+        el.imgRetry.hidden = !retry;
+        placeLegend();
+    }
+
+    // Pedidos de tiles de cada fonte do mapa (imagem, relevo, temáticas):
+    // quantos chegaram e quantos falharam, para avisar quando a API cai.
+    function track(prefix, onChange) {
+        trackers[prefix] = { errors: 0, loaded: 0, onChange: onChange };
+        return trackers[prefix];
+    }
+
+    function trackerFor(sourceId) {
+        for (var k in trackers) {
+            if (sourceId === k || sourceId.indexOf(k + '-') === 0) return trackers[k];
+        }
+        return null;
+    }
+
+    function evalImagery() {
+        var src = state.source;
+        if (!src || !state.map) return;
+        var extra = trackers['sat-extra'];
+        var tr = extra || trackers['sat-esri'];
+        if (!tr || !tr.errors) return;
+        var name = extra ? src.name : 'Esri';
+        if (!tr.loaded) {
+            // Sem a imagem escolhida, a Esri cobre o terreno.
+            if (extra) state.map.setLayoutProperty('sat-esri', 'visibility', 'visible');
+            setNote('Erro ao carregar a API de imagens (' + name + '). O serviço pode estar fora do ar ou sobrecarregado.' +
+                (extra ? ' Mostrando a Esri.' : ''), 'error', true);
+        } else {
+            setNote('Parte da imagem não carregou: a API (' + name + ') falhou em alguns trechos.', 'warn', true);
+        }
+    }
+
+    function evalTerrain() {
+        var tr = trackers.terrain;
+        if (tr && tr.errors && !tr.loaded) {
+            setNote('Erro ao carregar a API de relevo (AWS Terrain Tiles): o terreno pode aparecer plano.', 'warn', true);
+        }
+    }
+
+    function readdSource(id, spec, layer, beforeRe) {
+        var map = state.map;
+        var vis = map.getLayer(id) ? map.getLayoutProperty(id, 'visibility') || 'visible' : 'visible';
+        if (map.getLayer(id)) map.removeLayer(id);
+        if (map.getSource(id)) map.removeSource(id);
+        map.addSource(id, spec);
+        if (layer) map.addLayer(Object.assign({ id: id, source: id, layout: { visibility: vis } }, layer), firstLayerMatching(beforeRe));
+    }
+
+    // "Tentar de novo" da barra: refaz a lista (se ela falhou) e os tiles que falharam.
+    function retryImagery() {
+        if (!state.map || !state.source) return;
+        state.imgTries = (state.imgTries || 0) + 1;
+        var esri = trackers['sat-esri'];
+        if (esri && esri.errors) {
+            readdSource('sat-esri', {
+                type: 'raster', tiles: [withRetry(ESRI_URL, state.imgTries)], tileSize: 256, maxzoom: ESRI_MAX_ZOOM,
+                attribution: 'Imagens &copy; Esri'
+            }, { type: 'raster' }, /^(sat-extra|th-|ov\d+-)/);
+            track('sat-esri', evalImagery);
+        }
+        var terrain = trackers.terrain;
+        if (terrain && terrain.errors) {
+            // O terreno é o relevo 3D, não uma camada: troca a fonte e religa.
+            state.map.setTerrain(null);
+            readdSource('terrain', {
+                type: 'raster-dem', tiles: [withRetry(TERRAIN_URL, state.imgTries)], tileSize: 256, maxzoom: TERRAIN_MAX_ZOOM,
+                encoding: 'terrarium', attribution: 'Relevo &copy; Mapzen/AWS Terrain Tiles'
+            });
+            state.map.setTerrain({ source: 'terrain', exaggeration: Number(el.relief.value) });
+            track('terrain', evalTerrain);
+        }
+        selectSource(state.source.key);
+    }
+
+    // Ordem das camadas: imagem (sat-*) < relevo sombreado e temáticas (th-*)
+    // < bases da análise (ov*). Devolve o id antes do qual inserir.
+    function firstLayerMatching(re) {
+        var layers = state.map.getStyle().layers;
+        for (var i = 0; i < layers.length; i++) {
+            if (re.test(layers[i].id)) return layers[i].id;
+        }
+        return undefined;
     }
 
     function firstOverlayLayer() {
-        var layers = state.map.getStyle().layers;
-        for (var i = 0; i < layers.length; i++) {
-            if (/^ov\d+-/.test(layers[i].id)) return layers[i].id;
-        }
-        return undefined;
+        return firstLayerMatching(/^(th-|ov\d+-)/);
     }
 
     // Troca a imagem por cima da Esri; sem `tiles`, fica só a Esri.
@@ -473,10 +640,14 @@
         // Fonte com lista (datas, cenas...) só mostra algo com uma opção escolhida.
         var ready = src && src.tiles && (opt || !(src.options || src.load));
         var tiles = ready ? src.tiles(opt || {}, src.secondary && src.secondary.selected) : null;
+        delete trackers['sat-extra'];
         if (tiles) {
             var maxzoom = typeof src.maxzoom === 'function' ? src.maxzoom(opt || {}) : src.maxzoom;
+            track('sat-extra', evalImagery);
             map.addSource('sat-extra', {
-                type: 'raster', tiles: tiles, tileSize: src.tileSize || 256,
+                type: 'raster',
+                tiles: tiles.map(function (u) { return withRetry(u, state.imgTries); }),
+                tileSize: src.tileSize || 256,
                 minzoom: src.minzoom || 0, maxzoom: maxzoom || 19, attribution: src.attribution
             });
             map.addLayer({ id: 'sat-extra', type: 'raster', source: 'sat-extra' }, firstOverlayLayer());
@@ -528,7 +699,7 @@
             if (!options.length) {
                 showTiles(null);
                 fillSelect(el.secSelect, null);
-                setNote((src.emptyText || 'Nenhuma imagem desta fonte cobre este ponto.') + ' Mostrando a Esri.', true);
+                setNote((src.emptyText || 'Nenhuma imagem desta fonte cobre este ponto.') + ' Mostrando a Esri.', 'warn');
                 return;
             }
             var kept = options.some(function (o) { return o.value === src.selected; });
@@ -542,7 +713,7 @@
             if (seq !== state.imgSeq) return;
             showTiles(null);
             var reason = err instanceof TypeError ? 'sem resposta do servidor' : err.message;
-            setNote('Não foi possível carregar a lista de imagens (' + reason + '). Mostrando a Esri.', true);
+            setNote('Erro ao carregar a API de imagens (' + src.name + '): ' + reason + '. Mostrando a Esri.', 'error', true);
         });
     }
 
@@ -662,6 +833,20 @@
             map.getCanvas().style.cursor = map.queryRenderedFeatures(e.point, { layers: ids }).length ? 'pointer' : '';
         });
 
+        // Tiles que chegaram e que falharam, por fonte (ver track).
+        map.on('error', function (e) {
+            var tr = e && e.sourceId ? trackerFor(e.sourceId) : null;
+            if (tr) { tr.errors++; tr.onChange(); }
+            if (global.console) console.warn('[visão 3D]', (e && e.sourceId) || '', e && e.error);
+        });
+        map.on('data', function (e) {
+            if (e.dataType !== 'source' || !e.tile || !e.sourceId) return;
+            var tr = trackerFor(e.sourceId);
+            if (tr) { tr.loaded++; tr.onChange(); }
+        });
+        track('sat-esri', evalImagery);
+        track('terrain', evalTerrain);
+
         state.map = map;
         // `style.load`, não `load`: o `load` espera todos os tiles (imagem e
         // relevo) e a câmera ficaria parada até lá. A imagem completa depois.
@@ -670,11 +855,256 @@
                 addOverlays(map);
                 // Começa no Google quando ele está configurado (o 1º da lista).
                 selectSource(state.catalog[0].key);
+                // Temáticas marcadas antes do mapa ficar pronto (ou numa tentativa anterior).
+                (state.thematics || []).forEach(function (t) { if (t.on) showThematic(t); });
+                map.on('zoomend', evalAllThematics);
+                evalAllThematics();
                 resolve(map);
             }
             if (map.isStyleLoaded()) ready();
             else map.once('style.load', ready);
         });
+    }
+
+    // =====================================================================
+    // Camadas temáticas (os mesmos itens do mapa 2D, ver map_thematic.js)
+    // =====================================================================
+
+    var THEMATIC_ATTRIBUTION = {
+        mapbiomas: 'MapBiomas', fogo: 'MapBiomas Fogo',
+        deter: 'DETER &copy; INPE', focos: 'Focos de calor &copy; INPE (Queimadas)'
+    };
+
+    // Declividade: tiles calculados aqui a partir da elevação Terrarium.
+    function registerSlopeProtocol(maplibregl) {
+        if (state.slopeProtocol || !global.drawSlopeTile || !maplibregl.addProtocol) return;
+        state.slopeProtocol = true;
+        maplibregl.addProtocol('slope', function (params, abortController) {
+            var m = /^slope:\/\/(\d+)\/(\d+)\/(\d+)/.exec(params.url);
+            var coords = { z: +m[1], x: +m[2], y: +m[3] };
+            var url = global.TERRARIUM_URL.replace('{z}', coords.z).replace('{x}', coords.x).replace('{y}', coords.y);
+            return fetch(url, { signal: abortController.signal })
+                .then(function (r) {
+                    if (!r.ok) throw new Error('elevação indisponível');
+                    return r.blob();
+                })
+                .then(function (blob) { return createImageBitmap(blob); })
+                .then(function (bitmap) {
+                    var canvas = document.createElement('canvas');
+                    canvas.width = 256;
+                    canvas.height = 256;
+                    global.drawSlopeTile(canvas, bitmap, coords);
+                    return new Promise(function (resolve, reject) {
+                        canvas.toBlob(function (b) { b ? resolve(b) : reject(new Error('falha ao gerar o tile')); }, 'image/png');
+                    });
+                })
+                .then(function (blob) { return blob.arrayBuffer(); })
+                .then(function (data) { return { data: data }; });
+        });
+    }
+
+    // Quem responde por cada camada, para dizer qual API falhou.
+    var THEMATIC_API = {
+        mapbiomas: 'do MapBiomas', fogo: 'do MapBiomas',
+        deter: 'do INPE (TerraBrasilis)', focos: 'do INPE (Queimadas)',
+        declividade: 'de elevação (AWS Terrain Tiles)', relevo: 'de elevação (AWS Terrain Tiles)'
+    };
+
+    function buildThematics() {
+        var items = global.getThematicItems ? global.getThematicItems(state.imagery) : [];
+        // Sem `gl` não há como desenhar no 3D; a declividade precisa do protocolo próprio.
+        state.thematics = items.filter(function (it) {
+            return it.gl && (it.key !== 'declividade' || global.drawSlopeTile);
+        }).map(function (it) {
+            return { item: it, on: false, value: it.options ? it.options[0].value : null, opacity: it.opacity, layerIds: [], tries: 0 };
+        });
+        el.thematicsSection.hidden = !state.thematics.length;
+        el.thematics.innerHTML = '';
+        state.thematics.forEach(buildThematicItem);
+        updateCounts();
+    }
+
+    function buildThematicItem(t) {
+        var it = t.item;
+        var li = t.el = create('li', 'm3d-item m3d-th', el.thematics);
+        var top = create('div', 'm3d-th-top', li);
+        var check = switchRow(top, it.name, false);
+        t.dot = create('span', 'm3d-dot', top);
+        t.dot.setAttribute('aria-hidden', 'true');
+
+        var body = create('div', 'm3d-th-body', li);
+        body.hidden = true;
+
+        if (it.options) {
+            var select = create('select', 'm3d-th-select', body);
+            select.setAttribute('aria-label', 'Período de ' + it.name);
+            it.options.forEach(function (opt) { create('option', '', select, opt.text).value = opt.value; });
+            select.value = t.value;
+            select.addEventListener('change', function () {
+                t.value = select.value;
+                if (t.on) showThematic(t);
+            });
+        }
+
+        var row = create('label', 'm3d-th-opacity', body);
+        create('span', '', row, 'Opacidade');
+        var range = create('input', '', row);
+        range.type = 'range';
+        range.min = '0.1';
+        range.max = '1';
+        range.step = '0.05';
+        range.value = String(t.opacity);
+        var pct = create('b', '', row, Math.round(t.opacity * 100) + '%');
+        range.addEventListener('input', function () {
+            t.opacity = parseFloat(range.value);
+            pct.textContent = Math.round(t.opacity * 100) + '%';
+            setThematicOpacity(t);
+        });
+
+        // Aviso: aproximar, erro da API (com "Tentar de novo") ou falha parcial.
+        t.alert = create('div', 'm3d-alert', body);
+        t.alert.setAttribute('role', 'status');
+        t.alert.hidden = true;
+        t.alertText = create('span', '', t.alert);
+        t.retry = create('button', 'm3d-retry', t.alert, 'Tentar de novo');
+        t.retry.type = 'button';
+        t.retry.addEventListener('click', function () {
+            t.tries++;
+            showThematic(t);
+        });
+
+        if (it.legend && it.legend.length) {
+            // MapBiomas tem dezenas de classes: a legenda fica recolhida.
+            var details = create('details', 'm3d-th-legend', body);
+            create('summary', '', details, 'Legenda');
+            var grid = create('div', 'm3d-th-legend-grid', details);
+            it.legend.forEach(function (entry) {
+                var r = create('div', 'm3d-th-legend-row', grid);
+                if (entry.img) {
+                    var img = create('img', '', r);
+                    img.src = entry.img;
+                    img.alt = entry.label;
+                } else {
+                    var sw = create('span', 'm3d-th-swatch', r);
+                    if (entry.color) sw.style.background = entry.color; else sw.classList.add('is-empty');
+                    r.appendChild(document.createTextNode(entry.label));
+                }
+            });
+        }
+        if (it.note) create('p', 'm3d-th-note', body, it.note);
+
+        check.addEventListener('change', function () {
+            t.on = check.checked;
+            body.hidden = !t.on;
+            li.classList.toggle('is-on', t.on);
+            if (t.on) showThematic(t); else hideThematic(t);
+            evalThematic(t);
+            updateCounts();
+        });
+    }
+
+    function hideThematic(t) {
+        delete trackers['th-' + t.item.key];
+        t.tracker = null;
+        if (!state.map) return;
+        var map = state.map;
+        t.layerIds.forEach(function (id) {
+            if (map.getLayer(id)) map.removeLayer(id);
+            if (map.getSource(id)) map.removeSource(id);
+        });
+        t.layerIds = [];
+    }
+
+    // Em "Tentar de novo" a URL muda um pouco: o navegador não reaproveita
+    // a resposta de erro guardada no cache.
+    function withRetry(url, tries) {
+        if (!tries || !/^(https?:|\/)/.test(url)) return url;
+        return url + (url.indexOf('?') < 0 ? '?' : '&') + '_tentativa=' + tries;
+    }
+
+    // (Re)cria as fontes da temática com o período escolhido.
+    function showThematic(t) {
+        if (!state.map) return;  // o mapa aplica as marcadas quando ficar pronto
+        hideThematic(t);
+        var map = state.map;
+        var key = t.item.key;
+        t.tracker = track('th-' + key, function () { evalThematic(t); });
+        t.item.gl(t.value).forEach(function (spec, i) {
+            var id = 'th-' + key + '-' + i;
+            if (spec.hillshade) {
+                // Relevo sombreado por baixo das outras temáticas.
+                map.addSource(id, {
+                    type: 'raster-dem', tiles: [withRetry(TERRAIN_URL, t.tries)], tileSize: 256, maxzoom: TERRAIN_MAX_ZOOM,
+                    encoding: 'terrarium', attribution: 'Relevo &copy; Mapzen/AWS Terrain Tiles'
+                });
+                map.addLayer({ id: id, type: 'hillshade', source: id }, firstLayerMatching(/^(th-|ov\d+-)/));
+            } else {
+                map.addSource(id, {
+                    type: 'raster',
+                    tiles: spec.tiles.map(function (u) {
+                        return /^slope:/.test(u) ? u : withRetry(absoluteUrl(u), t.tries);
+                    }),
+                    tileSize: spec.tileSize || 256,
+                    minzoom: spec.minzoom || 0,
+                    maxzoom: spec.maxzoom || 19,
+                    attribution: spec.attribution || THEMATIC_ATTRIBUTION[key] || ''
+                });
+                map.addLayer({ id: id, type: 'raster', source: id }, firstLayerMatching(/^ov\d+-/));
+            }
+            t.layerIds.push(id);
+        });
+        setThematicOpacity(t);
+        evalThematic(t);
+    }
+
+    function setThematicOpacity(t) {
+        if (!state.map) return;
+        var map = state.map, op = t.opacity;
+        t.layerIds.forEach(function (id) {
+            var layer = map.getLayer(id);
+            if (!layer) return;
+            if (layer.type === 'hillshade') {
+                map.setPaintProperty(id, 'hillshade-shadow-color', 'rgba(0,0,0,' + op + ')');
+                map.setPaintProperty(id, 'hillshade-accent-color', 'rgba(0,0,0,' + (op * 0.5) + ')');
+                map.setPaintProperty(id, 'hillshade-highlight-color', 'rgba(255,255,255,' + (op * 0.35) + ')');
+            } else {
+                map.setPaintProperty(id, 'raster-opacity', op);
+            }
+        });
+    }
+
+    // Estado da camada: carregando, carregada, aproximar, falha parcial ou erro.
+    function setThematicState(t, kind, text) {
+        t.dot.className = 'm3d-dot' + (kind ? ' is-' + kind : '');
+        t.dot.title = text || '';
+        var showAlert = kind === 'zoom' || kind === 'warn' || kind === 'error';
+        t.alert.hidden = !showAlert;
+        t.alert.className = 'm3d-alert' + (kind ? ' is-' + kind : '');
+        t.alertText.textContent = showAlert ? text : '';
+        t.retry.hidden = kind !== 'warn' && kind !== 'error';
+        t.el.classList.toggle('has-error', kind === 'error');
+    }
+
+    function evalThematic(t) {
+        if (!t.on) return setThematicState(t, '', '');
+        var api = THEMATIC_API[t.item.key] || 'do provedor';
+        var tr = t.tracker;
+        if (tr && tr.errors && !tr.loaded) {
+            return setThematicState(t, 'error', 'Erro ao carregar a API ' + api + '. O serviço pode estar fora do ar ou sobrecarregado.');
+        }
+        var min = t.item.minZoom;
+        if (state.map && min && state.map.getZoom() < min) {
+            return setThematicState(t, 'zoom', 'Aproxime a câmera (zoom ' + min + '+) para ver esta camada.');
+        }
+        if (tr && tr.errors) {
+            return setThematicState(t, 'warn', 'Alguns trechos não carregaram: a API ' + api + ' falhou em parte dos pedidos.');
+        }
+        if (tr && tr.loaded) return setThematicState(t, 'ok', 'Camada carregada');
+        setThematicState(t, 'loading', 'Carregando…');
+    }
+
+    function evalAllThematics() {
+        (state.thematics || []).forEach(evalThematic);
     }
 
     // =====================================================================
@@ -693,7 +1123,7 @@
         var small = global.innerWidth < 760;
         return small
             ? { top: 120, bottom: 150, left: 30, right: 30 }
-            : { top: 110, bottom: 70, left: 300, right: 90 };
+            : { top: 110, bottom: 70, left: 400, right: 90 };
     }
 
     // Enquadra a propriedade de cima e desce inclinando, como um drone.
@@ -784,9 +1214,13 @@
 
         setStatus('Carregando a imagem 3D...');
         buildImagery();
+        if (!state.thematics) buildThematics();
         placeLegend();
         loadMaplibre()
-            .then(function (maplibregl) { return createMap(maplibregl); })
+            .then(function (maplibregl) {
+                registerSlopeProtocol(maplibregl);
+                return createMap(maplibregl);
+            })
             .then(function () {
                 setStatus('');
                 frameProperty(true);
