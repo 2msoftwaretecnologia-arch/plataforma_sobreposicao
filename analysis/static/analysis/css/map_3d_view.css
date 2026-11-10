@@ -634,3 +634,17 @@ html.m3d-open body { overflow: hidden; }
   .m3d { animation: none; }
   .btn-3d { transition: none; }
 }
+
+/* Lado a lado: o menu é o painel "Camadas" do 2D; o do 3D some e o
+   exagero do relevo vira uma pílula na barra (map_3d_view.js placePanel). */
+.m3d-panel[hidden] { display: none; }
+.m3d-relief-slot:empty { display: none; }
+.m3d-relief-slot .m3d-relief {
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(18, 39, 26, 0.88);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  white-space: nowrap;
+}
+.m3d-relief-slot .m3d-relief input { flex: none; width: 84px; }
+.m3d--shared-menu .m3d-controls { gap: 8px; }

@@ -210,6 +210,10 @@
             applyChoice(state.source);
         });
 
+        // Lado a lado o painel do 3D some (o menu é o do 2D): o exagero do
+        // relevo vem para cá.
+        el.reliefSlot = create('div', 'm3d-relief-slot', controls);
+
         // Ações: ícone + texto (na tela 3D estreita fica só o ícone, ver CSS).
         var actions = create('div', 'm3d-actions', controls);
         el.orbit = iconButton(actions, 'm3d-btn', ICONS.orbit, 'Girar', 'Girar a câmera ao redor da propriedade');
@@ -297,8 +301,9 @@
         el.panelToggle.setAttribute('aria-controls', el.panelBody.id);
 
         // Exagero do relevo (antes ficava na barra do topo).
-        var relief = create('label', 'm3d-relief', el.panelBody);
-        create('span', '', relief, 'Exagero do relevo');
+        var relief = el.reliefBox = create('label', 'm3d-relief', el.panelBody);
+        relief.title = 'Exagero do relevo';
+        el.reliefLabel = create('span', '', relief, 'Exagero do relevo');
         el.relief = create('input', '', relief);
         el.relief.type = 'range';
         el.relief.min = '1';
@@ -338,6 +343,23 @@
             body.hidden = !open;
         });
         return { root: sec, count: count, list: list };
+    }
+
+    /**
+     * 2D + 3D lado a lado: um menu só, o painel "Camadas" do 2D, que liga
+     * as bases e as temáticas nos dois mapas. O do 3D some e o exagero do
+     * relevo vai para a barra. Só 3D e tela 3D sozinha: o painel do 3D.
+     */
+    function placePanel() {
+        var shared = state.mode === 'split' && state.view === 'split';
+        el.legendBox.hidden = shared;
+        el.root.classList.toggle('m3d--shared-menu', shared);
+        var target = shared ? el.reliefSlot : el.panelBody;
+        if (el.reliefBox.parentNode !== target) {
+            if (shared) target.appendChild(el.reliefBox);
+            else target.insertBefore(el.reliefBox, target.firstChild);
+        }
+        el.reliefLabel.textContent = shared ? 'Relevo' : 'Exagero do relevo';
     }
 
     function setPanelOpen(open) {
@@ -952,37 +974,39 @@
         var it = t.item;
         var li = t.el = create('li', 'm3d-item m3d-th', el.thematics);
         var top = create('div', 'm3d-th-top', li);
-        var check = switchRow(top, it.name, false);
+        var check = t.check = switchRow(top, it.name, false);
         t.dot = create('span', 'm3d-dot', top);
         t.dot.setAttribute('aria-hidden', 'true');
 
-        var body = create('div', 'm3d-th-body', li);
+        var body = t.body = create('div', 'm3d-th-body', li);
         body.hidden = true;
 
         if (it.options) {
-            var select = create('select', 'm3d-th-select', body);
+            var select = t.select = create('select', 'm3d-th-select', body);
             select.setAttribute('aria-label', 'Período de ' + it.name);
             it.options.forEach(function (opt) { create('option', '', select, opt.text).value = opt.value; });
             select.value = t.value;
             select.addEventListener('change', function () {
                 t.value = select.value;
                 if (t.on) showThematic(t);
+                thematicTo2D(t);
             });
         }
 
         var row = create('label', 'm3d-th-opacity', body);
         create('span', '', row, 'Opacidade');
-        var range = create('input', '', row);
+        var range = t.range = create('input', '', row);
         range.type = 'range';
         range.min = '0.1';
         range.max = '1';
         range.step = '0.05';
         range.value = String(t.opacity);
-        var pct = create('b', '', row, Math.round(t.opacity * 100) + '%');
+        var pct = t.pct = create('b', '', row, Math.round(t.opacity * 100) + '%');
         range.addEventListener('input', function () {
             t.opacity = parseFloat(range.value);
             pct.textContent = Math.round(t.opacity * 100) + '%';
             setThematicOpacity(t);
+            thematicTo2D(t);
         });
 
         // Aviso: aproximar, erro da API (com "Tentar de novo") ou falha parcial.
@@ -1018,13 +1042,49 @@
         if (it.note) create('p', 'm3d-th-note', body, it.note);
 
         check.addEventListener('change', function () {
-            t.on = check.checked;
-            body.hidden = !t.on;
-            li.classList.toggle('is-on', t.on);
-            if (t.on) showThematic(t); else hideThematic(t);
-            evalThematic(t);
-            updateCounts();
+            setThematicOn(t, check.checked);
+            thematicTo2D(t);
         });
+    }
+
+    function setThematicOn(t, on) {
+        t.on = on;
+        t.check.checked = on;
+        t.body.hidden = !on;
+        t.el.classList.toggle('is-on', on);
+        if (on) showThematic(t); else hideThematic(t);
+        evalThematic(t);
+        updateCounts();
+    }
+
+    // As temáticas são as mesmas nos dois mapas: o que muda no 3D (Só 3D)
+    // muda no 2D, e o que muda no painel do 2D (lado a lado) muda no 3D.
+    function thematicTo2D(t) {
+        if (state.page && global.setMapThematic) {
+            global.setMapThematic(t.item.key, { on: t.on, value: t.value, opacity: t.opacity });
+        }
+    }
+
+    function thematicFrom2D(t, st) {
+        if (!st) return;
+        if (t.select && st.value != null && String(st.value) !== t.value) {
+            t.value = String(st.value);
+            t.select.value = t.value;
+            if (t.on && st.on) showThematic(t);
+        }
+        if (st.opacity != null && st.opacity !== t.opacity) {
+            t.opacity = st.opacity;
+            t.range.value = String(st.opacity);
+            t.pct.textContent = Math.round(st.opacity * 100) + '%';
+            setThematicOpacity(t);
+        }
+        if (!!st.on !== t.on) setThematicOn(t, !!st.on);
+    }
+
+    function thematicsFrom2D() {
+        if (!state.page || !state.thematics || !global.getMapThematics) return;
+        var all = global.getMapThematics();
+        state.thematics.forEach(function (t) { thematicFrom2D(t, all[t.item.key]); });
     }
 
     function hideThematic(t) {
@@ -1343,6 +1403,7 @@
         mountRoot(mode);
         el.root.hidden = false;
         buildLegend();
+        placePanel();
         // Na metade da tela o painel cobriria o mapa: começa recolhido.
         setPanelOpen((mode === 'full' || state.view === '3d') && el.root.clientWidth > 760);
         if (mode === 'full') el.close.focus();
@@ -1351,6 +1412,7 @@
             state.map.resize();
             placeLegend();
             refreshOverlays();
+            thematicsFrom2D();
             startView();
             return;
         }
@@ -1358,6 +1420,7 @@
         setStatus('Carregando a imagem 3D...');
         buildImagery();
         if (!state.thematics) buildThematics();
+        thematicsFrom2D();
         placeLegend();
         loadMaplibre()
             .then(function (maplibregl) {
@@ -1476,6 +1539,7 @@
         }
         if (state.mode === 'split' && state.map) {
             // O 3D já está no quadro: só mudou de largura.
+            placePanel();
             state.map.resize();
             setPanelOpen(view === '3d' && el.root.clientWidth > 760);
             placeLegend();
@@ -1568,6 +1632,12 @@
             };
             state.splitHost = opts.side;
             state.view = '2d';
+            if (global.onMapThematicChange) {
+                global.onMapThematicChange(function (key, st) {
+                    var t = (state.thematics || []).find(function (x) { return x.item.key === key; });
+                    if (t) thematicFrom2D(t, st);
+                });
+            }
             opts.viewSwitch.hidden = false;
             buttons.forEach(function (b) {
                 b.addEventListener('click', function () {

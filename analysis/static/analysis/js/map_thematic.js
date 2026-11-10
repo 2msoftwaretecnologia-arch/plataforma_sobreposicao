@@ -321,7 +321,24 @@
             relief.style.mixBlendMode = 'multiply';
         }
         var list = L.DomUtil.create('div', 'thematic-list', mount);
+        // Por camada: { get(), set(estado) }; e quem quer saber das mudanças
+        // feitas aqui (a visão 3D no lado a lado usa este painel).
+        var registry = {};
+        var listeners = [];
         buildItems(imagery, pane).forEach(function (item) { buildItem(item, list); });
+
+        /** Estado das temáticas do 2D: { chave: { on, value, opacity } }. */
+        global.getMapThematics = function () {
+            var out = {};
+            Object.keys(registry).forEach(function (k) { out[k] = registry[k].get(); });
+            return out;
+        };
+        /** Liga/desliga uma temática do 2D (sem avisar quem escuta). */
+        global.setMapThematic = function (key, st) {
+            if (registry[key]) registry[key].set(st || {});
+        };
+        /** `fn(chave, estado)` a cada mudança feita no painel do 2D. */
+        global.onMapThematicChange = function (fn) { listeners.push(fn); };
 
         function buildItem(item, body) {
             var wrap = L.DomUtil.create('div', 'thematic-item', body);
@@ -389,7 +406,11 @@
                 l.on('load', function () { loading = false; updateStatus(); });
             }
 
-            check.addEventListener('change', function () {
+            function notify() {
+                var st = registry[item.key].get();
+                listeners.forEach(function (fn) { fn(item.key, st); });
+            }
+            function apply() {
                 controls.hidden = !check.checked;
                 wrap.classList.toggle('is-on', check.checked);
                 if (check.checked) {
@@ -405,14 +426,38 @@
                     loading = false;
                 }
                 updateStatus();
-            });
+            }
+            check.addEventListener('change', function () { apply(); notify(); });
             if (select) {
                 select.addEventListener('change', function () {
                     if (layer && item.select) item.select(layer, select.value);
+                    notify();
                 });
             }
-            opacity.addEventListener('input', function () { setOpacity(parseFloat(opacity.value)); });
+            opacity.addEventListener('input', function () { setOpacity(parseFloat(opacity.value)); notify(); });
             map.on('zoomend', updateStatus);
+
+            registry[item.key] = {
+                get: function () {
+                    return { on: check.checked, value: select ? select.value : null, opacity: parseFloat(opacity.value) };
+                },
+                set: function (st) {
+                    var on = st.on === undefined ? check.checked : !!st.on;
+                    var value = select && st.value != null ? String(st.value) : null;
+                    var periodChanged = value !== null && value !== select.value;
+                    if (value !== null) select.value = value;
+                    if (st.opacity != null) {
+                        opacity.value = String(st.opacity);
+                        setOpacity(parseFloat(opacity.value));
+                    }
+                    if (on !== check.checked) {
+                        check.checked = on;
+                        apply();
+                    } else if (periodChanged && layer && on && item.select) {
+                        item.select(layer, select.value);
+                    }
+                }
+            };
         }
     }
 
