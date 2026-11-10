@@ -86,6 +86,15 @@
         };
     }
 
+    // Os mesmos serviços e composições na visão 3D (map_3d_view.js).
+    global.IMAGERY_DEFS = {
+        SENTINEL2_URL: SENTINEL2_URL,
+        SENTINEL2_RENDERINGS: SENTINEL2_RENDERINGS,
+        LANDSAT_URL: LANDSAT_URL,
+        LANDSAT_RENDERINGS: LANDSAT_RENDERINGS,
+        landsatRenderingRule: landsatRenderingRule
+    };
+
     /**
      * Parâmetros de consulta por ponto nos serviços ArcGIS. A geometria vai
      * em JSON com o sistema de coordenadas: no formato curto "x,y" alguns

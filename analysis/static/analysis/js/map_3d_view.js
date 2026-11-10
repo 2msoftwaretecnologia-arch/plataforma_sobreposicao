@@ -1,7 +1,10 @@
 /*
- * Visão 3D do mapa de sobreposições (página de resultados): a imagem de
- * satélite de melhor resolução disponível sobre o relevo, com a propriedade
- * e as bases da análise desenhadas por cima, nas mesmas cores do mapa 2D.
+ * Visão 3D do mapa de sobreposições (página de resultados): imagem de
+ * satélite sobre o relevo, com a propriedade e as bases da análise
+ * desenhadas por cima, nas mesmas cores do mapa 2D. A imagem é escolhida
+ * entre as fontes do mapa 2D (Google, Esri, Wayback, Sentinel-2, Landsat,
+ * CBERS-4A, Landsat 5/7 e provedores configurados); o CBERS-2B fica de fora
+ * porque cada cena precisa ser baixada e corrigida no servidor antes.
  *
  * O MapLibre só é baixado quando o usuário abre a visão 3D. As camadas vêm do
  * mapa interativo (maps.js → getMapOverlays), então o que está ligado lá
@@ -36,11 +39,19 @@
     var PROPERTY_COLOR = '#ffd23f';
     var SICAR_FONTE = 'Base de Dados Sicar';
 
+    // ImageServer da Esri (Sentinel-2, Landsat) gera cada tile na hora:
+    // tiles de 512 px para pedir menos imagens.
+    var IMAGE_SERVER_TILE = 512;
+
     var state = {
         built: false,
         map: null,
         imagery: {},
         overlays: [],
+        catalog: [],      // fontes de imagem (imageryCatalog)
+        source: null,     // fonte escolhida
+        lists: {},        // listas de datas/cenas já buscadas
+        imgSeq: 0,        // só vale a resposta da última escolha
         opener: null,
         orbiting: false,
         orbitFrame: null,
@@ -82,8 +93,21 @@
         return /^https?:\/\//.test(url) ? url : global.location.origin + url;
     }
 
-    function hasGoogle() {
-        return !!state.imagery.google_tile_url;
+    function formatDateBR(iso) {
+        var p = (iso || '').split('-');
+        return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : iso;
+    }
+
+    function getJson(url) {
+        return fetch(url, { credentials: 'same-origin' }).then(function (r) {
+            // Sessão expirada: o login redireciona para a página de entrada (HTML).
+            if (r.redirected && /\/auth\//.test(r.url)) throw new Error('sua sessão expirou; entre de novo');
+            return r.json().catch(function () { return null; }).then(function (json) {
+                if (!json) throw new Error('o servidor respondeu com erro ' + r.status);
+                if (!r.ok && json.erro) throw new Error(json.erro);
+                return json;
+            });
+        });
     }
 
     function fmtRelief(n) {
@@ -139,10 +163,26 @@
 
         var controls = create('div', 'm3d-controls', bar);
 
-        // Imagem de satélite
-        el.imagery = create('div', 'm3d-seg', controls);
-        el.imagery.setAttribute('role', 'radiogroup');
-        el.imagery.setAttribute('aria-label', 'Imagem de satélite');
+        // Imagem de satélite: fonte, data/cena/composição e (Landsat 5/7) composição.
+        el.imagery = create('div', 'm3d-imagery', controls);
+        el.imgSelect = create('select', 'm3d-select m3d-select-main', el.imagery);
+        el.imgSelect.setAttribute('aria-label', 'Imagem de satélite');
+        el.imgSelect.title = 'Imagem de satélite';
+        el.subSelect = create('select', 'm3d-select', el.imagery);
+        el.subSelect.hidden = true;
+        el.secSelect = create('select', 'm3d-select', el.imagery);
+        el.secSelect.hidden = true;
+        el.imgSelect.addEventListener('change', function () { selectSource(el.imgSelect.value); });
+        el.subSelect.addEventListener('change', function () {
+            if (!state.source) return;
+            state.source.selected = el.subSelect.value;
+            applyChoice(state.source);
+        });
+        el.secSelect.addEventListener('change', function () {
+            if (!state.source || !state.source.secondary) return;
+            state.source.secondary.selected = el.secSelect.value;
+            applyChoice(state.source);
+        });
 
         // Exagero do relevo
         var relief = create('label', 'm3d-relief', controls);
@@ -170,7 +210,8 @@
         el.close.setAttribute('aria-label', 'Fechar a visão 3D');
         el.close.innerHTML = 'Fechar <span aria-hidden="true">&times;</span>';
 
-        var legend = create('aside', 'm3d-legend', root);
+        el.bar = bar;
+        var legend = el.legendBox = create('aside', 'm3d-legend', root);
         legend.setAttribute('aria-label', 'Bases no mapa 3D');
         create('div', 'm3d-legend-title', legend, 'Bases no mapa');
         el.legend = create('ul', 'm3d-legend-list', legend);
@@ -192,32 +233,28 @@
         document.addEventListener('keydown', function (e) {
             if (e.key === 'Escape' && !root.hidden) close();
         });
+        global.addEventListener('resize', placeLegend);
 
         state.built = true;
     }
 
-    function buildImageryOptions() {
-        el.imagery.innerHTML = '';
-        var options = [];
-        if (hasGoogle()) options.push({ value: 'google', label: 'Google', title: 'Imagem do Google (até ~zoom 20)' });
-        options.push({ value: 'esri', label: 'Esri', title: 'Imagem da Esri (World Imagery)' });
-        // Uma opção só: não há o que escolher.
-        el.imagery.hidden = options.length < 2;
-        options.forEach(function (opt, i) {
-            var id = 'm3d_img_' + opt.value;
-            var input = create('input', '', el.imagery);
-            input.type = 'radio';
-            input.name = 'm3d_imagery';
-            input.id = id;
-            input.value = opt.value;
-            input.checked = i === 0;
-            var label = create('label', '', el.imagery, opt.label);
-            label.htmlFor = id;
-            label.title = opt.title;
-            input.addEventListener('change', function () {
-                if (input.checked) setImagery(opt.value);
-            });
+    // A barra do topo quebra em duas linhas quando os seletores de imagem
+    // não cabem: a legenda desce junto (no celular ela fica embaixo, pelo CSS).
+    function placeLegend() {
+        if (!state.built || el.root.hidden) return;
+        var small = global.matchMedia && global.matchMedia('(max-width: 760px)').matches;
+        el.legendBox.style.top = small ? '' : (el.bar.offsetTop + el.bar.offsetHeight + 12) + 'px';
+    }
+
+    function fillSelect(select, options, selected) {
+        select.innerHTML = '';
+        (options || []).forEach(function (opt) {
+            var o = create('option', '', select, opt.text);
+            o.value = opt.value;
         });
+        select.hidden = !options || !options.length;
+        if (!select.hidden) select.value = selected;
+        placeLegend();
     }
 
     function buildLegend() {
@@ -242,8 +279,10 @@
     // Mapa
     // =====================================================================
 
+    // A Esri fica sempre no estilo (é o fundo das fontes com `backdrop`);
+    // a imagem escolhida entra como a fonte 'sat-extra' (showTiles).
     function rasterSources() {
-        var sources = {
+        return {
             'sat-esri': {
                 type: 'raster', tiles: [ESRI_URL], tileSize: 256, maxzoom: ESRI_MAX_ZOOM,
                 attribution: 'Imagens &copy; Esri'
@@ -253,13 +292,258 @@
                 encoding: 'terrarium', attribution: 'Relevo &copy; Mapzen/AWS Terrain Tiles'
             }
         };
-        if (hasGoogle()) {
-            sources['sat-google'] = {
-                type: 'raster', tiles: [absoluteUrl(state.imagery.google_tile_url)], tileSize: 256,
-                maxzoom: GOOGLE_MAX_ZOOM, attribution: 'Imagens &copy; Google'
-            };
+    }
+
+    // =====================================================================
+    // Imagens de satélite (as mesmas fontes do mapa 2D, ver maps.js)
+    // =====================================================================
+
+    // ImageServer da Esri como tiles: o MapLibre troca {bbox-epsg-3857}
+    // pelo retângulo de cada tile.
+    function imageServerTiles(url, rule) {
+        var size = IMAGE_SERVER_TILE;
+        return [url + '/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=' + size + ',' + size +
+            '&format=jpgpng&f=image&renderingRule=' + encodeURIComponent(JSON.stringify(rule))];
+    }
+
+    // Centro da propriedade: as listas de cenas (CBERS, Landsat 5/7) são do lugar.
+    function imageryCenter() {
+        var b = boundsOf(targetFeatures());
+        if (b) return { lng: (b[0][0] + b[1][0]) / 2, lat: (b[0][1] + b[1][1]) / 2 };
+        return state.map.getCenter();
+    }
+
+    function centerQuery(url) {
+        var c = imageryCenter();
+        return url + '?lat=' + c.lat.toFixed(3) + '&lon=' + c.lng.toFixed(3);
+    }
+
+    /**
+     * Fontes do seletor. Cada uma: `name`, `note` (subtítulo), `tiles(opção,
+     * composição)` (null = a Esri do estilo), `options` ou `load()` (lista de
+     * datas/cenas/composições), `label`, `initial(opções)`, `secondary`
+     * (segundo seletor), `backdrop` (Esri por baixo), `minzoom`/`maxzoom`,
+     * `tileSize` e `centered` (lista depende do lugar).
+     */
+    function imageryCatalog() {
+        var im = state.imagery || {};
+        var defs = global.IMAGERY_DEFS;
+        var list = [];
+
+        if (im.google_tile_url) {
+            list.push({
+                key: 'google', name: 'Google', note: 'Imagem do Google sobre o relevo',
+                maxzoom: GOOGLE_MAX_ZOOM, mapMaxZoom: GOOGLE_MAX_ZOOM + 0.5, attribution: 'Imagens &copy; Google',
+                tiles: function () { return [absoluteUrl(im.google_tile_url)]; }
+            });
         }
-        return sources;
+        list.push({ key: 'esri', name: 'Esri (atual)', note: 'Imagem da Esri sobre o relevo', tiles: null });
+
+        if (im.wayback_tile_url && im.wayback_releases_url) {
+            list.push({
+                key: 'wayback', name: 'Histórico Esri (Wayback)', note: 'Imagem histórica da Esri',
+                label: 'Data da imagem', backdrop: true, maxzoom: ESRI_MAX_ZOOM,
+                attribution: 'Imagens &copy; Esri (World Imagery Wayback)',
+                load: function () {
+                    return getJson(absoluteUrl(im.wayback_releases_url)).then(function (j) {
+                        return (j.releases || []).map(function (r) {
+                            return { value: String(r.id), text: formatDateBR(r.date) };
+                        });
+                    });
+                },
+                tiles: function (o) { return [im.wayback_tile_url.replace('{release}', o.value)]; }
+            });
+        }
+
+        // Planet, Copernicus...: só os configurados no servidor.
+        (im.providers || []).forEach(function (p) {
+            list.push({
+                key: 'prov-' + p.key, name: p.base_name, note: p.base_name, label: p.label,
+                backdrop: true, attribution: p.attribution,
+                load: function () {
+                    return getJson(absoluteUrl(p.layers_url)).then(function (j) {
+                        return (j.layers || []).map(function (l) {
+                            return { value: encodeURIComponent(l.id), text: l.title, maxZoom: l.max_zoom };
+                        });
+                    });
+                },
+                maxzoom: function (o) { return o.maxZoom || 19; },
+                tiles: function (o) { return [absoluteUrl(p.tile_url.replace('{layer}', o.value))]; }
+            });
+        });
+
+        if (defs) {
+            list.push({
+                key: 'sentinel2', name: 'Sentinel-2 (10 m)', label: 'Composição',
+                note: 'Sentinel-2 · imagem gerada na hora, pode levar alguns segundos',
+                backdrop: true, tileSize: IMAGE_SERVER_TILE, maxzoom: 16,
+                attribution: 'Sentinel-2 (Copernicus) &copy; Esri',
+                options: defs.SENTINEL2_RENDERINGS,
+                // Em 3D a cor natural é a leitura mais direta; as outras ficam no seletor.
+                initial: function () { return 'Natural Color with DRA'; },
+                tiles: function (o) { return imageServerTiles(defs.SENTINEL2_URL, { rasterFunction: o.value }); }
+            });
+            list.push({
+                key: 'landsat', name: 'Landsat 8/9 (30 m)', label: 'Composição',
+                note: 'Landsat 8/9 · melhor cena recente, gerada na hora',
+                backdrop: true, tileSize: IMAGE_SERVER_TILE, maxzoom: 14,
+                attribution: 'Landsat (USGS/NASA) &copy; Esri',
+                options: defs.LANDSAT_RENDERINGS,
+                tiles: function (o) { return imageServerTiles(defs.LANDSAT_URL, defs.landsatRenderingRule(o.value)); }
+            });
+        }
+
+        if (im.cbers) {
+            list.push({
+                key: 'cbers', name: 'CBERS-4A (2 m, INPE)', label: 'Cena CBERS-4A', centered: true,
+                note: 'CBERS-4A · aparece de perto; ao fundo fica a Esri',
+                emptyText: 'Nenhuma cena CBERS-4A cobre este ponto.',
+                backdrop: true, minzoom: im.cbers.min_zoom, maxzoom: 18,
+                attribution: 'CBERS-4A &copy; INPE (Brazil Data Cube)',
+                load: function () {
+                    return getJson(centerQuery(absoluteUrl(im.cbers.scenes_url))).then(function (j) {
+                        return (j.scenes || []).map(function (s) { return { value: s.id, text: formatDateBR(s.date) }; });
+                    });
+                },
+                tiles: function (o) { return [absoluteUrl(im.cbers.tile_url.replace('{scene}', o.value))]; }
+            });
+        }
+
+        if (im.landsat_legacy) {
+            var ll = im.landsat_legacy;
+            list.push({
+                key: 'landsat-legacy', name: 'Landsat 5/7 (' + ll.years[0] + '–' + ll.years[1] + ')',
+                label: 'Cena (ano · data · satélite · nuvens)', centered: true,
+                note: 'Landsat 5/7 · 30 m',
+                emptyText: 'Nenhuma cena Landsat 5/7 cobre este ponto.',
+                backdrop: true, maxzoom: ll.max_native_zoom,
+                attribution: 'Landsat (USGS/NASA) via Microsoft Planetary Computer',
+                load: function () {
+                    return getJson(centerQuery(absoluteUrl(ll.scenes_url))).then(function (j) {
+                        return (j.scenes || []).map(function (s) {
+                            var sat = s.platform.replace('landsat-', 'Landsat ');
+                            var stripes = s.platform === 'landsat-7' && +s.date.slice(0, 4) >= 2003 ? ' (com faixas)' : '';
+                            return {
+                                value: s.id, year: s.date.slice(0, 4), cloud: s.cloud,
+                                text: s.date.slice(0, 4) + ' · ' + formatDateBR(s.date).slice(0, 5) + ' · ' + sat + stripes + ' · ' + s.cloud + '% nuvens'
+                            };
+                        });
+                    });
+                },
+                // A de menos nuvem de 2008 (marco do Código Florestal), como no 2D.
+                initial: function (options) {
+                    var y2008 = options.filter(function (o) { return o.year === '2008'; });
+                    if (!y2008.length) return null;
+                    return y2008.reduce(function (best, o) { return o.cloud < best.cloud ? o : best; }).value;
+                },
+                secondary: { label: 'Composição', options: ll.compositions, selected: ll.compositions[0].value },
+                tiles: function (o, comp) {
+                    return [absoluteUrl(ll.tile_url.replace('{scene}', o.value).replace('{comp}', comp))];
+                }
+            });
+        }
+        return list;
+    }
+
+    function buildImagery() {
+        state.catalog = imageryCatalog();
+        fillSelect(el.imgSelect, state.catalog.map(function (s) { return { value: s.key, text: s.name }; }),
+            state.catalog[0].key);
+        el.imgSelect.hidden = state.catalog.length < 2;
+    }
+
+    function setNote(text, isError) {
+        el.subtitle.textContent = text;
+        el.subtitle.classList.toggle('is-error', !!isError);
+    }
+
+    function firstOverlayLayer() {
+        var layers = state.map.getStyle().layers;
+        for (var i = 0; i < layers.length; i++) {
+            if (/^ov\d+-/.test(layers[i].id)) return layers[i].id;
+        }
+        return undefined;
+    }
+
+    // Troca a imagem por cima da Esri; sem `tiles`, fica só a Esri.
+    function showTiles(src, opt) {
+        var map = state.map;
+        if (map.getLayer('sat-extra')) map.removeLayer('sat-extra');
+        if (map.getSource('sat-extra')) map.removeSource('sat-extra');
+        // Fonte com lista (datas, cenas...) só mostra algo com uma opção escolhida.
+        var ready = src && src.tiles && (opt || !(src.options || src.load));
+        var tiles = ready ? src.tiles(opt || {}, src.secondary && src.secondary.selected) : null;
+        if (tiles) {
+            var maxzoom = typeof src.maxzoom === 'function' ? src.maxzoom(opt || {}) : src.maxzoom;
+            map.addSource('sat-extra', {
+                type: 'raster', tiles: tiles, tileSize: src.tileSize || 256,
+                minzoom: src.minzoom || 0, maxzoom: maxzoom || 19, attribution: src.attribution
+            });
+            map.addLayer({ id: 'sat-extra', type: 'raster', source: 'sat-extra' }, firstOverlayLayer());
+        }
+        map.setLayoutProperty('sat-esri', 'visibility', !tiles || src.backdrop ? 'visible' : 'none');
+    }
+
+    function currentOption(src) {
+        return (src.list || []).find(function (o) { return o.value === src.selected; }) || null;
+    }
+
+    function applyChoice(src) {
+        var opt = currentOption(src);
+        showTiles(src, opt);
+        setNote(src.note + (opt && src.list.length > 1 ? ' · ' + opt.text : ''));
+    }
+
+    function selectSource(key) {
+        var src = state.catalog.find(function (s) { return s.key === key; }) || state.catalog[0];
+        var seq = ++state.imgSeq;
+        state.source = src;
+        el.imgSelect.value = src.key;
+        state.map.setMaxZoom(src.mapMaxZoom || ESRI_MAX_ZOOM + 2);
+        fillSelect(el.subSelect, null);
+        fillSelect(el.secSelect, src.secondary ? src.secondary.options : null, src.secondary && src.secondary.selected);
+        el.secSelect.setAttribute('aria-label', src.secondary ? src.secondary.label : '');
+
+        if (!src.options && !src.load) {
+            src.list = [];
+            applyChoice(src);
+            return;
+        }
+
+        var cacheKey = src.key;
+        if (src.centered) {
+            var c = imageryCenter();
+            cacheKey += '@' + c.lat.toFixed(2) + ',' + c.lng.toFixed(2);
+        }
+        var pending = src.options ? Promise.resolve(src.options) : state.lists[cacheKey];
+        if (!pending) {
+            pending = state.lists[cacheKey] = src.load();
+            // Enquanto a lista não chega, a Esri segura o fundo.
+            showTiles(null);
+            setNote('Carregando as imagens disponíveis…');
+        }
+        pending.then(function (options) {
+            if (seq !== state.imgSeq) return;
+            src.list = options;
+            if (!options.length) {
+                showTiles(null);
+                fillSelect(el.secSelect, null);
+                setNote((src.emptyText || 'Nenhuma imagem desta fonte cobre este ponto.') + ' Mostrando a Esri.', true);
+                return;
+            }
+            var kept = options.some(function (o) { return o.value === src.selected; });
+            if (!kept) src.selected = (src.initial && src.initial(options)) || options[0].value;
+            fillSelect(el.subSelect, options, src.selected);
+            el.subSelect.setAttribute('aria-label', src.label || 'Opção da imagem');
+            el.subSelect.title = src.label || '';
+            applyChoice(src);
+        }, function (err) {
+            delete state.lists[cacheKey];
+            if (seq !== state.imgSeq) return;
+            showTiles(null);
+            var reason = err instanceof TypeError ? 'sem resposta do servidor' : err.message;
+            setNote('Não foi possível carregar a lista de imagens (' + reason + '). Mostrando a Esri.', true);
+        });
     }
 
     function overlayLayerIds(i) {
@@ -321,31 +605,8 @@
         });
     }
 
-    function setImagery(which) {
-        if (!state.map) return;
-        ['google', 'esri'].forEach(function (key) {
-            var id = 'sat-' + key;
-            if (state.map.getLayer(id)) state.map.setLayoutProperty(id, 'visibility', key === which ? 'visible' : 'none');
-        });
-        state.map.setMaxZoom(which === 'google' ? GOOGLE_MAX_ZOOM + 0.5 : ESRI_MAX_ZOOM + 2);
-        el.subtitle.textContent = which === 'google'
-            ? 'Imagem do Google sobre o relevo'
-            : 'Imagem da Esri sobre o relevo';
-    }
-
-    function initialImagery() {
-        return hasGoogle() ? 'google' : 'esri';
-    }
-
     function createMap(maplibregl) {
-        var imagery = initialImagery();
-        var layers = [];
-        if (hasGoogle()) {
-            layers.push({ id: 'sat-google', type: 'raster', source: 'sat-google',
-                layout: { visibility: imagery === 'google' ? 'visible' : 'none' } });
-        }
-        layers.push({ id: 'sat-esri', type: 'raster', source: 'sat-esri',
-            layout: { visibility: imagery === 'esri' ? 'visible' : 'none' } });
+        var layers = [{ id: 'sat-esri', type: 'raster', source: 'sat-esri' }];
 
         var view = global.getMapView ? global.getMapView() : null;
         var map = new maplibregl.Map({
@@ -353,7 +614,7 @@
             center: view ? view.center : [-48.3, -10.2],
             zoom: view ? view.zoom : 14,
             maxPitch: 80,
-            maxZoom: imagery === 'google' ? GOOGLE_MAX_ZOOM + 0.5 : ESRI_MAX_ZOOM + 2,
+            maxZoom: GOOGLE_MAX_ZOOM + 0.5,
             style: {
                 version: 8,
                 sources: rasterSources(),
@@ -407,7 +668,8 @@
         return new Promise(function (resolve) {
             function ready() {
                 addOverlays(map);
-                setImagery(imagery);
+                // Começa no Google quando ele está configurado (o 1º da lista).
+                selectSource(state.catalog[0].key);
                 resolve(map);
             }
             if (map.isStyleLoaded()) ready();
@@ -514,13 +776,15 @@
 
         if (state.map) {
             state.map.resize();
+            placeLegend();
             refreshOverlays();
             frameProperty(true);
             return;
         }
 
         setStatus('Carregando a imagem 3D...');
-        buildImageryOptions();
+        buildImagery();
+        placeLegend();
         loadMaplibre()
             .then(function (maplibregl) { return createMap(maplibregl); })
             .then(function () {
