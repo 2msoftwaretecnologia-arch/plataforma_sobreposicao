@@ -102,6 +102,7 @@ teste.py
 saida.json
 shps_local_provisorios/
 docs/
+final_output.json
 # Script local de deploy na VM
 deploy.ps1
 deploy.cmd
