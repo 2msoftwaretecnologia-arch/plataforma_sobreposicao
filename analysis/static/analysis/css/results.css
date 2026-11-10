@@ -1638,6 +1638,18 @@ body { background: var(--cream-50); color: var(--ink-900); }
 
 #map-imoveis .compare-toggle.active a { background: var(--green-900); color: var(--gold-400); }
 
+/* "Só imagem" (maps.js, setupCleanView): esconde tudo o que fica por cima
+   do mapa base — polígonos, contorno, temáticas, marcadores e dicas. */
+.leaflet-container.is-clean .leaflet-overlay-pane,
+.leaflet-container.is-clean .leaflet-shadow-pane,
+.leaflet-container.is-clean .leaflet-marker-pane,
+.leaflet-container.is-clean .leaflet-tooltip-pane,
+.leaflet-container.is-clean .leaflet-popup-pane,
+.leaflet-container.is-clean .leaflet-thematic-pane,
+.leaflet-container.is-clean .leaflet-thematicRelief-pane {
+  visibility: hidden;
+}
+
 .compare-divider {
   position: absolute;
   top: 0;

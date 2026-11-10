@@ -1960,6 +1960,54 @@
         };
     }
 
+    /**
+     * Botão "Só imagem": esconde de uma vez tudo o que está por cima do mapa
+     * base (contorno do imóvel, bases da análise, camadas temáticas, desenhos)
+     * para olhar só a imagem de satélite. Só esconde os panes por CSS
+     * (`.is-clean` em results.css) — o que estava ligado volta igual ao
+     * desligar. Atalho: tecla H.
+     */
+    function setupCleanView(map) {
+        var container = map.getContainer();
+        var bar, link;
+        var control = L.control({ position: 'topleft' });
+        control.onAdd = function () {
+            bar = L.DomUtil.create('div', 'leaflet-bar compare-toggle clean-toggle');
+            link = L.DomUtil.create('a', '', bar);
+            link.href = '#';
+            link.setAttribute('role', 'button');
+            L.DomEvent.on(link, 'click', function (e) {
+                L.DomEvent.preventDefault(e);
+                set(!container.classList.contains('is-clean'));
+            });
+            L.DomEvent.disableClickPropagation(bar);
+            return bar;
+        };
+        control.addTo(map);
+
+        function set(on) {
+            container.classList.toggle('is-clean', on);
+            bar.classList.toggle('active', on);
+            link.setAttribute('aria-pressed', String(on));
+            link.title = on ? 'Mostrar de novo as sobreposições (H)' : 'Esconder as sobreposições e ver só a imagem (H)';
+            link.innerHTML = on
+                ? '<span aria-hidden="true">◧</span> Mostrar camadas'
+                : '<span aria-hidden="true">◧</span> Só imagem';
+        }
+        set(false);
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'h' && e.key !== 'H') return;
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+            var t = e.target;
+            if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+            // Só quando o mapa está na tela (a página de resultados é longa).
+            var r = container.getBoundingClientRect();
+            if (r.bottom < 0 || r.top > window.innerHeight) return;
+            set(!container.classList.contains('is-clean'));
+        });
+    }
+
     // Só um ponto (sem imóvel): limites de tamanho zero levariam ao zoom máximo.
     function fitToItems(map, group, opts) {
         var bounds = group.getBounds();
@@ -2046,6 +2094,7 @@
                 'Sobreponha dados de uso do solo, desmatamento, fogo e relevo. Marque uma camada para escolher o período e a opacidade.';
             if (global.setupThematicLayers) global.setupThematicLayers(map, options.imagery || {}, THEMATIC_PANE, tematicas);
             setupCompare(map, options.imagery || {}, panel);
+            setupCleanView(map);
 
             if (data.allGroup.getLayers().length) {
                 fitToItems(map, data.allGroup, panel.fitPadding(12));
