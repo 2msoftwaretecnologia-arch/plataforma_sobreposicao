@@ -141,6 +141,7 @@
         orbit: '<path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/>',
         center: '<circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="1.5"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/>',
         expand: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
+        shrink: '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>',
         close: '<path d="M6 6l12 12M18 6 6 18"/>'
     };
 
@@ -214,9 +215,14 @@
         el.orbit = iconButton(actions, 'm3d-btn', ICONS.orbit, 'Girar', 'Girar a câmera ao redor da propriedade');
         el.orbit.setAttribute('aria-pressed', 'false');
         el.reset = iconButton(actions, 'm3d-btn', ICONS.center, 'Recentralizar', 'Voltar a câmera para a propriedade');
-        el.expand = iconButton(actions, 'm3d-btn', ICONS.expand, 'Tela cheia', 'Abrir o 3D na tela inteira');
+        el.expand = iconButton(actions, 'm3d-btn', ICONS.expand, 'Tela cheia', 'Tela cheia com o 2D e o 3D lado a lado');
         el.expand.hidden = true;
-        el.expand.addEventListener('click', function () { enter('full', { opener: el.expand }); });
+        // Lado a lado: a tela cheia leva os dois mapas juntos. Sem a API de
+        // tela cheia (iPhone), abre só o 3D por cima da página.
+        el.expand.addEventListener('click', function () {
+            if (state.page && canFullscreen(state.page.stage)) toggleStageFullscreen();
+            else enter('full', { opener: el.expand });
+        });
         el.close = iconButton(actions, 'm3d-btn m3d-close', ICONS.close, 'Fechar', 'Fechar a visão 3D');
 
         el.bar = bar;
@@ -1320,10 +1326,8 @@
     function enter(mode, opts) {
         opts = opts || {};
         if (!global.getMapOverlays) return;
-        // O mapa 2D em tela cheia esconderia a visão 3D.
-        if (document.fullscreenElement && document.exitFullscreen) {
-            document.exitFullscreen().catch(function () {});
-        }
+        // Um mapa em tela cheia esconderia a tela 3D (que fica no <body>).
+        if (mode === 'full' && fsElement()) exitFullscreen();
         var overlays = global.getMapOverlays().filter(function (ov) {
             return ov.geojson && ov.geojson.features && ov.geojson.features.length;
         });
@@ -1458,9 +1462,62 @@
         if (on) {
             var start = function () { if (state.split) enter('split', { imagery: p.imagery }); };
             if (o.lazy) whenVisible(p.stage, start); else start();
-        } else if (state.mode === 'split') {
-            hide();
+        } else {
+            if (fsElement() === p.stage) exitFullscreen();
+            if (state.mode === 'split') hide();
         }
+    }
+
+    // ----- Tela cheia do quadro do mapa (2D + 3D juntos) -----
+
+    function fsElement() {
+        return document.fullscreenElement || document.webkitFullscreenElement || null;
+    }
+
+    function canFullscreen(node) {
+        return !!(node && (node.requestFullscreen || node.webkitRequestFullscreen));
+    }
+
+    function exitFullscreen() {
+        var exit = document.exitFullscreen || document.webkitExitFullscreen;
+        if (!exit) return;
+        var r = exit.call(document);
+        if (r && r.catch) r.catch(function () {});
+    }
+
+    function toggleStageFullscreen() {
+        var stage = state.page && state.page.stage;
+        if (!stage) return;
+        if (fsElement() === stage) { exitFullscreen(); return; }
+        var request = stage.requestFullscreen || stage.webkitRequestFullscreen;
+        var r = request.call(stage);
+        // Navegador recusou (permissão, iframe...): pelo menos o 3D grande.
+        if (r && r.catch) r.catch(function () { enter('full', { opener: el.expand }); });
+    }
+
+    // Entrou/saiu da tela cheia: botões, classe do quadro e tamanho dos mapas.
+    function onFullscreenChange() {
+        var p = state.page;
+        if (!p) return;
+        var on = fsElement() === p.stage;
+        p.stage.classList.toggle('is-fullscreen', on);
+        if (state.built) {
+            el.expand.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + (on ? ICONS.shrink : ICONS.expand) + '</svg>';
+            el.expand.label = create('span', 'm3d-btn-label', el.expand, on ? 'Sair da tela cheia' : 'Tela cheia');
+            el.expand.title = on ? 'Sair da tela cheia (Esc)' : 'Tela cheia com o 2D e o 3D lado a lado';
+            el.expand.setAttribute('aria-pressed', String(on));
+        }
+        // O botão de tela cheia do Leaflet mostra o ícone de "sair".
+        var lmap = global.getImoveisMap && global.getImoveisMap();
+        if (lmap) {
+            var container = lmap.getContainer();
+            container.classList.toggle('leaflet-fullscreen-on', on);
+            var fsBtn = container.querySelector && container.querySelector('.leaflet-control-fullscreen-button');
+            if (fsBtn && state.split) fsBtn.title = on ? 'Sair da tela cheia (Esc)' : 'Tela cheia com o 2D e o 3D lado a lado';
+        }
+        if (global.resizeImoveisMap) global.resizeImoveisMap(false);
+        if (state.map) state.map.resize();
+        placeLegend();
     }
 
     /**
@@ -1508,8 +1565,22 @@
                 }, { threshold: 0 }).observe(opts.stage);
             }
         }
+        if (state.page) {
+            document.addEventListener('fullscreenchange', onFullscreenChange);
+            document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+        }
         var lmap = global.getImoveisMap && global.getImoveisMap();
         if (!lmap || !global.L) return;
+
+        // Botão de tela cheia do 2D (Leaflet.fullscreen): no lado a lado,
+        // a tela cheia é do quadro todo, com os dois mapas.
+        if (lmap.toggleFullscreen && state.page) {
+            var leafletToggle = lmap.toggleFullscreen;
+            lmap.toggleFullscreen = function () {
+                if (state.split && canFullscreen(state.page.stage)) toggleStageFullscreen();
+                else return leafletToggle.apply(lmap, arguments);
+            };
+        }
         var Control = global.L.Control.extend({
             options: { position: 'topleft' },
             onAdd: function () {

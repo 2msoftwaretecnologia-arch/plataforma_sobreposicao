@@ -917,6 +917,19 @@ body { background: var(--cream-50); color: var(--ink-900); }
 
 .map-3d-side[hidden] { display: none; }
 
+/* Tela cheia do quadro (map_3d_view.js): os dois mapas ocupam a tela toda. */
+.map-stage.is-fullscreen,
+.map-stage:fullscreen {
+  --map-h: 100vh;
+  width: 100vw;
+  height: 100vh;
+  background: #12271a;
+}
+
+@media (max-width: 900px) {
+  .map-stage.is-split.is-fullscreen { --map-h: 50vh; }
+}
+
 /* Antes do 3D carregar (ele só abre quando o mapa aparece na tela). */
 .map-3d-side::before {
   content: "Visão 3D";
