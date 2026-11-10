@@ -85,7 +85,8 @@
                     radius: 3, color: data.cor, weight: 0, fillColor: data.cor, fillOpacity: 1
                 }).addTo(map);
                 // A legenda (fora do mapa) só explica o círculo quando ele aparece.
-                if (el.parentNode) el.parentNode.classList.add('has-ring');
+                var fig = el.closest('.map-figure') || el.parentNode;
+                if (fig) fig.classList.add('has-ring');
             }
         });
 

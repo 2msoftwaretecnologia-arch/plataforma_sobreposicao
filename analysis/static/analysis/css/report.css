@@ -664,6 +664,120 @@ a {
   letter-spacing: 0.04em;
 }
 
+/* VISTAS 3D (report_3d.js troca o espaço reservado pela foto da cena) */
+.view3d {
+  margin-top: 22px;
+  break-inside: avoid;
+}
+
+.view3d h3 {
+  font-size: 18px;
+}
+
+.view3d__intro {
+  margin-top: 4px;
+  font-size: 13.5px;
+  color: var(--ink-600);
+}
+
+.view3d__grid,
+.view-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.view-pair .report-map,
+.view-pair .report-3d,
+.view3d__grid .report-3d {
+  margin-top: 6px;
+}
+
+.report-3d {
+  position: relative;
+  width: 100%;
+  height: 300px;
+  margin-top: 14px;
+  overflow: hidden;
+  border-radius: 10px;
+  border: 1px solid var(--cream-200);
+  background:
+    linear-gradient(180deg, #cfe0e6 0%, #e9e2cc 55%, #dcd3b8 100%);
+  break-inside: avoid;
+}
+
+.report-3d--wide {
+  height: 340px;
+}
+
+/* Enquanto a cena carrega */
+.report-3d:not(.is-ready):not(.is-failed)::after {
+  content: "Gerando vista 3D…";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font: 600 13px var(--sans);
+  color: var(--ink-600);
+  animation: report3d-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes report3d-pulse {
+  50% { opacity: 0.45; }
+}
+
+.report-3d__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.report-3d__north {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 6px 3px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 6px;
+  font: 800 11px var(--sans);
+  color: #111111;
+  line-height: 1;
+}
+
+.report-3d__north svg {
+  width: 12px;
+  height: 16px;
+  fill: #111111;
+}
+
+.report-3d.is-failed {
+  height: auto;
+  min-height: 0;
+  background: var(--cream-50);
+}
+
+.report-3d__msg {
+  display: block;
+  padding: 10px 14px;
+  font-size: 12.5px;
+  color: var(--ink-500);
+}
+
+/* Mapa fora da tela que desenha as cenas, uma de cada vez. */
+.report-3d__stage {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 600px;
+  height: 300px;
+  pointer-events: none;
+}
+
 /* ONDE FICA */
 .where {
   display: grid;
@@ -1159,6 +1273,8 @@ a {
   .cover__top { flex-wrap: wrap; }
   .where,
   .landuse__maps,
+  .view3d__grid,
+  .view-pair,
   .cover__ident,
   .rl__numbers,
   .clear-list ul,
@@ -1227,5 +1343,15 @@ a {
   .report-table td {
     orphans: 3;
     widows: 3;
+  }
+
+  /* Vista 3D que não saiu: no papel, melhor sumir que mostrar o aviso. */
+  .report-3d.is-failed,
+  .view-pair > div:has(.report-3d.is-failed) {
+    display: none;
+  }
+
+  .view-pair:has(.report-3d.is-failed) {
+    grid-template-columns: 1fr;
   }
 }

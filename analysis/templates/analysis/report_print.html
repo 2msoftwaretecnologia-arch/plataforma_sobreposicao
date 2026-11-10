@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="{% static 'analysis/css/report.css' %}?v={{ static_version|default:'20261021c' }}" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="{% static 'analysis/js/report_maps.js' %}?v={{ static_version|default:'20261021c' }}"></script>
+  <script src="{% static 'analysis/js/report_3d.js' %}?v={{ static_version|default:'20261021c' }}" defer></script>
 </head>
 <body>
 
@@ -31,7 +32,7 @@
         </span>
         <span class="cover__eyebrow">TerraView Tocantins</span>
       </div>
-      <button type="button" class="print-btn" onclick="window.print()">Salvar em PDF / Imprimir</button>
+      <button type="button" class="print-btn" onclick="printReport(this)">Salvar em PDF / Imprimir</button>
     </div>
 
     <h1>Relatório da Propriedade Rural</h1>
@@ -233,7 +234,29 @@
       <script>
         initReportMap('map-propriedade', JSON.parse(document.getElementById('map-propriedade-data').textContent));
       </script>
-      <p class="map-source">Imagens de satélite: Esri World Imagery. A data da foto varia conforme a região e pode não refletir a situação atual da propriedade.</p>
+      <div class="view3d">
+        <h3>A propriedade em 3D</h3>
+        <p class="view3d__intro">
+          A mesma imagem de satélite, agora em cima do relevo e vista de lado, como se fosse de um avião.
+          Ajuda a enxergar morros, baixadas e por onde a água escorre dentro da propriedade.
+        </p>
+        <div class="view3d__grid">
+          <figure class="map-figure">
+            <figcaption class="landuse__title">Olhando do sudoeste</figcaption>
+            <div class="report-3d" data-map="map-propriedade-data" data-bearing="35" data-pitch="58"
+                 data-alt="Propriedade em 3D, vista a partir do sudoeste"></div>
+          </figure>
+          <figure class="map-figure">
+            <figcaption class="landuse__title">Olhando do nordeste</figcaption>
+            <div class="report-3d" data-map="map-propriedade-data" data-bearing="215" data-pitch="58"
+                 data-alt="Propriedade em 3D, vista a partir do nordeste"></div>
+          </figure>
+        </div>
+      </div>
+      <p class="map-source">
+        Imagens de satélite: Esri World Imagery. A data da foto varia conforme a região e pode não refletir a situação atual da propriedade.
+        Relevo nas vistas 3D: Mapzen/AWS Terrain Tiles, com a altura exagerada 2 vezes para ficar visível (o Tocantins é quase todo plano).
+      </p>
     {% endif %}
   </section>
 
@@ -310,6 +333,13 @@
             <span class="map-legend__item"><span class="map-legend__fill map-legend__fill--soft" style="--swatch: #1f8d49"></span>Nativa nos dois anos</span>
             <span class="map-legend__item"><span class="map-legend__fill map-legend__fill--soft" style="--swatch: #e8c96a"></span>Já era uso em {{ uso_solo.ano_antes|unlocalize }} (consolidada)</span>
           </div>
+        </figure>
+
+        <figure class="map-figure landuse__changes">
+          <figcaption class="landuse__title">O que mudou, visto em 3D</figcaption>
+          <div class="report-3d report-3d--wide" data-map="map-uso-mudancas-data" data-bearing="35" data-pitch="55"
+               data-alt="Mudanças no uso do solo sobre o relevo, em 3D"></div>
+          <p class="map-source">Mesmas cores do mapa acima, sobre o relevo (altura exagerada 2 vezes).</p>
         </figure>
 
         {{ mapa_uso_solo.antes|json_script:"map-uso-antes-data" }}
@@ -452,7 +482,21 @@
 
         {% if base.mapa %}
           <figure class="map-figure">
-            <div id="map-base-{{ forloop.counter }}" class="report-map"></div>
+            {% if base.guia.nivel != 'info' %}
+              <div class="view-pair">
+                <div>
+                  <span class="landuse__title">Vista de cima</span>
+                  <div id="map-base-{{ forloop.counter }}" class="report-map"></div>
+                </div>
+                <div>
+                  <span class="landuse__title">Vista em 3D</span>
+                  <div class="report-3d" data-map="{{ base.json_id }}" data-bearing="35" data-pitch="55"
+                       data-alt="{{ base.guia.titulo }} sobre o relevo, em 3D"></div>
+                </div>
+              </div>
+            {% else %}
+              <div id="map-base-{{ forloop.counter }}" class="report-map"></div>
+            {% endif %}
             <figcaption class="map-legend">
               <span class="map-legend__item"><span class="map-legend__line"></span>Contorno da propriedade</span>
               <span class="map-legend__item"><span class="map-legend__swatch" style="--swatch: {{ base.cor_mapa }}"></span>{{ base.guia.titulo }}</span>
