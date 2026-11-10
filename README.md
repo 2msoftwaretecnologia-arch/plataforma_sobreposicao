@@ -28,8 +28,8 @@ Aplicação Django para análise geoespacial de imóveis rurais. Ela recebe uma 
 
 ## Fluxo resumido
 
-1. O usuário acessa a tela inicial em `/`.
-2. Em `/analysis/`, informa um CAR, envia um ZIP com shapefile ou envia PDF de recibo/demonstrativo.
+1. O usuário acessa a tela inicial em `/`: a navegação livre ("Explorar"), um mapa com as imagens de satélite, a visão 3D e ferramentas de desenho (polígono, linha, ponto), sem análise nenhuma. O tour 3D do SICAR e o mapa 2D do CAR continuam no menu (`/?interface=livre|3d|simples`).
+2. A análise é opcional: em "Analisar propriedade", informa um CAR, envia um ZIP com shapefile, um KML ou um PDF de recibo/demonstrativo, ou clica em "Analisar esta área" num polígono desenhado.
 3. A aplicação obtém uma geometria válida (`GEOSGeometry`, SRID 4674).
 4. `SearchAll` cria um alvo geográfico e executa `OverlapPipeline`.
 5. `OverlapService` consulta cada camada geográfica e calcula as interseções.

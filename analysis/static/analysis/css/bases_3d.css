@@ -735,3 +735,6 @@ html, body.bases3d-page {
   width: 100%;
   margin-bottom: 14px;
 }
+
+/* Três opções no painel estreito: menos folga em cada uma. */
+.panel-view-switch .view-opt { padding: 7px 6px; gap: 5px; font-size: 12.5px; }

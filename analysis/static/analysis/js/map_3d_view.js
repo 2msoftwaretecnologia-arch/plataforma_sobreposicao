@@ -313,7 +313,7 @@
         el.relief.setAttribute('aria-label', 'Exagero do relevo');
         el.reliefValue = create('b', '', relief, fmtRelief(DEFAULT_EXAGGERATION));
 
-        var bases = panelSection('Bases da análise', 'Ligue e desligue o que aparece sobre o relevo.');
+        var bases = panelSection(state.free ? 'Desenhos' : 'Bases da análise', 'Ligue e desligue o que aparece sobre o relevo.');
         el.legend = bases.list;
         el.basesCount = bases.count;
 
@@ -437,7 +437,7 @@
 
     // Centro da propriedade: as listas de cenas (CBERS, Landsat 5/7) são do lugar.
     function imageryCenter() {
-        var b = boundsOf(targetFeatures());
+        var b = state.free ? null : boundsOf(targetFeatures());
         if (b) return { lng: (b[0][0] + b[1][0]) / 2, lat: (b[0][1] + b[1][1]) / 2 };
         return state.map.getCenter();
     }
@@ -810,15 +810,17 @@
             } else {
                 // Como no mapa 2D: SICAR só com contorno, as demais preenchidas.
                 var outlineOnly = ov.fonte === SICAR_FONTE;
+                // `_color`: cor própria da feição (desenhos da navegação livre).
+                var color = ['coalesce', ['get', '_color'], ov.color];
                 map.addLayer({ id: src + '-fill', type: 'fill', source: src, filter: polygons, layout: vis,
-                    paint: { 'fill-color': ov.color, 'fill-opacity': outlineOnly ? 0 : 0.38 } });
+                    paint: { 'fill-color': color, 'fill-opacity': outlineOnly ? 0 : state.free ? 0.2 : 0.38 } });
                 map.addLayer({ id: src + '-line', type: 'line', source: src, filter: lines,
                     layout: Object.assign({ 'line-join': 'round' }, vis),
-                    paint: { 'line-color': ov.color, 'line-width': 2.2 } });
+                    paint: { 'line-color': color, 'line-width': state.free ? 3 : 2.2 } });
             }
             map.addLayer({ id: src + '-pt', type: 'circle', source: src, filter: points, layout: vis,
                 paint: {
-                    'circle-color': ov.color, 'circle-radius': 8,
+                    'circle-color': ['coalesce', ['get', '_color'], ov.color], 'circle-radius': 8,
                     'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2
                 } });
         });
@@ -837,6 +839,20 @@
             var src = map.getSource('ov' + i);
             if (src) src.setData(ov.geojson);
             setOverlayVisible(i, ov.visible);
+        });
+    }
+
+    // Os desenhos do mapa 2D mudaram (navegação livre, explorar.js): as
+    // mesmas geometrias vão para o 3D que já está aberto.
+    function overlayDataFrom2D() {
+        if (!state.built || !state.map || !global.getMapOverlays) return;
+        var fresh = {};
+        global.getMapOverlays().forEach(function (ov) { fresh[ov.fonte] = ov.geojson; });
+        state.overlays.forEach(function (ov, i) {
+            if (!fresh[ov.fonte]) return;
+            ov.geojson = fresh[ov.fonte];
+            var src = state.map.isStyleLoaded() ? state.map.getSource('ov' + i) : null;
+            if (src) src.setData(ov.geojson);
         });
     }
 
@@ -871,6 +887,18 @@
         // Usuário mexeu na câmera: para de girar sozinho.
         ['mousedown', 'touchstart', 'wheel'].forEach(function (ev) {
             map.getCanvasContainer().addEventListener(ev, stopOrbit, { passive: true });
+        });
+
+        // O easeTo/flyTo do MapLibre 4 termina com a elevação da câmera
+        // "congelada" (`_elevationFreeze`; só um gesto do mouse solta). Assim
+        // a câmera mira o nível do mar embaixo do centro e, com o relevo, o
+        // meio da tela 3D mostra outro lugar, centenas de metros adiante: o
+        // 2D e o 3D deixam de mostrar o mesmo ponto. Solta no fim de cada
+        // movimento; o mapa volta a pôr o centro no chão a cada quadro.
+        map.on('moveend', function () {
+            if (!map._elevationFreeze || map.isMoving()) return;
+            map._elevationFreeze = false;
+            map.triggerRepaint();
         });
 
         map.on('click', function (e) {
@@ -1243,12 +1271,21 @@
     // Enquadra a propriedade de cima e desce inclinando, como um drone.
     function frameProperty(animate) {
         var map = state.map;
-        var bounds = boundsOf(targetFeatures());
-        if (!bounds) return;
-        var single = bounds[0][0] === bounds[1][0] && bounds[0][1] === bounds[1][1];
-        var flat = single
-            ? { center: bounds[0], zoom: 17 }
-            : map.cameraForBounds(bounds, { padding: framePadding(), maxZoom: 18 });
+        var flat;
+        if (state.free) {
+            // Navegação livre: não há imóvel para enquadrar; o 3D abre onde o
+            // mapa 2D está (os desenhos podem estar longe dali).
+            var view = global.getMapView && global.getMapView();
+            if (!view) return;
+            flat = { center: view.center, zoom: view.zoom - LEAFLET_ZOOM_OFFSET };
+        } else {
+            var bounds = boundsOf(targetFeatures());
+            if (!bounds) return;
+            var single = bounds[0][0] === bounds[1][0] && bounds[0][1] === bounds[1][1];
+            flat = single
+                ? { center: bounds[0], zoom: 17 }
+                : map.cameraForBounds(bounds, { padding: framePadding(), maxZoom: 18 });
+        }
         if (!flat) return;
         map.jumpTo({ center: flat.center, zoom: flat.zoom, pitch: 0, bearing: 0 });
         // Inclinada, a propriedade fica menor na tela (o fundo foge): um
@@ -1283,7 +1320,8 @@
     // começa a girar sozinha. Mexer no mapa antes disso (ou fechar) cancela.
     function autoOrbit() {
         global.clearTimeout(state.autoOrbitTimer);
-        if (reduceMotion()) return;
+        // Navegação livre: a câmera fica onde o usuário pôs (gira só no botão).
+        if (reduceMotion() || state.free) return;
         state.autoOrbitTimer = global.setTimeout(function () {
             state.autoOrbitTimer = null;
             if (!el.root.hidden) startOrbit();
@@ -1444,7 +1482,7 @@
         // Um mapa em tela cheia esconderia a tela 3D (que fica no <body>).
         if (mode === 'full' && fsElement()) exitFullscreen();
         var overlays = global.getMapOverlays().filter(function (ov) {
-            return ov.geojson && ov.geojson.features && ov.geojson.features.length;
+            return ov.geojson && ov.geojson.features && (ov.keepEmpty || ov.geojson.features.length);
         });
         if (!overlays.length) return;
         state.overlays = overlays;
@@ -1538,13 +1576,13 @@
     // Última escolha do usuário ('2d' (só o mapa 2D), 'split' (2D + 3D lado a lado) ou '3d' (só o 3D, no quadro)); só conveniência local.
     function savedView() {
         try {
-            var v = global.localStorage.getItem(VIEW_KEY);
+            var v = global.localStorage.getItem(state.viewKey || VIEW_KEY);
             return VIEWS.indexOf(v) >= 0 ? v : null;
         } catch (e) { return null; }
     }
 
     function saveView(value) {
-        try { global.localStorage.setItem(VIEW_KEY, value); } catch (e) { /* sem armazenamento: tudo bem */ }
+        try { global.localStorage.setItem(state.viewKey || VIEW_KEY, value); } catch (e) { /* sem armazenamento: tudo bem */ }
     }
 
     // Roda `fn` quando o elemento aparece na tela (o 3D só baixa o MapLibre
@@ -1667,10 +1705,16 @@
      * mapa Leaflet (visível também em tela cheia).
      *
      *   install3dView({ imagery, button, viewSwitch, stage, side })
+     *
+     * Navegação livre (explorar.js): `free` (o 3D abre onde o 2D está, sem
+     * imóvel para enquadrar), `viewKey` (a escolha da visualização é
+     * guardada à parte da página de resultados) e `defaultView`.
      */
     function install(opts) {
         opts = opts || {};
         var imagery = opts.imagery || {};
+        state.free = !!opts.free;
+        state.viewKey = opts.viewKey || null;
         var headerBtn = opts.button;
         var hasSwitch = !!(opts.viewSwitch && opts.stage && opts.side);
         // Com o seletor Só 2D | 2D + 3D | Só 3D, o "Ver em 3D" sobra.
@@ -1703,7 +1747,7 @@
 
             // Padrão: 2D e 3D lado a lado, ou a última escolha do usuário. Em
             // tela estreita o 3D ficaria embaixo do 2D: começa no 2D.
-            var initial = savedView() || (opts.stage.clientWidth >= 900 ? 'split' : '2d');
+            var initial = savedView() || opts.defaultView || (opts.stage.clientWidth >= 900 ? 'split' : '2d');
             if (initial !== '2d' && global.getMapOverlays && global.getMapOverlays().length) {
                 setView(initial, { lazy: true, refit: true });
             }
@@ -1759,4 +1803,6 @@
     global.open3dView = function (opts) { enter('full', opts); };
     global.close3dView = close;
     global.install3dView = install;
+    global.sync3dOverlays = overlayDataFrom2D;
+    global.loadMaplibreGl = loadMaplibre;
 })(window);

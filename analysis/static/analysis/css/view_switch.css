@@ -1,9 +1,10 @@
-/* Seletor de interface da página inicial (3D com tour | 2D simples), usado
+/* Seletor de interface da página inicial (Explorar | 3D com tour | 2D simples), usado
    no painel do mapa 3D e no topo da interface simples — ambos em fundo verde. */
 
 .view-switch {
   display: inline-grid;
-  grid-template-columns: 1fr 1fr;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   gap: 2px;
   padding: 3px;
   border-radius: 999px;

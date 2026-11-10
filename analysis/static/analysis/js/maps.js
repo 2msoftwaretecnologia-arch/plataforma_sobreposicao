@@ -570,6 +570,14 @@
         { key: 'imagem', label: 'Imagem' },
         { key: 'tematicas', label: 'Temáticas' }
     ];
+    // Navegação livre (explorar.js): sem análise, a 1ª aba é a dos desenhos.
+    var FREE_PANEL_TABS = [
+        { key: 'lugares', label: 'Desenhos' },
+        { key: 'imagem', label: 'Imagem' },
+        { key: 'tematicas', label: 'Temáticas' }
+    ];
+    // Tocantins: onde a navegação livre abre na primeira vez.
+    var FREE_BOUNDS = [[-13.50, -50.75], [-5.15, -45.65]];
 
     /**
      * Painel lateral do mapa (canto superior direito) que reúne, em abas, as
@@ -1546,13 +1554,20 @@
                 fullscreenControl: false
             });
         } else {
-            return L.map(elementId, {
+            var mapOptions = {
                 // Canvas em vez de um <path> SVG por polígono: bem mais leve
                 // com bases de muitos vértices (MapBiomas, PRODES...).
                 preferCanvas: true,
                 fullscreenControl: options.fullscreenControl || true,
                 scrollWheelZoom: (options.scrollWheelZoom !== undefined) ? options.scrollWheelZoom : true
-            });
+            };
+            // Navegação livre: o zoom mínimo é do mapa (uma camada com
+            // `minZoom` próprio limitaria o mapa inteiro).
+            if (options.free) {
+                mapOptions.minZoom = 3;
+                mapOptions.worldCopyJump = true;
+            }
+            return L.map(elementId, mapOptions);
         }
     }
 
@@ -2044,8 +2059,11 @@
         options = options || {};
         var elementId = options.elementId || 'map-imoveis';
         var isStatic = options.isStatic || false;
+        // `free`: navegação livre (página Explorar), sem análise nem itens.
+        var free = !!options.free && !isStatic;
 
-        if (!items || !items.length) return;
+        items = items || [];
+        if (!items.length && !free) return;
         
         var mapEl = document.getElementById(elementId);
         if (!mapEl) {
@@ -2058,6 +2076,9 @@
 
         // 2. Base Layers
         var baseLayersInfo = getBaseLayers(isStatic ? {} : options.imagery);
+        if (options.defaultBase && baseLayersInfo.layers[options.defaultBase]) {
+            baseLayersInfo.defaultLayer = baseLayersInfo.layers[options.defaultBase];
+        }
         baseLayersInfo.defaultLayer.addTo(map);
 
         // 3. Process & Add Items (Overlays)
@@ -2074,26 +2095,36 @@
         // 4. Fit Bounds
         if (data.allGroup.getLayers().length) {
             fitToItems(map, data.allGroup, { padding: [12, 12] });
+        } else if (free) {
+            // Sem nada para enquadrar: a última posição do usuário ou o estado.
+            var view = options.view;
+            if (view && view.center && isFinite(view.zoom)) map.setView(view.center, view.zoom);
+            else map.fitBounds(options.bounds || FREE_BOUNDS);
         }
 
         // 5. Controls & Legend
         if (!isStatic) {
             // Only add the panel and legend if NOT static
-            var panel = setupMapPanel(map);
+            var panel = setupMapPanel(map, free
+                ? { tabs: FREE_PANEL_TABS, openTitle: 'Mostrar desenhos, imagens e camadas' }
+                : undefined);
 
             // Aba "Análise": bases da análise, ligadas/desligadas pela legenda.
-            var analise = panel.section('analise');
-            var analiseHead = L.DomUtil.create('div', 'map-panel-heading-row', analise);
-            L.DomUtil.create('div', 'map-panel-heading', analiseHead).textContent = 'Bases da análise';
-            var toggleAllBtn = L.DomUtil.create('button', 'map-panel-link', analiseHead);
-            toggleAllBtn.type = 'button';
-            toggleAllBtn.id = 'toggle-all-layers';
-            L.DomUtil.create('p', 'map-panel-hint', analise).textContent =
-                'Clique em uma base para mostrá-la ou escondê-la no mapa. Passe o mouse sobre um polígono para ver os detalhes.';
-            var legendEl = L.DomUtil.create('div', '', analise);
-            legendEl.id = 'legend-imoveis';
-            setupLegend(legendEl, data.legend, data.layersByFonte, map);
-            setupToggleAll(toggleAllBtn, data.layersByFonte, map, legendEl);
+            // Na navegação livre ela não existe: a 1ª aba é montada por explorar.js.
+            if (!free) {
+                var analise = panel.section('analise');
+                var analiseHead = L.DomUtil.create('div', 'map-panel-heading-row', analise);
+                L.DomUtil.create('div', 'map-panel-heading', analiseHead).textContent = 'Bases da análise';
+                var toggleAllBtn = L.DomUtil.create('button', 'map-panel-link', analiseHead);
+                toggleAllBtn.type = 'button';
+                toggleAllBtn.id = 'toggle-all-layers';
+                L.DomUtil.create('p', 'map-panel-hint', analise).textContent =
+                    'Clique em uma base para mostrá-la ou escondê-la no mapa. Passe o mouse sobre um polígono para ver os detalhes.';
+                var legendEl = L.DomUtil.create('div', '', analise);
+                legendEl.id = 'legend-imoveis';
+                setupLegend(legendEl, data.legend, data.layersByFonte, map);
+                setupToggleAll(toggleAllBtn, data.layersByFonte, map, legendEl);
+            }
 
             // Aba "Imagem": lista de mapas base, com os detalhes da imagem
             // logo abaixo da opção escolhida (na comparação, é o lado esquerdo).
@@ -2133,7 +2164,18 @@
             legend: data.legend,
             legendEl: (!isStatic) ? document.getElementById('legend-imoveis') : null,
             panel: (!isStatic) ? panel : null,
-            allGroup: data.allGroup
+            allGroup: data.allGroup,
+            free: free
+        };
+
+        // Para quem monta outras coisas no mesmo mapa (explorar.js): grupos
+        // novos em `layersByFonte`/`legend` entram na visão 3D e no "Clicar
+        // no mapa" do download de imagem.
+        return {
+            map: map,
+            panel: (!isStatic) ? panel : null,
+            layersByFonte: data.layersByFonte,
+            legend: data.legend
         };
     };
 
@@ -2170,6 +2212,8 @@
                 visible: mapState.map.hasLayer(grp),
                 isProperty: f === PROPERTY_FONTE,
                 isPoint: f === POINT_FONTE,
+                // Navegação livre: o grupo existe mesmo sem nenhum desenho.
+                keepEmpty: !!mapState.free,
                 geojson: grp.toGeoJSON()
             };
         });

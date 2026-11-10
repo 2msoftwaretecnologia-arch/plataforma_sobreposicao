@@ -451,10 +451,15 @@ class AnalysisCancelView(View):
         return HttpResponse(status=204)
 
 
-# Interfaces da página inicial: o mapa 3D com o tour (padrão) ou a interface
-# simples, um mapa 2D do CAR. A escolha fica num cookie e vale até ser trocada.
-INTERFACE_COOKIE = 'interface'
+# Interfaces da página inicial: a navegação livre (padrão; mapa com as
+# imagens de satélite e os desenhos, a análise é opcional), o mapa 3D com o
+# tour do SICAR ou a interface simples, um mapa 2D do CAR. A escolha fica num
+# cookie e vale até ser trocada. (O cookie antigo, `interface`, é ignorado:
+# quem tinha escolhido o 3D ou o simples também passa a entrar pela livre.)
+INTERFACE_COOKIE = 'interface_v2'
+INTERFACE_DEFAULT = 'livre'
 INTERFACE_TEMPLATES = {
+    'livre': 'analysis/explorar.html',
     '3d': 'analysis/bases_3d.html',
     'simples': 'analysis/interface_simples.html',
 }
@@ -462,12 +467,12 @@ INTERFACE_TEMPLATES = {
 
 def _interface_of(request):
     choice = request.COOKIES.get(INTERFACE_COOKIE)
-    return choice if choice in INTERFACE_TEMPLATES else '3d'
+    return choice if choice in INTERFACE_TEMPLATES else INTERFACE_DEFAULT
 
 
 class UploadZipCarView(View):
-    """Página inicial depois do login: o formulário de análise sobre o mapa,
-    na interface escolhida pelo usuário (`?interface=3d|simples`)."""
+    """Página inicial depois do login: o mapa na interface escolhida pelo
+    usuário (`?interface=livre|3d|simples`), com o formulário de análise."""
     template_index = 'analysis/results.html'
     # Trocado em `post` pelo andamento da análise pedida; este é no-op.
     progress = AnalysisProgress()
@@ -486,7 +491,13 @@ class UploadZipCarView(View):
         config['searchError'] = bool(context.get('erro'))
         context['bases_3d_config'] = config
         context['recent_searches'] = _recent_searches(request.user)
-        return render(request, INTERFACE_TEMPLATES[_interface_of(request)], context)
+        interface = _interface_of(request)
+        if interface == 'livre':
+            # As mesmas fontes de imagem do mapa de resultados (maps.js).
+            context['imagery'] = imagery_config()
+            # Os desenhos ficam no navegador, separados por usuário.
+            config['userKey'] = str(request.user.pk)
+        return render(request, INTERFACE_TEMPLATES[interface], context)
 
     def post(self, request):
         # Andamento para a tela (ver `analysis_progress`): a página consulta

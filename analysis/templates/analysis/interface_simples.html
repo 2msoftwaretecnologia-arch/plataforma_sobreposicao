@@ -52,6 +52,7 @@
         </form>
 
         <div class="view-switch" role="group" aria-label="Tipo de visualização">
+            <a class="view-opt" href="{% url 'upload_zip_car' %}?interface=livre" title="Navegação livre: imagens de satélite e desenho, sem análise"><svg class="ico"><use href="#i-target"/></svg>Explorar</a>
             <a class="view-opt" href="{% url 'upload_zip_car' %}?interface=3d" title="Mapa 3D com o tour de cidade em cidade"><svg class="ico"><use href="#i-cube"/></svg>3D</a>
             <span class="view-opt is-active" aria-current="page"><svg class="ico"><use href="#i-map"/></svg>2D simples</span>
         </div>

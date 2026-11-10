@@ -79,7 +79,10 @@ html.m3d-open body { overflow: hidden; }
   to { opacity: 1; }
 }
 
-.m3d-map {
+/* Dois seletores de propósito: o maplibre-gl.css (carregado depois, por
+   map_3d_view.js) traz `.maplibregl-map { position: relative }`, que com um
+   seletor só ganharia desta regra e deixaria o mapa 3D com altura zero. */
+.m3d .m3d-map {
   position: absolute;
   inset: 0;
 }

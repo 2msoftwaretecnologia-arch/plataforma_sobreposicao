@@ -329,7 +329,8 @@
             keyFor: keyFor,
             targetFrom: targetFrom,
             polygonsOf: polygonsOf,
-            cityOfCar: cityOfCar
+            cityOfCar: cityOfCar,
+            parseCoordinates: parseCoordinates
         };
     }
 
