@@ -1372,9 +1372,10 @@
 
     function setupCompare(map, imagery, panel) {
         var state = null;
+        var bar = null;
         var button = L.control({ position: 'topleft' });
         button.onAdd = function () {
-            var bar = L.DomUtil.create('div', 'leaflet-bar compare-toggle');
+            bar = L.DomUtil.create('div', 'leaflet-bar compare-toggle');
             var link = L.DomUtil.create('a', '', bar);
             link.href = '#';
             link.title = 'Comparar duas imagens lado a lado';
@@ -1389,6 +1390,18 @@
             return bar;
         };
         button.addTo(map);
+
+        /**
+         * Comparar imagens só no "Só 2D" (map_3d_view.js): com o 3D ao lado
+         * (ou só o 3D) o botão some e uma comparação aberta é encerrada.
+         */
+        global.setImageCompareAvailable = function (on) {
+            if (!on && state) {
+                stop();
+                L.DomUtil.removeClass(bar, 'active');
+            }
+            if (bar) bar.style.display = on ? '' : 'none';
+        };
 
         function clipRect(pane, side, x) {
             var nw = map.containerPointToLayerPoint([0, 0]);

@@ -1462,6 +1462,9 @@
             b.classList.toggle('is-active', active);
             b.setAttribute('aria-pressed', String(active));
         });
+        // Comparar imagens (barra arrastável) só no Só 2D. Antes do painel
+        // "Camadas": encerrar a comparação mexe nele.
+        if (global.setImageCompareAvailable) global.setImageCompareAvailable(view === '2d');
         // Na metade da largura o painel "Camadas" do 2D cobriria o mapa.
         if (global.setMapPanelOpen) global.setMapPanelOpen(view === '2d' && p.stage.clientWidth >= 640);
         // O Leaflet não percebe sozinho que o quadro dele mudou de tamanho.
