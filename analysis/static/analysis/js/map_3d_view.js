@@ -215,7 +215,7 @@
         el.orbit = iconButton(actions, 'm3d-btn', ICONS.orbit, 'Girar', 'Girar a câmera ao redor da propriedade');
         el.orbit.setAttribute('aria-pressed', 'false');
         el.reset = iconButton(actions, 'm3d-btn', ICONS.center, 'Recentralizar', 'Voltar a câmera para a propriedade');
-        el.expand = iconButton(actions, 'm3d-btn', ICONS.expand, 'Tela cheia', 'Tela cheia com o 2D e o 3D lado a lado');
+        el.expand = iconButton(actions, 'm3d-btn', ICONS.expand, 'Tela cheia', 'Tela cheia');
         el.expand.hidden = true;
         // Lado a lado: a tela cheia leva os dois mapas juntos. Sem a API de
         // tela cheia (iPhone), abre só o 3D por cima da página.
@@ -1317,9 +1317,10 @@
         el.root.setAttribute('aria-modal', mode === 'full' ? 'true' : 'false');
         el.root.setAttribute('role', mode === 'full' ? 'dialog' : 'region');
         document.documentElement.classList.toggle('m3d-open', mode === 'full');
-        el.close.label.textContent = mode === 'split' ? 'Fechar 3D' : (state.split ? 'Voltar ao lado a lado' : 'Fechar');
-        el.close.title = mode === 'split' ? 'Fechar o 3D e voltar só para o mapa 2D'
-            : (state.split ? 'Voltar para o 2D e 3D lado a lado' : 'Fechar a visão 3D');
+        var inPage = state.view === 'split' || state.view === '3d';
+        el.close.label.textContent = mode === 'split' ? 'Fechar 3D' : (inPage ? 'Voltar' : 'Fechar');
+        el.close.title = mode === 'split' ? 'Fechar o 3D e ver só o mapa 2D'
+            : (inPage ? 'Voltar para o mapa da página' : 'Fechar a visão 3D');
         el.expand.hidden = mode !== 'split';
     }
 
@@ -1343,7 +1344,7 @@
         el.root.hidden = false;
         buildLegend();
         // Na metade da tela o painel cobriria o mapa: começa recolhido.
-        setPanelOpen(mode === 'full' && el.root.clientWidth > 760);
+        setPanelOpen((mode === 'full' || state.view === '3d') && el.root.clientWidth > 760);
         if (mode === 'full') el.close.focus();
 
         if (state.map) {
@@ -1402,7 +1403,7 @@
     function close() {
         if (!state.built || el.root.hidden) return;
         if (state.mode === 'full') {
-            if (state.split) {
+            if (state.view === 'split' || state.view === '3d') {
                 enter('split');
             } else {
                 hide();
@@ -1411,15 +1412,18 @@
             return;
         }
         saveView('2d');
-        setSplit(false);
+        setView('2d');
     }
 
-    // Liga/desliga a comparação no quadro do mapa (botões do cabeçalho).
     var VIEW_KEY = 'mapa_resultados_visualizacao';
+    var VIEWS = ['2d', 'split', '3d'];
 
-    // Última escolha do usuário ('split' ou '2d'); só conveniência local.
+    // Última escolha do usuário ('2d' (só o mapa 2D), 'split' (2D + 3D lado a lado) ou '3d' (só o 3D, no quadro)); só conveniência local.
     function savedView() {
-        try { return global.localStorage.getItem(VIEW_KEY); } catch (e) { return null; }
+        try {
+            var v = global.localStorage.getItem(VIEW_KEY);
+            return VIEWS.indexOf(v) >= 0 ? v : null;
+        } catch (e) { return null; }
     }
 
     function saveView(value) {
@@ -1439,33 +1443,43 @@
     }
 
     /**
-     * Liga/desliga a comparação no quadro do mapa. `o.lazy`: abre o 3D só
-     * quando o mapa aparecer na tela; `o.refit`: reenquadra a propriedade
-     * no 2D (na abertura da página, em vez de só manter o centro).
+     * Troca o que o quadro do mapa mostra: '2d' (só o mapa 2D), 'split' (2D + 3D lado a lado) ou '3d' (só o 3D, no quadro).
+     * `o.lazy`: abre o 3D só quando o mapa aparecer na tela; `o.refit`:
+     * reenquadra a propriedade no 2D (na abertura da página). Trocar de
+     * visualização não sai da tela cheia: o seletor flutua nela.
      */
-    function setSplit(on, o) {
+    function setView(view, o) {
         o = o || {};
         var p = state.page;
-        if (!p) return;
-        state.split = on;
-        p.stage.classList.toggle('is-split', on);
-        p.side.hidden = !on;
+        if (!p || VIEWS.indexOf(view) < 0) return;
+        state.view = view;
+        var with3d = view !== '2d';
+        p.stage.classList.toggle('is-split', view === 'split');
+        p.stage.classList.toggle('is-3d-only', view === '3d');
+        p.side.hidden = !with3d;
         p.buttons.forEach(function (b) {
-            var active = (b.getAttribute('data-view') === 'split') === on;
+            var active = b.getAttribute('data-view') === view;
             b.classList.toggle('is-active', active);
             b.setAttribute('aria-pressed', String(active));
         });
         // Na metade da largura o painel "Camadas" do 2D cobriria o mapa.
-        if (global.setMapPanelOpen) global.setMapPanelOpen(!on && p.stage.clientWidth >= 640);
-        // O Leaflet não percebe sozinho que o quadro dele mudou de largura.
-        if (global.resizeImoveisMap) global.resizeImoveisMap(!!o.refit);
-        if (on) {
-            var start = function () { if (state.split) enter('split', { imagery: p.imagery }); };
-            if (o.lazy) whenVisible(p.stage, start); else start();
-        } else {
-            if (fsElement() === p.stage) exitFullscreen();
+        if (global.setMapPanelOpen) global.setMapPanelOpen(view === '2d' && p.stage.clientWidth >= 640);
+        // O Leaflet não percebe sozinho que o quadro dele mudou de tamanho.
+        // Escondido (só 3D) não dá para enquadrar: ele segue o 3D.
+        if (global.resizeImoveisMap) global.resizeImoveisMap(!!o.refit && view !== '3d');
+        if (!with3d) {
             if (state.mode === 'split') hide();
+            return;
         }
+        if (state.mode === 'split' && state.map) {
+            // O 3D já está no quadro: só mudou de largura.
+            state.map.resize();
+            setPanelOpen(view === '3d' && el.root.clientWidth > 760);
+            placeLegend();
+            return;
+        }
+        var start = function () { if (state.view !== '2d') enter('split', { imagery: p.imagery }); };
+        if (o.lazy) whenVisible(p.stage, start); else start();
     }
 
     // ----- Tela cheia do quadro do mapa (2D + 3D juntos) -----
@@ -1501,10 +1515,16 @@
         if (!p) return;
         var on = fsElement() === p.stage;
         p.stage.classList.toggle('is-fullscreen', on);
+        // Na tela cheia o cabeçalho some: o seletor 2D/3D vai junto, flutuando.
+        if (p.switchEl) {
+            if (on) p.stage.appendChild(p.switchEl);
+            else p.switchHome.insertBefore(p.switchEl, p.switchNext);
+            p.switchEl.classList.toggle('is-floating', on);
+        }
         if (state.built) {
             el.expand.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + (on ? ICONS.shrink : ICONS.expand) + '</svg>';
             el.expand.label = create('span', 'm3d-btn-label', el.expand, on ? 'Sair da tela cheia' : 'Tela cheia');
-            el.expand.title = on ? 'Sair da tela cheia (Esc)' : 'Tela cheia com o 2D e o 3D lado a lado';
+            el.expand.title = on ? 'Sair da tela cheia (Esc)' : 'Tela cheia';
             el.expand.setAttribute('aria-pressed', String(on));
         }
         // O botão de tela cheia do Leaflet mostra o ícone de "sair".
@@ -1513,7 +1533,7 @@
             var container = lmap.getContainer();
             container.classList.toggle('leaflet-fullscreen-on', on);
             var fsBtn = container.querySelector && container.querySelector('.leaflet-control-fullscreen-button');
-            if (fsBtn && state.split) fsBtn.title = on ? 'Sair da tela cheia (Esc)' : 'Tela cheia com o 2D e o 3D lado a lado';
+            if (fsBtn) fsBtn.title = on ? 'Sair da tela cheia (Esc)' : 'Tela cheia';
         }
         if (global.resizeImoveisMap) global.resizeImoveisMap(false);
         if (state.map) state.map.resize();
@@ -1531,29 +1551,34 @@
         opts = opts || {};
         var imagery = opts.imagery || {};
         var headerBtn = opts.button;
-        if (headerBtn) {
+        var hasSwitch = !!(opts.viewSwitch && opts.stage && opts.side);
+        // Com o seletor Só 2D | 2D + 3D | Só 3D, o "Ver em 3D" sobra.
+        if (headerBtn && !hasSwitch) {
             headerBtn.hidden = false;
             headerBtn.addEventListener('click', function () { enter('full', { imagery: imagery, opener: headerBtn }); });
         }
-        if (opts.viewSwitch && opts.stage && opts.side) {
+        if (hasSwitch) {
             var buttons = Array.prototype.slice.call(opts.viewSwitch.querySelectorAll('[data-view]'));
-            state.page = { stage: opts.stage, side: opts.side, buttons: buttons, imagery: imagery };
+            state.page = {
+                stage: opts.stage, side: opts.side, buttons: buttons, imagery: imagery,
+                switchEl: opts.viewSwitch, switchHome: opts.viewSwitch.parentNode, switchNext: opts.viewSwitch.nextSibling
+            };
             state.splitHost = opts.side;
+            state.view = '2d';
             opts.viewSwitch.hidden = false;
             buttons.forEach(function (b) {
                 b.addEventListener('click', function () {
-                    var on = b.getAttribute('data-view') === 'split';
-                    saveView(on ? 'split' : '2d');
-                    if (on !== !!state.split) setSplit(on);
+                    var view = b.getAttribute('data-view');
+                    saveView(view);
+                    if (view !== state.view) setView(view);
                 });
             });
 
-            // Padrão: 2D e 3D lado a lado (se o usuário não escolheu só o 2D
-            // antes). Em tela estreita o 3D ficaria embaixo do 2D: começa no 2D.
-            var saved = savedView();
-            var startSplit = saved ? saved === 'split' : opts.stage.clientWidth >= 900;
-            if (startSplit && global.getMapOverlays && global.getMapOverlays().length) {
-                setSplit(true, { lazy: true, refit: true });
+            // Padrão: 2D e 3D lado a lado, ou a última escolha do usuário. Em
+            // tela estreita o 3D ficaria embaixo do 2D: começa no 2D.
+            var initial = savedView() || (opts.stage.clientWidth >= 900 ? 'split' : '2d');
+            if (initial !== '2d' && global.getMapOverlays && global.getMapOverlays().length) {
+                setView(initial, { lazy: true, refit: true });
             }
 
             // Rolou a página e o mapa saiu da tela: para de girar (economiza
@@ -1572,15 +1597,17 @@
         var lmap = global.getImoveisMap && global.getImoveisMap();
         if (!lmap || !global.L) return;
 
-        // Botão de tela cheia do 2D (Leaflet.fullscreen): no lado a lado,
-        // a tela cheia é do quadro todo, com os dois mapas.
+        // Botão de tela cheia do 2D (Leaflet.fullscreen): a tela cheia é do
+        // quadro todo, com o seletor 2D/3D flutuando nela.
         if (lmap.toggleFullscreen && state.page) {
             var leafletToggle = lmap.toggleFullscreen;
             lmap.toggleFullscreen = function () {
-                if (state.split && canFullscreen(state.page.stage)) toggleStageFullscreen();
+                if (canFullscreen(state.page.stage)) toggleStageFullscreen();
                 else return leafletToggle.apply(lmap, arguments);
             };
         }
+        // Botão "3D" no mapa: só sem o seletor (com ele, sobraria).
+        if (state.page) return;
         var Control = global.L.Control.extend({
             options: { position: 'topleft' },
             onAdd: function () {

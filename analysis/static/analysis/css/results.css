@@ -894,6 +894,7 @@ body { background: var(--cream-50); color: var(--ink-900); }
 /* Mapa 2D e, na comparação, o 3D à direita (map_3d_view.js). */
 .map-stage {
   --map-h: clamp(620px, 84vh, 1000px);
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
 }
@@ -916,6 +917,10 @@ body { background: var(--cream-50); color: var(--ink-900); }
 }
 
 .map-3d-side[hidden] { display: none; }
+
+/* Só 3D: o 2D fica escondido (mas vivo, seguindo a câmera do 3D). */
+.map-stage.is-3d-only #map-imoveis { display: none; }
+.map-stage.is-3d-only .map-3d-side { border: 0; }
 
 /* Tela cheia do quadro (map_3d_view.js): os dois mapas ocupam a tela toda. */
 .map-stage.is-fullscreen,
@@ -952,7 +957,7 @@ body { background: var(--cream-50); color: var(--ink-900); }
 .map-stage.is-split .map-download-shortcut { padding: 9px; }
 .map-stage.is-split #map-imoveis .compare-toggle a { padding: 0 10px; }
 
-/* Seletor "Mapa 2D | 2D + 3D lado a lado" no cabeçalho do mapa. */
+/* Seletor "Só 2D | 2D + 3D | Só 3D" no cabeçalho do mapa. */
 .map-view-switch {
   display: inline-grid;
   grid-auto-flow: column;
@@ -966,6 +971,10 @@ body { background: var(--cream-50); color: var(--ink-900); }
 .map-view-switch[hidden] { display: none; }
 
 .map-view-opt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   padding: 7px 14px;
   border: 0;
   border-radius: 999px;
@@ -982,6 +991,28 @@ body { background: var(--cream-50); color: var(--ink-900); }
 .map-view-opt:hover { background: var(--cream-100); }
 .map-view-opt:focus-visible { outline: 2px solid var(--green-700); outline-offset: 2px; }
 .map-view-opt.is-active { background: var(--green-900); color: var(--gold-400); cursor: default; }
+
+.map-view-ico {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Na tela cheia o cabeçalho some: o seletor flutua embaixo, no centro. */
+.map-view-switch.is-floating {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  z-index: 1200;
+  transform: translateX(-50%);
+  border-color: transparent;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35);
+}
 
 @media (max-width: 1100px) {
   .map-frame-header { flex-wrap: wrap; }
@@ -1960,7 +1991,8 @@ body { background: var(--cream-50); color: var(--ink-900); }
   .map-stage { --map-h: 480px; }
   .map-stage.is-split { --map-h: 400px; }
   .map-frame-header .online { display: none; }
-  .map-view-switch { width: 100%; grid-auto-columns: 1fr; }
+  .map-view-switch:not(.is-floating) { width: 100%; grid-auto-columns: 1fr; }
+  .map-view-opt { padding: 7px 8px; }
 }
 
 /* ===== Transição vinda da busca no mapa 3D (ver results.html) ===== */
