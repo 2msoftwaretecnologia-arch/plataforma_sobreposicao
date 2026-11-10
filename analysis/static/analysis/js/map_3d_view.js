@@ -35,6 +35,8 @@
     var TOUR_PITCH = 62;
     var TOUR_BEARING = -28;
     var ORBIT_DEG_PER_SEC = 4;
+    // Descida da câmera até a propriedade ao abrir (frameProperty), em ms.
+    var FRAME_DURATION = 2600;
 
     var PROPERTY_COLOR = '#ffd23f';
     var SICAR_FONTE = 'Base de Dados Sicar';
@@ -1140,7 +1142,7 @@
         // Inclinada, a propriedade fica menor na tela (o fundo foge): um
         // pouco mais de zoom compensa sem cortar as bordas.
         var tilted = { center: flat.center, zoom: flat.zoom + 0.25, pitch: TOUR_PITCH, bearing: TOUR_BEARING };
-        if (animate && !reduceMotion()) map.easeTo(Object.assign({ duration: 2600, essential: true }, tilted));
+        if (animate && !reduceMotion()) map.easeTo(Object.assign({ duration: FRAME_DURATION, essential: true }, tilted));
         else map.jumpTo(tilted);
     }
 
@@ -1165,7 +1167,20 @@
         state.orbitFrame = global.requestAnimationFrame(orbitStep);
     }
 
+    // Ao abrir a visão 3D a câmera desce até a propriedade e, quando termina,
+    // começa a girar sozinha. Mexer no mapa antes disso (ou fechar) cancela.
+    function autoOrbit() {
+        global.clearTimeout(state.autoOrbitTimer);
+        if (reduceMotion()) return;
+        state.autoOrbitTimer = global.setTimeout(function () {
+            state.autoOrbitTimer = null;
+            if (!el.root.hidden) startOrbit();
+        }, FRAME_DURATION + 300);
+    }
+
     function stopOrbit() {
+        global.clearTimeout(state.autoOrbitTimer);
+        state.autoOrbitTimer = null;
         if (!state.orbiting) return;
         state.orbiting = false;
         if (state.orbitFrame) global.cancelAnimationFrame(state.orbitFrame);
@@ -1209,6 +1224,7 @@
             placeLegend();
             refreshOverlays();
             frameProperty(true);
+            autoOrbit();
             return;
         }
 
@@ -1224,6 +1240,7 @@
             .then(function () {
                 setStatus('');
                 frameProperty(true);
+                autoOrbit();
             })
             .catch(function () {
                 setStatus('Não foi possível abrir a visão 3D. Confira a conexão e tente de novo.', true);
