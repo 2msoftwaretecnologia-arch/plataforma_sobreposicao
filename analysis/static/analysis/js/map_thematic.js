@@ -85,6 +85,13 @@
         }
     });
 
+    // Limites das classes em tan²(ângulo): compara direto com o gradiente ao
+    // quadrado (sem atan/sqrt por pixel). Acima de 90° não há limite.
+    var SLOPE_LIMITS = SLOPE_CLASSES.map(function (c) {
+        var t = Math.tan(c.max * Math.PI / 180);
+        return c.max >= 90 ? Infinity : t * t;
+    });
+
     function drawSlope(canvas, img, coords) {
         var w = canvas.width, h = canvas.height;
         var ctx = canvas.getContext('2d');
@@ -101,27 +108,30 @@
 
         var out = ctx.createImageData(w, h);
         var px = out.data;
-        function e(x, y) {
-            x = x < 0 ? 0 : (x >= w ? w - 1 : x);
-            y = y < 0 ? 0 : (y >= h ? h - 1 : y);
-            return elev[y * w + x];
-        }
+        var inv = 1 / (8 * cell);
+        var nCls = SLOPE_CLASSES.length;
+        // Método de Horn; na borda repete o pixel de dentro.
         for (var y = 0; y < h; y++) {
+            var rU = (y > 0 ? y - 1 : 0) * w, rC = y * w, rD = (y < h - 1 ? y + 1 : h - 1) * w;
             for (var x = 0; x < w; x++) {
-                var a = e(x - 1, y - 1), b = e(x, y - 1), c = e(x + 1, y - 1);
-                var d = e(x - 1, y), f = e(x + 1, y);
-                var g = e(x - 1, y + 1), hh = e(x, y + 1), k = e(x + 1, y + 1);
-                var dzdx = ((c + 2 * f + k) - (a + 2 * d + g)) / (8 * cell);
-                var dzdy = ((g + 2 * hh + k) - (a + 2 * b + c)) / (8 * cell);
-                var slope = Math.atan(Math.sqrt(dzdx * dzdx + dzdy * dzdy)) * 180 / Math.PI;
-                var cls = SLOPE_CLASSES.find(function (s) { return slope < s.max; });
-                if (cls && cls.color) {
-                    var o = (y * w + x) * 4;
-                    px[o] = cls.color[0];
-                    px[o + 1] = cls.color[1];
-                    px[o + 2] = cls.color[2];
-                    px[o + 3] = 255;
+                var xl = x > 0 ? x - 1 : 0, xr = x < w - 1 ? x + 1 : w - 1;
+                var a = elev[rU + xl], b = elev[rU + x], c = elev[rU + xr];
+                var d = elev[rC + xl], f = elev[rC + xr];
+                var g = elev[rD + xl], hh = elev[rD + x], k = elev[rD + xr];
+                var dzdx = ((c + 2 * f + k) - (a + 2 * d + g)) * inv;
+                var dzdy = ((g + 2 * hh + k) - (a + 2 * b + c)) * inv;
+                var g2 = dzdx * dzdx + dzdy * dzdy;
+                if (g2 < SLOPE_LIMITS[0]) continue;  // classe sem cor (o mais comum)
+                for (var ci = 1; ci < nCls; ci++) {
+                    if (g2 < SLOPE_LIMITS[ci]) break;
                 }
+                var col = SLOPE_CLASSES[ci < nCls ? ci : nCls - 1].color;
+                if (!col) continue;
+                var o = (rC + x) * 4;
+                px[o] = col[0];
+                px[o + 1] = col[1];
+                px[o + 2] = col[2];
+                px[o + 3] = 255;
             }
         }
         ctx.putImageData(out, 0, 0);

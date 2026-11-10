@@ -584,6 +584,9 @@
     // Subtítulo da barra: qual imagem está na tela, ou o aviso de erro dela
     // (`kind`: 'error' | 'warn'), com o botão "Tentar de novo" se `retry`.
     function setNote(text, kind, retry) {
+        var sig = text + '|' + kind + '|' + !!retry;
+        if (el.noteSig === sig) return;
+        el.noteSig = sig;
         el.subtitle.textContent = text;
         el.subtitle.classList.toggle('is-error', kind === 'error' || kind === true);
         el.subtitle.classList.toggle('is-warn', kind === 'warn');
@@ -596,6 +599,21 @@
     function track(prefix, onChange) {
         trackers[prefix] = { errors: 0, loaded: 0, onChange: onChange };
         return trackers[prefix];
+    }
+
+    // Cada tile que chega dispara um evento: os avisos (que mexem no painel e
+    // na barra) são recalculados uma vez só, no fim do quadro.
+    var trackerFrame = 0;
+    function trackerChanged(tr) {
+        tr.dirty = true;
+        if (trackerFrame) return;
+        trackerFrame = (global.requestAnimationFrame || setTimeout)(function () {
+            trackerFrame = 0;
+            Object.keys(trackers).forEach(function (k) {
+                var t = trackers[k];
+                if (t && t.dirty) { t.dirty = false; t.onChange(); }
+            });
+        });
     }
 
     function trackerFor(sourceId) {
@@ -882,13 +900,13 @@
         // Tiles que chegaram e que falharam, por fonte (ver track).
         map.on('error', function (e) {
             var tr = e && e.sourceId ? trackerFor(e.sourceId) : null;
-            if (tr) { tr.errors++; tr.onChange(); }
+            if (tr) { tr.errors++; trackerChanged(tr); }
             if (global.console) console.warn('[visão 3D]', (e && e.sourceId) || '', e && e.error);
         });
         map.on('data', function (e) {
             if (e.dataType !== 'source' || !e.tile || !e.sourceId) return;
             var tr = trackerFor(e.sourceId);
-            if (tr) { tr.loaded++; tr.onChange(); }
+            if (tr) { tr.loaded++; trackerChanged(tr); }
         });
         track('sat-esri', evalImagery);
         track('terrain', evalTerrain);
@@ -1159,6 +1177,9 @@
 
     // Estado da camada: carregando, carregada, aproximar, falha parcial ou erro.
     function setThematicState(t, kind, text) {
+        var sig = kind + '|' + text;
+        if (t.stateSig === sig) return;
+        t.stateSig = sig;
         t.dot.className = 'm3d-dot' + (kind ? ' is-' + kind : '');
         t.dot.title = text || '';
         var showAlert = kind === 'zoom' || kind === 'warn' || kind === 'error';
@@ -1286,7 +1307,12 @@
 
     // Zoom do Leaflet (tiles de 256 px) = zoom do MapLibre (512 px) + 1.
     var LEAFLET_ZOOM_OFFSET = 1;
-    var sync = { lock: null, frame2d: 0, frameOv: 0, last3d: null, bound: false };
+    var sync = { lock: null, timer2d: 0, frameOv: 0, timer3d: 0, last3d: null, bound: false };
+    // Cada passo da câmera redesenha o outro mapa (relevo, bases, camadas),
+    // no mesmo processador: durante o movimento, o outro mapa acompanha
+    // em passos; quando o movimento termina, fica exato.
+    var CAMERA_TO_2D_MS = 150;
+    var CAMERA_TO_3D_MS = 100;
 
     function splitActive() {
         return state.mode === 'split' && !!state.map;
@@ -1299,6 +1325,8 @@
         var lmap = global.getImoveisMap && global.getImoveisMap();
         if (!lmap || !splitActive()) return;
         var c = lmap.getCenter();
+        clearTimeout(sync.timer3d);
+        sync.timer3d = 0;
         sync.lock = '2d';
         state.map.jumpTo(Object.assign({ center: [c.lng, c.lat], zoom: lmap.getZoom() - LEAFLET_ZOOM_OFFSET }, extra || {}));
         sync.lock = null;
@@ -1340,12 +1368,26 @@
         if (!lmap || !state.map) return;
         sync.bound = true;
         lmap.on('move', function () {
-            if (!splitActive() || sync.lock === '3d' || sync.frame2d) return;
-            sync.frame2d = global.requestAnimationFrame(function () {
-                sync.frame2d = 0;
+            if (!splitActive() || sync.lock === '3d' || sync.timer2d) return;
+            sync.timer2d = setTimeout(function () {
+                sync.timer2d = 0;
                 cameraFrom2D();
-            });
+            }, CAMERA_TO_3D_MS);
         });
+        lmap.on('moveend', function () {
+            if (!splitActive() || sync.lock === '3d') return;
+            clearTimeout(sync.timer2d);
+            sync.timer2d = 0;
+            cameraFrom2D();
+        });
+        // Mexeu no 2D (arrastar, roda do mouse, painel Camadas): o 3D para de
+        // girar sozinho. Girando, ele redesenha a cada quadro e trava o 2D.
+        var container = lmap.getContainer && lmap.getContainer();
+        if (container) {
+            ['pointerdown', 'wheel', 'touchstart', 'keydown'].forEach(function (ev) {
+                container.addEventListener(ev, function () { if (splitActive()) stopOrbit(); }, { passive: true });
+            });
+        }
         lmap.on('layeradd layerremove', function () {
             if (state.mode !== 'split' || sync.frameOv) return;
             sync.frameOv = global.requestAnimationFrame(function () {
@@ -1353,8 +1395,20 @@
                 overlaysFrom2D();
             });
         });
+        // 3D -> 2D: o 2D redesenha bases e camadas a cada passo, então
+        // acompanha a cada 150 ms durante o movimento e exato no fim.
         state.map.on('move', function () {
-            if (sync.lock !== '2d') cameraTo2D();
+            if (sync.lock === '2d' || sync.timer3d) return;
+            sync.timer3d = setTimeout(function () {
+                sync.timer3d = 0;
+                cameraTo2D();
+            }, CAMERA_TO_2D_MS);
+        });
+        state.map.on('moveend', function () {
+            if (sync.lock === '2d') return;
+            clearTimeout(sync.timer3d);
+            sync.timer3d = 0;
+            cameraTo2D();
         });
     }
 
