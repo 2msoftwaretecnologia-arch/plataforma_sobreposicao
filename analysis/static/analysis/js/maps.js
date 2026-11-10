@@ -1379,7 +1379,7 @@
             link.href = '#';
             link.title = 'Comparar duas imagens lado a lado';
             link.setAttribute('role', 'button');
-            link.innerHTML = '<span aria-hidden="true">⇆</span> Comparar';
+            link.innerHTML = '<span aria-hidden="true">⇆</span><span class="ctl-label"> Comparar</span>';
             L.DomEvent.on(link, 'click', function (e) {
                 L.DomEvent.preventDefault(e);
                 if (state) { stop(); } else { start(); }
@@ -2000,8 +2000,8 @@
             link.setAttribute('aria-pressed', String(on));
             link.title = on ? 'Mostrar de novo as sobreposições (H)' : 'Esconder as sobreposições e ver só a imagem (H)';
             link.innerHTML = on
-                ? '<span aria-hidden="true">◧</span> Mostrar camadas'
-                : '<span aria-hidden="true">◧</span> Só imagem';
+                ? '<span aria-hidden="true">◧</span><span class="ctl-label"> Mostrar camadas</span>'
+                : '<span aria-hidden="true">◧</span><span class="ctl-label"> Só imagem</span>';
         }
         set(false);
 
@@ -2119,8 +2119,27 @@
             layersByFonte: data.layersByFonte,
             legend: data.legend,
             legendEl: (!isStatic) ? document.getElementById('legend-imoveis') : null,
-            panel: (!isStatic) ? panel : null
+            panel: (!isStatic) ? panel : null,
+            allGroup: data.allGroup
         };
+    };
+
+    /**
+     * O quadro do mapa mudou de tamanho (comparação lado a lado com o 3D):
+     * o Leaflet recalcula o tamanho e, com `refit`, volta a enquadrar a
+     * propriedade; sem ele, mantém o centro.
+     */
+    global.resizeImoveisMap = function (refit) {
+        if (!mapState) return;
+        mapState.map.invalidateSize({ animate: false });
+        if (refit && mapState.allGroup && mapState.allGroup.getLayers().length) {
+            fitToItems(mapState.map, mapState.allGroup, mapState.panel ? mapState.panel.fitPadding(12) : { padding: [12, 12] });
+        }
+    };
+
+    /** Abre/recolhe o painel "Camadas" do mapa interativo. */
+    global.setMapPanelOpen = function (open) {
+        if (mapState && mapState.panel) mapState.panel.setOpen(open);
     };
 
     /**
@@ -2141,6 +2160,33 @@
                 geojson: grp.toGeoJSON()
             };
         });
+    };
+
+    /** Quais bases estão ligadas agora no mapa interativo: { fonte: true/false }. */
+    global.getMapOverlayVisibility = function () {
+        var out = {};
+        if (!mapState) return out;
+        Object.keys(mapState.layersByFonte).forEach(function (f) {
+            out[f] = mapState.map.hasLayer(mapState.layersByFonte[f]);
+        });
+        return out;
+    };
+
+    /**
+     * Liga/desliga uma base no mapa interativo e na legenda do painel (a
+     * comparação lado a lado com o 3D usa para manter os dois iguais).
+     */
+    global.setMapOverlayVisible = function (fonte, on) {
+        if (!mapState) return;
+        var grp = mapState.layersByFonte[fonte];
+        if (!grp || mapState.map.hasLayer(grp) === on) return;
+        if (on) mapState.map.addLayer(grp); else mapState.map.removeLayer(grp);
+        if (mapState.legendEl) {
+            var legendItems = mapState.legendEl.querySelectorAll('.legend-item');
+            for (var i = 0; i < legendItems.length; i++) {
+                if (legendItems[i].dataset.fonte === fonte) legendItems[i].classList.toggle('off', !on);
+            }
+        }
     };
 
     /** Instância Leaflet do mapa interativo (para controles extras, ex.: botão 3D). */

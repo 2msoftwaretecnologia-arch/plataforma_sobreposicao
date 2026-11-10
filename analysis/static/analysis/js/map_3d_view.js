@@ -137,6 +137,23 @@
         return isFinite(b[0]) ? [[b[0], b[1]], [b[2], b[3]]] : null;
     }
 
+    var ICONS = {
+        orbit: '<path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/>',
+        center: '<circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="1.5"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/>',
+        expand: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
+        close: '<path d="M6 6l12 12M18 6 6 18"/>'
+    };
+
+    // Botão com ícone e texto; o texto também vira o nome acessível/dica.
+    function iconButton(parent, cls, icon, label, title) {
+        var b = create('button', cls, parent);
+        b.type = 'button';
+        b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + icon + '</svg>';
+        b.label = create('span', 'm3d-btn-label', b, label);
+        b.title = title;
+        return b;
+    }
+
     function create(tag, cls, parent, text) {
         var node = document.createElement(tag);
         if (cls) node.className = cls;
@@ -192,31 +209,15 @@
             applyChoice(state.source);
         });
 
-        // Exagero do relevo
-        var relief = create('label', 'm3d-relief', controls);
-        create('span', '', relief, 'Relevo');
-        el.relief = create('input', '', relief);
-        el.relief.type = 'range';
-        el.relief.min = '1';
-        el.relief.max = '5';
-        el.relief.step = '0.5';
-        el.relief.value = String(DEFAULT_EXAGGERATION);
-        el.relief.setAttribute('aria-label', 'Exagero do relevo');
-        el.reliefValue = create('b', '', relief, fmtRelief(DEFAULT_EXAGGERATION));
-
-        el.orbit = create('button', 'm3d-btn', controls, 'Girar');
-        el.orbit.type = 'button';
+        // Ações: ícone + texto (na tela 3D estreita fica só o ícone, ver CSS).
+        var actions = create('div', 'm3d-actions', controls);
+        el.orbit = iconButton(actions, 'm3d-btn', ICONS.orbit, 'Girar', 'Girar a câmera ao redor da propriedade');
         el.orbit.setAttribute('aria-pressed', 'false');
-        el.orbit.title = 'Gira a câmera ao redor da propriedade';
-
-        el.reset = create('button', 'm3d-btn', controls, 'Recentralizar');
-        el.reset.type = 'button';
-        el.reset.title = 'Volta a câmera para a propriedade';
-
-        el.close = create('button', 'm3d-btn m3d-close', controls);
-        el.close.type = 'button';
-        el.close.setAttribute('aria-label', 'Fechar a visão 3D');
-        el.close.innerHTML = 'Fechar <span aria-hidden="true">&times;</span>';
+        el.reset = iconButton(actions, 'm3d-btn', ICONS.center, 'Recentralizar', 'Voltar a câmera para a propriedade');
+        el.expand = iconButton(actions, 'm3d-btn', ICONS.expand, 'Tela cheia', 'Abrir o 3D na tela inteira');
+        el.expand.hidden = true;
+        el.expand.addEventListener('click', function () { enter('full', { opener: el.expand }); });
+        el.close = iconButton(actions, 'm3d-btn m3d-close', ICONS.close, 'Fechar', 'Fechar a visão 3D');
 
         el.bar = bar;
         buildPanel(root);
@@ -236,7 +237,7 @@
             if (state.map) state.map.setTerrain({ source: 'terrain', exaggeration: Number(el.relief.value) });
         });
         document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape' && !root.hidden) close();
+            if (e.key === 'Escape' && !root.hidden && state.mode === 'full') close();
         });
         global.addEventListener('resize', placeLegend);
 
@@ -245,10 +246,13 @@
 
     // A barra do topo quebra em duas linhas quando os seletores de imagem
     // não cabem: a legenda desce junto (no celular ela fica embaixo, pelo CSS).
+    function isSmall() {
+        return el.root.clientWidth <= 760;
+    }
+
     function placeLegend() {
         if (!state.built || el.root.hidden) return;
-        var small = global.matchMedia && global.matchMedia('(max-width: 760px)').matches;
-        el.legendBox.style.top = small ? '' : (el.bar.offsetTop + el.bar.offsetHeight + 12) + 'px';
+        el.legendBox.style.top = isSmall() ? '' : (el.bar.offsetTop + el.bar.offsetHeight + 12) + 'px';
     }
 
     function fillSelect(select, options, selected) {
@@ -286,6 +290,18 @@
         el.panelBody.id = 'm3d-panel-body';
         el.panelToggle.setAttribute('aria-controls', el.panelBody.id);
 
+        // Exagero do relevo (antes ficava na barra do topo).
+        var relief = create('label', 'm3d-relief', el.panelBody);
+        create('span', '', relief, 'Exagero do relevo');
+        el.relief = create('input', '', relief);
+        el.relief.type = 'range';
+        el.relief.min = '1';
+        el.relief.max = '5';
+        el.relief.step = '0.5';
+        el.relief.value = String(DEFAULT_EXAGGERATION);
+        el.relief.setAttribute('aria-label', 'Exagero do relevo');
+        el.reliefValue = create('b', '', relief, fmtRelief(DEFAULT_EXAGGERATION));
+
         var bases = panelSection('Bases da análise', 'Ligue e desligue o que aparece sobre o relevo.');
         el.legend = bases.list;
         el.basesCount = bases.count;
@@ -295,8 +311,7 @@
         el.thematics = th.list;
         el.thematicsCount = th.count;
 
-        // No celular o painel cobriria o mapa: começa recolhido.
-        setPanelOpen(!(global.matchMedia && global.matchMedia('(max-width: 760px)').matches));
+        setPanelOpen(true);
     }
 
     function panelSection(title, hint) {
@@ -350,11 +365,12 @@
         el.legend.innerHTML = '';
         state.overlays.forEach(function (ov, i) {
             var li = create('li', 'm3d-item', el.legend);
-            var check = switchRow(li, ov.fonte, ov.visible, ov.isProperty ? PROPERTY_COLOR : ov.color);
+            var check = ov.switchEl = switchRow(li, ov.fonte, ov.visible, ov.isProperty ? PROPERTY_COLOR : ov.color);
             check.addEventListener('change', function () {
                 ov.visible = check.checked;
                 setOverlayVisible(i, ov.visible);
                 updateCounts();
+                if (state.mode === 'split' && global.setMapOverlayVisible) global.setMapOverlayVisible(ov.fonte, ov.visible);
             });
         });
         updateCounts();
@@ -1122,10 +1138,19 @@
     }
 
     function framePadding() {
-        var small = global.innerWidth < 760;
-        return small
-            ? { top: 120, bottom: 150, left: 30, right: 30 }
-            : { top: 110, bottom: 70, left: 400, right: 90 };
+        var w = el.root.clientWidth, h = el.root.clientHeight;
+        var small = isSmall();
+        var panelOpen = !el.legendBox.classList.contains('is-collapsed');
+        var p = {
+            top: el.bar.offsetTop + el.bar.offsetHeight + 16,
+            bottom: small && panelOpen ? Math.min(h * 0.45, el.legendBox.offsetHeight) + 24 : 60,
+            left: !small && panelOpen ? el.legendBox.offsetLeft + el.legendBox.offsetWidth + 24 : 30,
+            right: small ? 30 : 70
+        };
+        // Margens maiores que o mapa fariam o cameraForBounds desistir.
+        if (p.left + p.right > w - 120) { p.left = 30; p.right = 30; }
+        if (p.top + p.bottom > h - 120) { p.top = 20; p.bottom = 20; }
+        return p;
     }
 
     // Enquadra a propriedade de cima e desce inclinando, como um drone.
@@ -1189,6 +1214,85 @@
     }
 
     // =====================================================================
+    // Comparação lado a lado: o mapa 2D (Leaflet) e o 3D seguem o mesmo
+    // ponto e zoom, e as bases da análise ligadas são as mesmas.
+    // =====================================================================
+
+    // Zoom do Leaflet (tiles de 256 px) = zoom do MapLibre (512 px) + 1.
+    var LEAFLET_ZOOM_OFFSET = 1;
+    var sync = { lock: null, frame2d: 0, frameOv: 0, last3d: null, bound: false };
+
+    function splitActive() {
+        return state.mode === 'split' && !!state.map;
+    }
+
+    // Câmera do 3D no mesmo lugar do 2D (mantém a inclinação e o giro, a
+    // não ser que `extra` traga outros). Tudo num jumpTo só e travado: um
+    // movimento à parte antes disso empurraria o 2D para a posição antiga.
+    function cameraFrom2D(extra) {
+        var lmap = global.getImoveisMap && global.getImoveisMap();
+        if (!lmap || !splitActive()) return;
+        var c = lmap.getCenter();
+        sync.lock = '2d';
+        state.map.jumpTo(Object.assign({ center: [c.lng, c.lat], zoom: lmap.getZoom() - LEAFLET_ZOOM_OFFSET }, extra || {}));
+        sync.lock = null;
+        sync.last3d = null;
+    }
+
+    // 2D no mesmo lugar do 3D, só quando o centro ou o zoom mudaram (girar a
+    // câmera muda só o rumo e não mexe no 2D).
+    function cameraTo2D() {
+        var lmap = global.getImoveisMap && global.getImoveisMap();
+        if (!lmap || !splitActive() || sync.lock === '2d') return;
+        var c = state.map.getCenter();
+        var z = state.map.getZoom() + LEAFLET_ZOOM_OFFSET;
+        var last = sync.last3d;
+        // Tolerância ~1 m: com relevo, o centro oscila um pouco enquanto gira.
+        if (last && Math.abs(last.lat - c.lat) < 1e-5 && Math.abs(last.lng - c.lng) < 1e-5 && Math.abs(last.z - z) < 0.01) return;
+        sync.last3d = { lat: c.lat, lng: c.lng, z: z };
+        sync.lock = '3d';
+        lmap.setView([c.lat, c.lng], Math.round(z), { animate: false });
+        sync.lock = null;
+    }
+
+    // Bases ligadas/desligadas no 2D (legenda, "Marcar todas", cartões).
+    function overlaysFrom2D() {
+        if (!state.built || !global.getMapOverlayVisibility) return;
+        var vis = global.getMapOverlayVisibility();
+        state.overlays.forEach(function (ov, i) {
+            if (!(ov.fonte in vis) || vis[ov.fonte] === ov.visible) return;
+            ov.visible = vis[ov.fonte];
+            if (ov.switchEl) ov.switchEl.checked = ov.visible;
+            setOverlayVisible(i, ov.visible);
+        });
+        updateCounts();
+    }
+
+    function bindSync() {
+        if (sync.bound) return;
+        var lmap = global.getImoveisMap && global.getImoveisMap();
+        if (!lmap || !state.map) return;
+        sync.bound = true;
+        lmap.on('move', function () {
+            if (!splitActive() || sync.lock === '3d' || sync.frame2d) return;
+            sync.frame2d = global.requestAnimationFrame(function () {
+                sync.frame2d = 0;
+                cameraFrom2D();
+            });
+        });
+        lmap.on('layeradd layerremove', function () {
+            if (state.mode !== 'split' || sync.frameOv) return;
+            sync.frameOv = global.requestAnimationFrame(function () {
+                sync.frameOv = 0;
+                overlaysFrom2D();
+            });
+        });
+        state.map.on('move', function () {
+            if (sync.lock !== '2d') cameraTo2D();
+        });
+    }
+
+    // =====================================================================
     // Abrir / fechar
     // =====================================================================
 
@@ -1198,33 +1302,51 @@
         el.status.classList.toggle('is-error', !!isError);
     }
 
-    function open(opts) {
+    // Põe a tela 3D no lugar: por cima de tudo ('full') ou dentro da
+    // metade direita do quadro do mapa ('split').
+    function mountRoot(mode) {
+        var host = mode === 'split' ? state.splitHost : document.body;
+        if (el.root.parentNode !== host) host.appendChild(el.root);
+        el.root.classList.toggle('m3d--embedded', mode === 'split');
+        el.root.setAttribute('aria-modal', mode === 'full' ? 'true' : 'false');
+        el.root.setAttribute('role', mode === 'full' ? 'dialog' : 'region');
+        document.documentElement.classList.toggle('m3d-open', mode === 'full');
+        el.close.label.textContent = mode === 'split' ? 'Fechar 3D' : (state.split ? 'Voltar ao lado a lado' : 'Fechar');
+        el.close.title = mode === 'split' ? 'Fechar o 3D e voltar só para o mapa 2D'
+            : (state.split ? 'Voltar para o 2D e 3D lado a lado' : 'Fechar a visão 3D');
+        el.expand.hidden = mode !== 'split';
+    }
+
+    function enter(mode, opts) {
         opts = opts || {};
         if (!global.getMapOverlays) return;
-        // O mapa 2D em tela cheia esconderia a visão 3D (que fica no <body>).
+        // O mapa 2D em tela cheia esconderia a visão 3D.
         if (document.fullscreenElement && document.exitFullscreen) {
             document.exitFullscreen().catch(function () {});
         }
-        state.overlays = global.getMapOverlays().filter(function (ov) {
+        var overlays = global.getMapOverlays().filter(function (ov) {
             return ov.geojson && ov.geojson.features && ov.geojson.features.length;
         });
-        if (!state.overlays.length) return;
+        if (!overlays.length) return;
+        state.overlays = overlays;
 
         if (!state.built) buildDom();
         state.imagery = opts.imagery || state.imagery || {};
-        state.opener = opts.opener || document.activeElement;
-
+        if (mode === 'full' && opts.opener) state.opener = opts.opener;
+        state.mode = mode;
+        stopOrbit();
+        mountRoot(mode);
         el.root.hidden = false;
-        document.documentElement.classList.add('m3d-open');
         buildLegend();
-        el.close.focus();
+        // Na metade da tela o painel cobriria o mapa: começa recolhido.
+        setPanelOpen(mode === 'full' && el.root.clientWidth > 760);
+        if (mode === 'full') el.close.focus();
 
         if (state.map) {
             state.map.resize();
             placeLegend();
             refreshOverlays();
-            frameProperty(true);
-            autoOrbit();
+            startView();
             return;
         }
 
@@ -1239,8 +1361,7 @@
             })
             .then(function () {
                 setStatus('');
-                frameProperty(true);
-                autoOrbit();
+                startView();
             })
             .catch(function () {
                 setStatus('Não foi possível abrir a visão 3D. Confira a conexão e tente de novo.', true);
@@ -1249,17 +1370,105 @@
             });
     }
 
-    function close() {
-        if (!state.built || el.root.hidden) return;
+    // Câmera ao abrir: em tela cheia desce até a propriedade; lado a lado
+    // parte do mesmo ponto do 2D e só inclina. Depois gira sozinha.
+    function startView() {
+        if (state.mode === 'split') {
+            bindSync();
+            var map = state.map;
+            cameraFrom2D({ pitch: 0, bearing: 0 });
+            var tilted = { pitch: TOUR_PITCH, bearing: TOUR_BEARING };
+            if (reduceMotion()) map.jumpTo(tilted);
+            else map.easeTo(Object.assign({ duration: FRAME_DURATION, essential: true }, tilted));
+        } else {
+            frameProperty(true);
+        }
+        autoOrbit();
+    }
+
+    function hide() {
         stopOrbit();
         el.root.hidden = true;
+        state.mode = null;
         document.documentElement.classList.remove('m3d-open');
-        if (state.opener && state.opener.focus) state.opener.focus();
+    }
+
+    // "Fechar" / Esc: da tela cheia volta para o lado a lado (se estava
+    // nele); do lado a lado, fecha a comparação.
+    function close() {
+        if (!state.built || el.root.hidden) return;
+        if (state.mode === 'full') {
+            if (state.split) {
+                enter('split');
+            } else {
+                hide();
+            }
+            if (state.opener && state.opener.focus) state.opener.focus();
+            return;
+        }
+        saveView('2d');
+        setSplit(false);
+    }
+
+    // Liga/desliga a comparação no quadro do mapa (botões do cabeçalho).
+    var VIEW_KEY = 'mapa_resultados_visualizacao';
+
+    // Última escolha do usuário ('split' ou '2d'); só conveniência local.
+    function savedView() {
+        try { return global.localStorage.getItem(VIEW_KEY); } catch (e) { return null; }
+    }
+
+    function saveView(value) {
+        try { global.localStorage.setItem(VIEW_KEY, value); } catch (e) { /* sem armazenamento: tudo bem */ }
+    }
+
+    // Roda `fn` quando o elemento aparece na tela (o 3D só baixa o MapLibre
+    // e os tiles quando o usuário chega no mapa).
+    function whenVisible(node, fn) {
+        if (!global.IntersectionObserver) { fn(); return; }
+        var io = new global.IntersectionObserver(function (entries) {
+            if (!entries.some(function (e) { return e.isIntersecting; })) return;
+            io.disconnect();
+            fn();
+        }, { threshold: 0.15 });
+        io.observe(node);
     }
 
     /**
-     * Liga o botão "Ver em 3D" do cabeçalho do mapa e põe um botão "3D" no
-     * próprio mapa Leaflet (visível também em tela cheia).
+     * Liga/desliga a comparação no quadro do mapa. `o.lazy`: abre o 3D só
+     * quando o mapa aparecer na tela; `o.refit`: reenquadra a propriedade
+     * no 2D (na abertura da página, em vez de só manter o centro).
+     */
+    function setSplit(on, o) {
+        o = o || {};
+        var p = state.page;
+        if (!p) return;
+        state.split = on;
+        p.stage.classList.toggle('is-split', on);
+        p.side.hidden = !on;
+        p.buttons.forEach(function (b) {
+            var active = (b.getAttribute('data-view') === 'split') === on;
+            b.classList.toggle('is-active', active);
+            b.setAttribute('aria-pressed', String(active));
+        });
+        // Na metade da largura o painel "Camadas" do 2D cobriria o mapa.
+        if (global.setMapPanelOpen) global.setMapPanelOpen(!on && p.stage.clientWidth >= 640);
+        // O Leaflet não percebe sozinho que o quadro dele mudou de largura.
+        if (global.resizeImoveisMap) global.resizeImoveisMap(!!o.refit);
+        if (on) {
+            var start = function () { if (state.split) enter('split', { imagery: p.imagery }); };
+            if (o.lazy) whenVisible(p.stage, start); else start();
+        } else if (state.mode === 'split') {
+            hide();
+        }
+    }
+
+    /**
+     * Liga os controles do cabeçalho do mapa: "Ver em 3D" (tela cheia), o
+     * seletor "Mapa 2D | 2D + 3D lado a lado" e um botão "3D" no próprio
+     * mapa Leaflet (visível também em tela cheia).
+     *
+     *   install3dView({ imagery, button, viewSwitch, stage, side })
      */
     function install(opts) {
         opts = opts || {};
@@ -1267,7 +1476,37 @@
         var headerBtn = opts.button;
         if (headerBtn) {
             headerBtn.hidden = false;
-            headerBtn.addEventListener('click', function () { open({ imagery: imagery, opener: headerBtn }); });
+            headerBtn.addEventListener('click', function () { enter('full', { imagery: imagery, opener: headerBtn }); });
+        }
+        if (opts.viewSwitch && opts.stage && opts.side) {
+            var buttons = Array.prototype.slice.call(opts.viewSwitch.querySelectorAll('[data-view]'));
+            state.page = { stage: opts.stage, side: opts.side, buttons: buttons, imagery: imagery };
+            state.splitHost = opts.side;
+            opts.viewSwitch.hidden = false;
+            buttons.forEach(function (b) {
+                b.addEventListener('click', function () {
+                    var on = b.getAttribute('data-view') === 'split';
+                    saveView(on ? 'split' : '2d');
+                    if (on !== !!state.split) setSplit(on);
+                });
+            });
+
+            // Padrão: 2D e 3D lado a lado (se o usuário não escolheu só o 2D
+            // antes). Em tela estreita o 3D ficaria embaixo do 2D: começa no 2D.
+            var saved = savedView();
+            var startSplit = saved ? saved === 'split' : opts.stage.clientWidth >= 900;
+            if (startSplit && global.getMapOverlays && global.getMapOverlays().length) {
+                setSplit(true, { lazy: true, refit: true });
+            }
+
+            // Rolou a página e o mapa saiu da tela: para de girar (economiza
+            // a placa de vídeo); volta quando o usuário mexer ou clicar em Girar.
+            if (global.IntersectionObserver) {
+                new global.IntersectionObserver(function (entries) {
+                    var visible = entries.some(function (e) { return e.isIntersecting; });
+                    if (!visible && state.mode === 'split') stopOrbit();
+                }, { threshold: 0 }).observe(opts.stage);
+            }
         }
         var lmap = global.getImoveisMap && global.getImoveisMap();
         if (!lmap || !global.L) return;
@@ -1284,7 +1523,7 @@
                 global.L.DomEvent.disableClickPropagation(bar);
                 global.L.DomEvent.on(a, 'click', function (e) {
                     global.L.DomEvent.preventDefault(e);
-                    open({ imagery: imagery, opener: a });
+                    enter('full', { imagery: imagery, opener: a });
                 });
                 return bar;
             }
@@ -1292,7 +1531,7 @@
         new Control().addTo(lmap);
     }
 
-    global.open3dView = open;
+    global.open3dView = function (opts) { enter('full', opts); };
     global.close3dView = close;
     global.install3dView = install;
 })(window);

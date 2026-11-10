@@ -4,8 +4,9 @@
 .map-frame-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
-  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  flex: 0 1 auto;
 }
 
 .btn-3d {
@@ -53,7 +54,23 @@ html.m3d-open body { overflow: hidden; }
   background: #12271a;
   font-family: var(--sans);
   animation: m3dIn .25s ease both;
+  /* As regras "tela pequena" valem pelo tamanho da própria tela 3D: na
+     comparação lado a lado ela tem metade da largura da janela. */
+  container: m3d / inline-size;
 }
+
+/* Comparação lado a lado: a tela 3D fica dentro da metade direita do
+   quadro do mapa (.map-3d-side), não por cima da página. */
+.m3d.m3d--embedded {
+  position: absolute;
+  z-index: 1;
+  animation: none;
+}
+
+.m3d--embedded .m3d-bar { top: 10px; left: 10px; right: 10px; }
+.m3d--embedded .m3d-title strong { font-size: 16px; }
+.m3d--embedded .m3d-hint { display: none; }
+.m3d--embedded .m3d-panel { left: 10px; max-height: calc(100% - 120px); }
 
 .m3d[hidden] { display: none; }
 
@@ -150,21 +167,27 @@ html.m3d-open body { overflow: hidden; }
 .m3d-title span.is-warn { color: #ffd59c; font-weight: 600; }
 .m3d-retry-inline { padding: 2px 10px; font-size: 11.5px; color: var(--gold-400); }
 
-/* Exagero do relevo */
+/* Exagero do relevo (topo do painel lateral) */
 .m3d-relief {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 6px;
-  font-size: 13px;
+  gap: 10px;
+  padding: 10px 14px 8px;
+  font-size: 12.5px;
   font-weight: 600;
   color: rgba(251, 248, 240, 0.85);
 }
 
-.m3d-relief input { width: 96px; accent-color: var(--gold-400); }
-.m3d-relief b { min-width: 2.6em; color: var(--gold-400); font-variant-numeric: tabular-nums; }
+.m3d-relief input { flex: 1; min-width: 0; accent-color: var(--gold-400); }
+.m3d-relief b { min-width: 2.6em; text-align: right; color: var(--gold-400); font-variant-numeric: tabular-nums; }
+
+/* Ações da barra: ícone + texto */
+.m3d-actions { display: flex; align-items: center; gap: 8px; }
 
 .m3d-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   padding: 8px 14px;
   border: 1px solid rgba(251, 248, 240, 0.22);
   border-radius: 999px;
@@ -183,7 +206,18 @@ html.m3d-open body { overflow: hidden; }
 
 .m3d-close { background: var(--cream-50); border-color: var(--cream-50); color: var(--green-950); }
 .m3d-close:hover { background: var(--gold-100); border-color: var(--gold-100); }
-.m3d-close span { font-size: 17px; line-height: 0; margin-left: 2px; }
+.m3d-btn[hidden] { display: none; }
+
+.m3d-btn svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 
 /* ===== Painel lateral: bases da análise e camadas temáticas ===== */
 .m3d-panel {
@@ -536,23 +570,63 @@ html.m3d-open body { overflow: hidden; }
 .m3d-popup-area { color: var(--ink-500); }
 
 /* ===== Telas menores ===== */
-@media (max-width: 760px) {
-  .m3d-bar { top: 8px; left: 8px; right: 8px; padding: 10px 12px; }
+@container m3d (max-width: 1100px) {
+  .m3d-bar {
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    pointer-events: none;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+  }
+  .m3d-bar > * { pointer-events: auto; }
+  .m3d-title { display: none; }
+  .m3d-title:has(.is-error, .is-warn) {
+    display: block;
+    order: 2;
+    max-width: 46%;
+    padding: 7px 10px;
+    border-radius: 10px;
+    background: rgba(18, 39, 26, 0.9);
+  }
+  .m3d-title:has(.is-error, .is-warn) strong { display: none; }
+  .m3d-controls { flex: 1; justify-content: space-between; flex-wrap: nowrap; align-items: flex-start; }
+  .m3d-imagery { min-width: 0; }
+  .m3d-select,
+  .m3d-btn {
+    background-color: rgba(18, 39, 26, 0.88);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  }
+  .m3d-select { max-width: 200px; }
+  .m3d-btn { width: 36px; height: 36px; padding: 0; justify-content: center; }
+  .m3d-btn-label { display: none; }
+  .m3d-close { background: var(--cream-50); }
+  .m3d-btn.is-on { background: var(--gold-400); }
+}
+
+@container m3d (max-width: 760px) {
+  .m3d-bar { top: 8px; left: 8px; right: 8px; }
+  .m3d-controls { flex-wrap: wrap; gap: 6px; }
   .m3d-title span { display: none; }
-  .m3d-relief input { width: 70px; }
   .m3d-imagery { width: 100%; }
   .m3d-select { flex: 1 1 140px; max-width: none; }
-  .m3d-panel {
+  .m3d-panel,
+  .m3d--embedded .m3d-panel {
     top: auto;
     bottom: 10px;
     left: 8px;
     width: min(340px, calc(100% - 70px));
-    max-height: 45vh;
+    max-height: 50%;
   }
   .m3d-note { display: none; }
   .m3d-note:has(.is-error, .is-warn) { display: flex; }
   .m3d-note:has(.is-error, .is-warn) span { display: block; }
   .m3d-hint { display: none; }
+}
+
+@media (max-width: 760px) {
   .map-frame-actions .online { display: none; }
 }
 

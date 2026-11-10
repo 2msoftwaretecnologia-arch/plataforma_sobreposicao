@@ -883,10 +883,101 @@ body { background: var(--cream-50); color: var(--ink-900); }
 
 .map-frame-header .online { flex: 0 0 auto; }
 
+/* O cartão do mapa passa da largura do conteúdo (1180px) e usa quase a
+   tela toda: sobra espaço para o lado a lado com o 3D. Item de .page (flex
+   em coluna): centralizado, ele cresce igual para os dois lados. */
+.panel--map {
+  align-self: center;
+  width: min(1680px, calc(100vw - 48px));
+}
+
+/* Mapa 2D e, na comparação, o 3D à direita (map_3d_view.js). */
+.map-stage {
+  --map-h: clamp(620px, 84vh, 1000px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.map-stage.is-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+
 #map-imoveis {
-  height: clamp(520px, 74vh, 780px);
+  height: var(--map-h);
   border: none;
   font-family: var(--sans);
+}
+
+.map-3d-side {
+  position: relative;
+  min-width: 0;
+  height: var(--map-h);
+  border-left: 3px solid var(--cream-50);
+  background: #12271a;
+  overflow: hidden;
+}
+
+.map-3d-side[hidden] { display: none; }
+
+/* Antes do 3D carregar (ele só abre quando o mapa aparece na tela). */
+.map-3d-side::before {
+  content: "Visão 3D";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: rgba(251, 248, 240, 0.45);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .6px;
+  text-transform: uppercase;
+}
+
+/* Lado a lado: o 2D tem metade da largura, então os botões do canto
+   ficam só com o ícone (o texto continua na dica do mouse). */
+.map-stage.is-split .ctl-label,
+.map-stage.is-split .map-download-shortcut span { display: none; }
+.map-stage.is-split .map-download-shortcut { padding: 9px; }
+.map-stage.is-split #map-imoveis .compare-toggle a { padding: 0 10px; }
+
+/* Seletor "Mapa 2D | 2D + 3D lado a lado" no cabeçalho do mapa. */
+.map-view-switch {
+  display: inline-grid;
+  grid-auto-flow: column;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  border: 1px solid var(--cream-200);
+  background: #fff;
+}
+
+.map-view-switch[hidden] { display: none; }
+
+.map-view-opt {
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--green-900);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background .2s ease, color .2s ease;
+}
+
+.map-view-opt:hover { background: var(--cream-100); }
+.map-view-opt:focus-visible { outline: 2px solid var(--green-700); outline-offset: 2px; }
+.map-view-opt.is-active { background: var(--green-900); color: var(--gold-400); cursor: default; }
+
+@media (max-width: 1100px) {
+  .map-frame-header { flex-wrap: wrap; }
+}
+
+/* Telas estreitas: o 3D vai para baixo do 2D, cada um com meia altura. */
+@media (max-width: 900px) {
+  .map-stage.is-split { grid-template-columns: minmax(0, 1fr); --map-h: clamp(380px, 46vh, 520px); }
+  .map-3d-side { border-left: 0; border-top: 3px solid var(--cream-50); }
 }
 
 /* Botões do canto esquerdo (zoom, tela cheia, comparar) com o mesmo acabamento. */
@@ -1852,8 +1943,11 @@ body { background: var(--cream-50); color: var(--ink-900); }
   .panel { padding: 24px 20px; }
   .area-item { grid-template-columns: 1fr; }
   .area-item__icon { width: 40px; height: 40px; }
-  #map-imoveis { height: 460px; }
+  .panel--map { width: 100%; }
+  .map-stage { --map-h: 480px; }
+  .map-stage.is-split { --map-h: 400px; }
   .map-frame-header .online { display: none; }
+  .map-view-switch { width: 100%; grid-auto-columns: 1fr; }
 }
 
 /* ===== Transição vinda da busca no mapa 3D (ver results.html) ===== */

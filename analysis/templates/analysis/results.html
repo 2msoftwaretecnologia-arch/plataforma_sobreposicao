@@ -275,7 +275,7 @@
         {% endif %}
 
         {% if map_items %}
-        <section class="panel reveal">
+        <section class="panel panel--map reveal">
             <div class="panel-header">
                 <div>
                     <p class="eyebrow">Mapa</p>
@@ -290,17 +290,24 @@
                             <svg class="ico" style="width:16px;height:16px;margin-right:8px;vertical-align:-3px"><use href="#i-layers"/></svg>
                             {% if resultado %}Propriedade e bases sobrepostas{% else %}Local do ponto informado{% endif %}
                         </div>
-                        <p class="map-frame-hint">Use o painel <strong>Camadas</strong> no mapa para ligar as bases da análise, trocar a imagem de satélite e adicionar camadas temáticas.</p>
+                        <p class="map-frame-hint">Use o painel <strong>Camadas</strong> no mapa para ligar as bases da análise, trocar a imagem de satélite e adicionar camadas temáticas. Em <strong>2D + 3D lado a lado</strong>, os dois mapas andam juntos.</p>
                     </div>
                     <div class="map-frame-actions">
-                        <button type="button" id="open_3d" class="btn-3d" hidden title="Imagem de satélite sobre o relevo, em 3D">
+                        <div class="map-view-switch" id="map_view_switch" role="group" aria-label="Visualização do mapa" hidden>
+                            <button type="button" class="map-view-opt is-active" data-view="2d" aria-pressed="true">Mapa 2D</button>
+                            <button type="button" class="map-view-opt" data-view="split" aria-pressed="false" title="Mapa 2D e visão 3D lado a lado, no mesmo lugar">2D + 3D lado a lado</button>
+                        </div>
+                        <button type="button" id="open_3d" class="btn-3d" hidden title="Imagem de satélite sobre o relevo, em 3D, na tela inteira">
                             <svg class="ico"><use href="#i-cube"/></svg>
                             Ver em 3D
                         </button>
                         <span class="online">online</span>
                     </div>
                 </div>
-                <div id="map-imoveis"></div>
+                <div class="map-stage" id="map_stage">
+                    <div id="map-imoveis"></div>
+                    <div class="map-3d-side" id="map_3d_side" hidden></div>
+                </div>
             </div>
         </section>
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -324,7 +331,13 @@
             };
 
             initImoveisMap(items, options);
-            install3dView({ imagery: options.imagery, button: document.getElementById('open_3d') });
+            install3dView({
+                imagery: options.imagery,
+                button: document.getElementById('open_3d'),
+                viewSwitch: document.getElementById('map_view_switch'),
+                stage: document.getElementById('map_stage'),
+                side: document.getElementById('map_3d_side')
+            });
         </script>
         {% endif %}
 
