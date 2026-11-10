@@ -3,6 +3,9 @@
  * nível de um relevo imaginário que muda devagar, nas laterais da folha.
  * Lembra um mapa topográfico, o mesmo assunto das vistas 3D.
  *
+ * Mouse nas laterais: um morro segue o cursor (as curvas viram anéis em
+ * volta dele) e o clique solta uma onda que se espalha pelo relevo.
+ *
  * Só enfeite: não imprime (CSS), não aparece quando a lateral é estreita,
  * para quando a aba está oculta e fica parado com "reduzir movimento".
  */
@@ -14,9 +17,20 @@
     var SPEED = 0.018;        // quanto o relevo muda por segundo
     var LEVELS = 16;          // curvas entre o mínimo e o máximo do relevo
     var MASTER_EVERY = 4;     // curva mestra (mais forte) a cada N curvas
-    var FPS = 20;
+    var FPS_IDLE = 20;
+    var FPS_ACTIVE = 40;      // com o mouse mexendo, mais fluido
     var PARALLAX = 0.12;      // o relevo anda um pouco com a rolagem
     var MIN_SIDE = 90;        // largura mínima (px) de cada lateral
+
+    var HILL_HEIGHT = 1.05;   // altura do morro do cursor (em unidades do relevo)
+    var HILL_SIGMA = 85;      // largura do morro, px
+    var HILL_FOLLOW = 7;      // quão rápido o morro alcança o cursor (1/s)
+    var HILL_GROW = 4;        // quão rápido ele nasce e some (1/s)
+    var RIPPLE_SPEED = 260;   // px/s
+    var RIPPLE_LIFE = 2.4;    // s
+    var RIPPLE_WIDTH = 34;    // px
+    var RIPPLE_HEIGHT = 0.85;
+    var MAX_RIPPLES = 6;
 
     // ---- Ruído de Perlin 3D (x, y, tempo) ---------------------------------
     var perm = new Uint8Array(512);
@@ -61,8 +75,36 @@
     var canvas, ctx, sheet;
     var cols = 0, rows = 0, field = null;
     var W = 0, H = 0, dpr = 1;
-    var t0 = 0, last = 0, raf = 0;
+    var t0 = 0, last = 0, lastTime = 0, raf = 0;
     var reduced = global.matchMedia && global.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // Mouse: onde está e se está numa lateral; o morro persegue esse ponto.
+    var mouse = { x: 0, y: 0, onSide: false };
+    var hill = { x: 0, y: 0, amp: 0 };
+    var ripples = [];
+
+    function onSide(x) {
+        var side = sideRect();
+        return x < side.left - 8 || x > side.right + 8;
+    }
+
+    function stepHill(dt) {
+        var target = mouse.onSide ? 1 : 0;
+        if (hill.amp < 0.01 && target) {
+            // Nasce já embaixo do cursor, sem atravessar a tela.
+            hill.x = mouse.x;
+            hill.y = mouse.y;
+        }
+        var f = 1 - Math.exp(-dt * HILL_FOLLOW);
+        hill.x += (mouse.x - hill.x) * f;
+        hill.y += (mouse.y - hill.y) * f;
+        hill.amp += (target - hill.amp) * (1 - Math.exp(-dt * HILL_GROW));
+        if (hill.amp < 0.002) hill.amp = 0;
+    }
+
+    function active() {
+        return hill.amp > 0 || ripples.length > 0;
+    }
 
     function sideRect() {
         // Faixa ocupada pela folha: as curvas somem perto dela.
@@ -84,12 +126,38 @@
     }
 
     function draw(time) {
+        var dt = Math.min(Math.max(time - lastTime, 0), 0.1);
+        lastTime = time;
+        stepHill(dt);
+        ripples = ripples.filter(function (r) { return time - r.t < RIPPLE_LIFE; });
+
         var z = time * SPEED;
         var dy = global.scrollY * PARALLAX;
-        var i, j;
+        var twoSigma2 = 2 * HILL_SIGMA * HILL_SIGMA;
+        var hillReach = HILL_SIGMA * 3.5;
+        var vmin = Infinity, vmax = -Infinity;
+        var i, j, n;
         for (j = 0; j < rows; j++) {
             for (i = 0; i < cols; i++) {
-                field[j * cols + i] = relief(i * CELL * SCALE, (j * CELL + dy) * SCALE, z);
+                var px = i * CELL, py = j * CELL;
+                var v = relief(px * SCALE, (py + dy) * SCALE, z);
+                if (hill.amp > 0) {
+                    var hx = px - hill.x, hy = py - hill.y;
+                    if (Math.abs(hx) < hillReach && Math.abs(hy) < hillReach) {
+                        v += HILL_HEIGHT * hill.amp * Math.exp(-(hx * hx + hy * hy) / twoSigma2);
+                    }
+                }
+                for (n = 0; n < ripples.length; n++) {
+                    var r = ripples[n], age = time - r.t;
+                    var rx = px - r.x, ry = py - r.y;
+                    var off = (Math.sqrt(rx * rx + ry * ry) - age * RIPPLE_SPEED) / RIPPLE_WIDTH;
+                    if (off > -3 && off < 3) {
+                        v += RIPPLE_HEIGHT * (1 - age / RIPPLE_LIFE) * Math.exp(-off * off);
+                    }
+                }
+                field[j * cols + i] = v;
+                if (v < vmin) vmin = v;
+                if (v > vmax) vmax = v;
             }
         }
 
@@ -98,10 +166,32 @@
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
 
-        var lo = -0.9, hi = 0.9;
-        for (var k = 1; k < LEVELS; k++) {
-            var level = lo + (hi - lo) * k / LEVELS;
-            var master = k % MASTER_EVERY === 0;
+        // Brilho dourado embaixo do morro do cursor.
+        if (hill.amp > 0) {
+            var glow = ctx.createRadialGradient(hill.x, hill.y, 0, hill.x, hill.y, HILL_SIGMA * 2.2);
+            glow.addColorStop(0, 'rgba(219, 166, 63, ' + (0.16 * hill.amp) + ')');
+            glow.addColorStop(1, 'rgba(219, 166, 63, 0)');
+            ctx.fillStyle = glow;
+            ctx.fillRect(hill.x - HILL_SIGMA * 2.2, hill.y - HILL_SIGMA * 2.2, HILL_SIGMA * 4.4, HILL_SIGMA * 4.4);
+        }
+
+        // Anel da onda do clique, por cima do relevo que ela deforma.
+        ripples.forEach(function (r) {
+            var age = time - r.t, life = 1 - age / RIPPLE_LIFE;
+            ctx.beginPath();
+            ctx.arc(r.x, r.y, age * RIPPLE_SPEED, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(201, 143, 45, ' + (0.8 * life * life) + ')';
+            ctx.lineWidth = 2.5 * life + 0.5;
+            ctx.stroke();
+        });
+
+        // Curvas a cada `step`, contadas a partir de `lo` (assim a curva mestra
+        // continua a mesma quando o morro ou a onda passam do topo do relevo).
+        var lo = -0.9, step = 1.8 / LEVELS;
+        var kFirst = Math.floor((vmin - lo) / step) + 1, kLast = Math.ceil((vmax - lo) / step) - 1;
+        for (var k = kFirst; k <= kLast; k++) {
+            var level = lo + step * k;
+            var master = ((k % MASTER_EVERY) + MASTER_EVERY) % MASTER_EVERY === 0;
             ctx.beginPath();
             for (j = 0; j < rows - 1; j++) {
                 for (i = 0; i < cols - 1; i++) {
@@ -157,7 +247,8 @@
 
     function loop(now) {
         raf = global.requestAnimationFrame(loop);
-        if (canvas.hidden || now - last < 1000 / FPS) return;
+        var fps = active() ? FPS_ACTIVE : FPS_IDLE;
+        if (canvas.hidden || now - last < 1000 / fps) return;
         last = now;
         draw((now - t0) / 1000);
     }
@@ -197,6 +288,25 @@
         document.addEventListener('visibilitychange', function () {
             if (document.hidden) stop(); else start();
         });
+        if (!reduced) {
+            global.addEventListener('pointermove', function (e) {
+                mouse.x = e.clientX;
+                mouse.y = e.clientY;
+                mouse.onSide = !canvas.hidden && onSide(e.clientX);
+                document.documentElement.classList.toggle('backdrop-hover', mouse.onSide);
+            }, { passive: true });
+            // Mouse saiu da janela: o morro afunda.
+            document.addEventListener('mouseout', function (e) {
+                if (e.relatedTarget) return;
+                mouse.onSide = false;
+                document.documentElement.classList.remove('backdrop-hover');
+            });
+            global.addEventListener('pointerdown', function (e) {
+                if (canvas.hidden || !onSide(e.clientX)) return;
+                ripples.push({ x: e.clientX, y: e.clientY, t: (performance.now() - t0) / 1000 });
+                if (ripples.length > MAX_RIPPLES) ripples.shift();
+            }, { passive: true });
+        }
         // Imprimir: nada de desenhar enquanto o navegador monta as páginas.
         global.addEventListener('beforeprint', stop);
         global.addEventListener('afterprint', start);

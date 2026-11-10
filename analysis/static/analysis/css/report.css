@@ -99,7 +99,14 @@ a {
     pointer-events: none;
   }
 
+  /* Lateral interativa: mira no lugar da seta (a folha mantém o cursor normal). */
+  html.backdrop-hover,
+  html.backdrop-hover body {
+    cursor: crosshair;
+  }
+
   .sheet {
+    cursor: auto;
     position: relative;
     z-index: 1;
     background: #ffffff;
