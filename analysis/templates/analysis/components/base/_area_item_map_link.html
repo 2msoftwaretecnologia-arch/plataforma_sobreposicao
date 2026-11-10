@@ -1,8 +1,10 @@
 {% if resultado.poligonos_imoveis and area.area %}
-<button type="button" class="area-item__locate"
+<button type="button" class="ov-locate"
         data-fonte="{{ base.nome_base }}"
         data-label="{% firstof area.item_info area.unidade "" %}"
-        data-area-val="{{ area.area|stringformat:'.4f' }}">
-    📍 Ver no mapa
+        data-area-val="{{ area.area|stringformat:'.4f' }}"
+        title="Mostrar este item no mapa">
+    <svg class="ico" aria-hidden="true"><use href="#i-pin"/></svg>
+    <span>Mapa</span>
 </button>
 {% endif %}

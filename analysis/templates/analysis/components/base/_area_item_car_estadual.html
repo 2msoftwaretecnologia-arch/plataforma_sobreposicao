@@ -1,33 +1,19 @@
-<div class="area-item area-item--imoveis area-item--{{ severity }}" data-area="{{ area.area|stringformat:'f' }}" title="{{ area.item_info|default:'' }}">
-    <div class="area-item__icon" role="img" aria-label="{% if severity == 'critical' %}Alerta crítico{% elif severity == 'warning' %}Área de atenção{% else %}Informativo{% endif %}">🏠</div>
-    <div class="area-item__content">
-        <p class="area-item__label">Área sobreposta</p>
-        <p class="area-item__value">{{ area.area|floatformat:4 }} ha</p>
-        {% include "analysis/components/base/_area_item_pct.html" %}
-        {% if area.status %}
-        <span class="badge badge-soft">Status: {{ area.status }}</span>
-        {% endif %}
-
-        <div style="margin-top: 8px; border-top: 1px solid #eee; padding-top: 6px;">
-            <p class="area-item__meta"><strong>Nº CAR Estadual:</strong> {{ area.numero_car|default:"-" }}</p>
-            <p class="area-item__meta"><strong>Imóvel:</strong> {{ area.nome_imovel|default:"-" }}</p>
-            <p class="area-item__meta"><strong>CAR Federal:</strong> {{ area.car_federal|default:"-" }}</p>
-            <p class="area-item__meta"><strong>Município:</strong> {{ area.municipio|default:"-" }}{% if area.cod_ibge %} (IBGE {{ area.cod_ibge|stringformat:"d" }}){% endif %}</p>
-            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                <p class="area-item__meta" style="margin: 0;"><strong>Área declarada:</strong> {% if area.area_declarada_ha is not None %}{{ area.area_declarada_ha|floatformat:4 }} ha{% else %}-{% endif %}</p>
-                <p class="area-item__meta" style="margin: 0;"><strong>Módulos fiscais:</strong> {% if area.modulos_fiscais is not None %}{{ area.modulos_fiscais|floatformat:3 }}{% else %}-{% endif %}</p>
-            </div>
-            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                <p class="area-item__meta" style="margin: 0;"><strong>Cadastro:</strong> {{ area.data_cadastro|default:"-" }}</p>
-                <p class="area-item__meta" style="margin: 0;"><strong>Tipo de área:</strong> {{ area.tipo_area|default:"-" }}</p>
-            </div>
-            <p class="area-item__meta"><strong>Cadastrante:</strong> {{ area.cadastrante|default:"-" }}</p>
-            <p class="area-item__meta"><strong>Telefone:</strong> {{ area.telefone_contato|default:"-" }} · <strong>E-mail:</strong> {{ area.email_contato|default:"-" }}</p>
-            <div style="margin-top: 6px; font-size: 0.85em; background: #f9f9f9; padding: 4px; border-radius: 4px;">
-                <p class="area-item__meta" style="margin: 0;"><strong>Proprietário(s):</strong> {{ area.proprietario|default:"-" }}</p>
-            </div>
-        </div>
-
-        {% include "analysis/components/base/_area_item_map_link.html" %}
-    </div>
-</div>
+<article class="ov-item" data-area="{{ area.area|stringformat:'f' }}">
+    {% include "analysis/components/base/_area_item_head.html" %}
+    <p class="ov-item__title">
+        {{ area.nome_imovel|default:"Imóvel sem nome" }}
+        {% if area.status %}<span class="ov-tag">{{ area.status }}</span>{% endif %}
+    </p>
+    <dl class="ov-facts">
+        <div><dt>Nº CAR Estadual</dt><dd>{{ area.numero_car|default:"—" }}</dd></div>
+        <div><dt>CAR Federal</dt><dd>{{ area.car_federal|default:"—" }}</dd></div>
+        <div><dt>Município</dt><dd>{{ area.municipio|default:"—" }}{% if area.cod_ibge %} <small>(IBGE {{ area.cod_ibge|stringformat:"d" }})</small>{% endif %}</dd></div>
+        <div><dt>Área declarada</dt><dd>{% if area.area_declarada_ha is not None %}{{ area.area_declarada_ha|floatformat:4 }} ha{% else %}—{% endif %}</dd></div>
+        <div><dt>Módulos fiscais</dt><dd>{% if area.modulos_fiscais is not None %}{{ area.modulos_fiscais|floatformat:3 }}{% else %}—{% endif %}</dd></div>
+        <div><dt>Cadastro</dt><dd>{{ area.data_cadastro|default:"—" }}</dd></div>
+        <div><dt>Tipo de área</dt><dd>{{ area.tipo_area|default:"—" }}</dd></div>
+        <div><dt>Cadastrante</dt><dd>{{ area.cadastrante|default:"—" }}</dd></div>
+        <div class="ov-facts__wide"><dt>Contato</dt><dd>{{ area.telefone_contato|default:"—" }} · {{ area.email_contato|default:"—" }}</dd></div>
+        <div class="ov-facts__wide"><dt>Proprietário(s)</dt><dd>{{ area.proprietario|default:"—" }}</dd></div>
+    </dl>
+</article>

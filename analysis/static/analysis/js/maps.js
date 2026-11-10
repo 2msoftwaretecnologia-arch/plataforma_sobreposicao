@@ -2175,6 +2175,14 @@
         });
     };
 
+    /** Cor de cada base na legenda do mapa: { fonte: '#rrggbb' } (sem montar GeoJSON). */
+    global.getMapLegendColors = function () {
+        var out = {};
+        if (!mapState || !mapState.legend) return out;
+        Object.keys(mapState.legend).forEach(function (f) { out[f] = mapState.legend[f]; });
+        return out;
+    };
+
     /** Quais bases estão ligadas agora no mapa interativo: { fonte: true/false }. */
     global.getMapOverlayVisibility = function () {
         var out = {};

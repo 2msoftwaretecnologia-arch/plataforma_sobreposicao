@@ -1,6 +1,4 @@
 {% load report_extras %}
-{% with pct=area.area|pct_of_property:resultado.tamanho_area %}
-{% if pct %}
-<p class="area-item__pct">{{ pct }}% da área da propriedade</p>
-{% endif %}
+{% with p=area.area|pct_of_property:resultado.tamanho_area %}
+{% if p %}<span class="ov-item__pct" title="Parte da propriedade analisada coberta por este item">{{ p|pct }} do imóvel</span>{% endif %}
 {% endwith %}

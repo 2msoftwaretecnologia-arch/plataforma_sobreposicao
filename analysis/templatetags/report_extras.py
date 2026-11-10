@@ -101,13 +101,47 @@ def bases_overview(bases):
     sem_sobreposicao = [b for b in bases if not b.get("areas_encontradas")]
     criticas = sum(1 for b in com_sobreposicao if base_severity(b.get("nome_base")) == "critical")
     atencao = sum(1 for b in com_sobreposicao if base_severity(b.get("nome_base")) == "warning")
+    criticas_nomes = [b.get("nome_base") for b in com_sobreposicao if base_severity(b.get("nome_base")) == "critical"]
+    atencao_nomes = [b.get("nome_base") for b in com_sobreposicao if base_severity(b.get("nome_base")) == "warning"]
     return {
         "total": len(bases),
         "com_sobreposicao": len(com_sobreposicao),
         "sem_sobreposicao": len(sem_sobreposicao),
         "criticas": criticas,
         "atencao": atencao,
+        "informativas": len(com_sobreposicao) - criticas - atencao,
+        "criticas_nomes": criticas_nomes,
+        "atencao_nomes": atencao_nomes,
     }
+
+
+_SEVERITY_GROUPS = (
+    ("critical", "Críticas", "Embargos e desmatamento: exigem atenção imediata."),
+    ("warning", "De atenção", "Áreas protegidas, territórios e recursos hídricos."),
+    ("info", "Informativas", "Cadastros, zoneamento e dados de referência."),
+)
+
+
+@register.filter
+def bases_by_severity(bases):
+    """Agrupa as bases com sobreposição por gravidade (crítica → atenção → informativa),
+    mantendo a ordem original (maior área primeiro) dentro de cada grupo.
+    Grupos sem bases ficam de fora."""
+    grupos = []
+    for chave, rotulo, descricao in _SEVERITY_GROUPS:
+        itens = [
+            b for b in (bases or [])
+            if b.get("areas_encontradas") and base_severity(b.get("nome_base")) == chave
+        ]
+        if itens:
+            grupos.append({"key": chave, "label": rotulo, "description": descricao, "bases": itens})
+    return grupos
+
+
+@register.filter
+def bases_sem_sobreposicao(bases):
+    """Bases consultadas que não tiveram nenhuma sobreposição."""
+    return [b for b in (bases or []) if not b.get("areas_encontradas")]
 
 
 @register.filter

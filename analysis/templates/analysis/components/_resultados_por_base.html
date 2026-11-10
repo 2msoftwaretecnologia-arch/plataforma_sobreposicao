@@ -1,364 +1,148 @@
-{% load report_extras %}
-{% if resultado.resultados_por_base %}
-    {% with overview=resultado.resultados_por_base|bases_overview %}
+{% load report_extras l10n %}
+{# Lista de sobreposições da tela de resultados: bases agrupadas por gravidade, #}
+{# cada uma recolhível com os itens dentro. A interação fica em results_overlaps.js. #}
+{% with bases=resultado.resultados_por_base %}
+{% with overview=bases|bases_overview groups=bases|bases_by_severity vazias=bases|bases_sem_sobreposicao %}
+{% firstof historico.pk historico_id as analise_id %}
 
-    <div class="panel-subheader">
-        <p class="eyebrow">Bases consultadas</p>
-        <p class="panel-description">
-            Visualize as intersecções identificadas em cada fonte.
-            As informações aparecem organizadas por base de dados.
-            Para levar uma base para outro programa, use o botão <strong>Baixar</strong> do card.
-        </p>
-
-        <div class="bases-overview">
-            <span class="overview-chip">{{ overview.total }} base{{ overview.total|pluralize }} consultada{{ overview.total|pluralize }}</span>
-            <span class="overview-chip">{{ overview.com_sobreposicao }} com sobreposição</span>
-            {% if overview.criticas %}
-            <span class="overview-chip overview-chip--critical">🔴 {{ overview.criticas }} crítica{{ overview.criticas|pluralize }}</span>
-            {% endif %}
-            {% if overview.atencao %}
-            <span class="overview-chip overview-chip--warning">🟠 {{ overview.atencao }} de atenção</span>
-            {% endif %}
-            {% if overview.sem_sobreposicao and overview.com_sobreposicao %}
-            <button type="button" id="toggle-empty-bases" class="overview-chip overview-chip--toggle" aria-pressed="false">
-                👁️ Mostrar sem sobreposição ({{ overview.sem_sobreposicao }})
-            </button>
-            {% endif %}
+<div class="ov" id="ov">
+    {% if overview.com_sobreposicao %}
+    <div class="ov-toolbar">
+        <label class="ov-search">
+            <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
+            <span class="sr-only">Buscar nas sobreposições</span>
+            <input type="search" id="ov-search" placeholder="Buscar base, imóvel, nome, nº…" autocomplete="off">
+        </label>
+        <div class="ov-seg" role="group" aria-label="Filtrar por gravidade">
+            <button type="button" class="ov-seg__opt is-active" data-sev="" aria-pressed="true">Todas <b>{{ overview.com_sobreposicao }}</b></button>
+            {% if overview.criticas %}<button type="button" class="ov-seg__opt ov-seg__opt--critical" data-sev="critical" aria-pressed="false">Críticas <b>{{ overview.criticas }}</b></button>{% endif %}
+            {% if overview.atencao %}<button type="button" class="ov-seg__opt ov-seg__opt--warning" data-sev="warning" aria-pressed="false">Atenção <b>{{ overview.atencao }}</b></button>{% endif %}
+            {% if overview.informativas %}<button type="button" class="ov-seg__opt ov-seg__opt--info" data-sev="info" aria-pressed="false">Informativas <b>{{ overview.informativas }}</b></button>{% endif %}
         </div>
-
-        <div class="results-toolbar">
-            <div class="results-toolbar__field">
-                <label for="resultados-search">Buscar</label>
-                <input type="search" id="resultados-search" placeholder="Base, item, unidade..." autocomplete="off">
-            </div>
-            <div class="results-toolbar__field">
-                <label for="resultados-severity-filter">Gravidade</label>
-                <select id="resultados-severity-filter">
-                    <option value="">Todas</option>
-                    <option value="critical">🔴 Crítica</option>
-                    <option value="warning">🟠 Atenção</option>
-                    <option value="info">🔵 Informativa</option>
-                </select>
-            </div>
-            <div class="results-toolbar__field">
-                <label for="resultados-min-area">Área mínima (ha)</label>
-                <input type="number" id="resultados-min-area" min="0" step="0.01" placeholder="0">
-            </div>
+        <div class="ov-toolbar__row">
+            <button type="button" class="ov-link" id="ov-expand-all">Abrir todas</button>
+            <span aria-hidden="true">·</span>
+            <button type="button" class="ov-link" id="ov-collapse-all">Fechar todas</button>
         </div>
-        <p id="resultados-no-matches" class="no-matches-message" style="display:none;">
-            Nenhum resultado corresponde aos filtros aplicados.
-        </p>
     </div>
+    {% endif %}
 
-    <div class="base-grid" id="base-grid-container"
-         data-collapse-empty="{% if overview.com_sobreposicao and overview.sem_sobreposicao %}true{% else %}false{% endif %}">
-
-        {% for base in resultado.resultados_por_base %}
-        {% with severity=base.nome_base|base_severity %}
-        <article class="base-card reveal {% cycle 'reveal-delay-1' 'reveal-delay-2' 'reveal-delay-3' %} {% if base.areas_encontradas %}base-card--has-overlap base-card--{{ severity }}{% else %}base-card--empty{% endif %}"
-                 data-total-area="{{ base.total_area|stringformat:'f' }}"
-                 data-nome-base="{{ base.nome_base|lower }}"
-                 data-severity="{{ severity }}">
-
-            <header class="base-card__header">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <p class="base-card__title">{{ base.nome_base }}</p>
-                    {% if base.areas_encontradas|length > 1 %}
-                    <button type="button" class="local-sort-btn" title="Inverter ordem (maior/menor área)" data-sort-dir="desc">
-                        ⇅
-                    </button>
-                    {% endif %}
-                </div>
-
-                <div class="base-card__actions">
-                    {% if base.areas_encontradas %}
-                    {% firstof historico.pk historico_id as analise_id %}
-                    <details class="base-download">
-                        <summary class="base-download__toggle" title="Baixar os recortes desta base">
-                            <svg class="ico" aria-hidden="true"><use href="#i-download"/></svg>
-                            <span>Baixar</span>
-                        </summary>
-                        <div class="base-download__menu">
-                            <p class="base-download__title">
-                                {{ base.areas_encontradas|length }} recorte{{ base.areas_encontradas|length|pluralize }} dentro da propriedade
-                            </p>
-                            <a class="base-download__option" href="{% url 'download_base' %}?base={{ base.nome_base|urlencode }}&amp;fmt=shp{% if analise_id %}&amp;historico={{ analise_id }}{% endif %}">
-                                <span class="format-badge format-badge--shp">SHP</span>
-                                <span class="base-download__text">
-                                    <strong>Shapefile</strong>
-                                    <small>QGIS, ArcGIS · arquivo .zip</small>
-                                </span>
-                            </a>
-                            <a class="base-download__option" href="{% url 'download_base' %}?base={{ base.nome_base|urlencode }}&amp;fmt=kml{% if analise_id %}&amp;historico={{ analise_id }}{% endif %}">
-                                <span class="format-badge format-badge--kml">KML</span>
-                                <span class="base-download__text">
-                                    <strong>KML</strong>
-                                    <small>Google Earth · arquivo .kml</small>
-                                </span>
-                            </a>
-                        </div>
-                    </details>
-                    {% endif %}
-                    <span class="pill {% if base.areas_encontradas %}pill--{{ severity }}{% endif %}">
-                        {{ base.total_areas_com_sobreposicao }} sobreposições
-                    </span>
-                </div>
+    <div class="ov-groups">
+        {% for group in groups %}
+        <section class="ov-group ov-group--{{ group.key }}" data-sev="{{ group.key }}">
+            <header class="ov-group__head">
+                <span class="ov-group__dot" aria-hidden="true"></span>
+                <h3 class="ov-group__title">{{ group.label }}</h3>
+                <span class="ov-group__count">{{ group.bases|length }} base{{ group.bases|length|pluralize }}</span>
+                <p class="ov-group__desc">{{ group.description }}</p>
             </header>
 
-            {% if base.areas_encontradas %}
-
-                <div class="area-list">
-                    {% for area in base.areas_encontradas %}
-
-                        {# --- APAs / Domínios legais / Unidades #}
-                        {% if area.unidade or area.dominios or area.classe or area.fundo_legal %}
-                            {% include "analysis/components/base/_area_item_apas.html" %}
-
-                        {# --- CAR Estadual 13/02/2023 (antes do SICAR: também tem status) #}
-                        {% elif "car estadual" in base.nome_base|lower %}
-                            {% include "analysis/components/base/_area_item_car_estadual.html" %}
-
-                        {# --- Imóveis SICAR #}
-                        {% elif area.status %}
-                            {% include "analysis/components/base/_area_item_imoveis.html" %}
-
-                        {# --- Zoneamento #}
-                        {% elif area.item_info and "zoneamento" in area.item_info|lower %}
-                            {% include "analysis/components/base/_area_item_zoneamento.html" %}
-
-                        {# --- Fitoecologias #}
-                        {% elif "fitoecologias" in base.nome_base|lower %}
-                            {% include "analysis/components/base/_area_item_fitoecologias.html" %}
-
-                        {# --- Embargos #}
-                        {% elif "embargos" in base.nome_base|lower or "embargoes" in base.nome_base|lower %}
-                            {% include "analysis/components/base/_area_item_embargoes.html" %}
-
-                        {# --- Prodes #}
-                        {% elif "prodes" in base.nome_base|lower %}
-                            {% include "analysis/components/base/_area_item_prodes.html" %}
-
-                        {# --- Fallback genérico #}
-                        {% else %}
-                            {% include "analysis/components/_area_item.html" %}
+            {% for base in group.bases %}
+            {% with severity=group.key n=base.areas_encontradas|length p=base.total_area|pct_of_property:resultado.tamanho_area %}
+            <details class="ov-base ov-base--{{ severity }}" data-fonte="{{ base.nome_base }}" data-nome="{{ base.nome_base|lower }}"
+                     {% if severity == 'critical' or overview.com_sobreposicao <= 2 %}open{% endif %}>
+                <summary class="ov-base__sum">
+                    <span class="ov-base__swatch" aria-hidden="true"></span>
+                    <span class="ov-base__main">
+                        <span class="ov-base__name">{{ base.nome_base }}</span>
+                        <span class="ov-base__meta">
+                            <span>{{ n }} ite{{ n|pluralize:"m,ns" }}</span>
+                            <span>{{ base.total_area|ha }}</span>
+                            {% if p %}<span class="ov-base__pct">{{ p|pct }} do imóvel</span>{% endif %}
+                        </span>
+                        {% if p %}
+                        <span class="ov-bar" aria-hidden="true"><i style="width: {% localize off %}{{ p }}{% endlocalize %}%"></i></span>
                         {% endif %}
+                    </span>
+                    <svg class="ov-base__chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4"/></svg>
+                </summary>
 
-                    {% endfor %}
+                <div class="ov-base__body">
+                    <div class="ov-base__tools">
+                        {% if resultado.poligonos_imoveis %}
+                        <button type="button" class="ov-tool ov-focus-base" data-fonte="{{ base.nome_base }}" title="Enquadrar toda esta base no mapa">
+                            <svg class="ico" aria-hidden="true"><use href="#i-map"/></svg> Ver no mapa
+                        </button>
+                        {% endif %}
+                        {% if n > 1 %}
+                        <button type="button" class="ov-tool ov-sort" data-sort-dir="desc" title="Inverter a ordem por área">
+                            <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M4.5 15.5 8 19l3.5-3.5M16 19V5M12.5 8.5 16 5l3.5 3.5"/></svg>
+                            <span>Maior área</span>
+                        </button>
+                        {% endif %}
+                        <details class="base-download">
+                            <summary class="base-download__toggle" title="Baixar os recortes desta base">
+                                <svg class="ico" aria-hidden="true"><use href="#i-download"/></svg>
+                                <span>Baixar</span>
+                            </summary>
+                            <div class="base-download__menu">
+                                <p class="base-download__title">{{ n }} recorte{{ n|pluralize }} dentro da propriedade</p>
+                                <a class="base-download__option" href="{% url 'download_base' %}?base={{ base.nome_base|urlencode }}&amp;fmt=shp{% if analise_id %}&amp;historico={{ analise_id }}{% endif %}">
+                                    <span class="format-badge format-badge--shp">SHP</span>
+                                    <span class="base-download__text"><strong>Shapefile</strong><small>QGIS, ArcGIS · arquivo .zip</small></span>
+                                </a>
+                                <a class="base-download__option" href="{% url 'download_base' %}?base={{ base.nome_base|urlencode }}&amp;fmt=kml{% if analise_id %}&amp;historico={{ analise_id }}{% endif %}">
+                                    <span class="format-badge format-badge--kml">KML</span>
+                                    <span class="base-download__text"><strong>KML</strong><small>Google Earth · arquivo .kml</small></span>
+                                </a>
+                            </div>
+                        </details>
+                    </div>
+
+                    <div class="ov-items">
+                        {% for area in base.areas_encontradas %}
+                            {# --- APAs / Domínios legais / Unidades #}
+                            {% if area.unidade or area.dominios or area.classe or area.fundo_legal %}
+                                {% include "analysis/components/base/_area_item_apas.html" %}
+                            {# --- CAR Estadual 13/02/2023 (antes do SICAR: também tem status) #}
+                            {% elif "car estadual" in base.nome_base|lower %}
+                                {% include "analysis/components/base/_area_item_car_estadual.html" %}
+                            {# --- Imóveis SICAR #}
+                            {% elif area.status %}
+                                {% include "analysis/components/base/_area_item_imoveis.html" %}
+                            {# --- Zoneamento #}
+                            {% elif area.item_info and "zoneamento" in area.item_info|lower %}
+                                {% include "analysis/components/base/_area_item_zoneamento.html" %}
+                            {# --- Fitoecologias #}
+                            {% elif "fitoecologias" in base.nome_base|lower %}
+                                {% include "analysis/components/base/_area_item_fitoecologias.html" %}
+                            {# --- Embargos #}
+                            {% elif "embargos" in base.nome_base|lower or "embargoes" in base.nome_base|lower %}
+                                {% include "analysis/components/base/_area_item_embargoes.html" %}
+                            {# --- Prodes #}
+                            {% elif "prodes" in base.nome_base|lower %}
+                                {% include "analysis/components/base/_area_item_prodes.html" %}
+                            {# --- Genérico #}
+                            {% else %}
+                                {% include "analysis/components/_area_item.html" %}
+                            {% endif %}
+                        {% endfor %}
+                    </div>
                 </div>
-
-            {% else %}
-
-                <div class="empty-state">
-                    <p class="empty-title">Nenhuma sobreposição nesta base</p>
-                    <p class="empty-description">
-                        A consulta não encontrou intersecções para esta fonte de dados.
-                    </p>
-                </div>
-
-            {% endif %}
-
-        </article>
-        {% endwith %}
+            </details>
+            {% endwith %}
+            {% endfor %}
+        </section>
+        {% empty %}
+            {% include "analysis/components/_sem_sobreposicao_global.html" %}
         {% endfor %}
-
     </div>
 
-    {% endwith %}
+    <p id="ov-no-matches" class="ov-no-matches" hidden>Nada corresponde à busca.</p>
 
-{% else %}
-    {% include "analysis/components/_sem_sobreposicao_global.html" %}
-{% endif %}
+    {% if vazias %}
+    <details class="ov-clear">
+        <summary>
+            <svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>
+            <span><strong>{{ vazias|length }}</strong> base{{ vazias|length|pluralize }} consultada{{ vazias|length|pluralize }} sem sobreposição</span>
+            <svg class="ov-base__chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4"/></svg>
+        </summary>
+        <ul class="ov-clear__list">
+            {% for base in vazias %}<li>{{ base.nome_base }}</li>{% endfor %}
+        </ul>
+    </details>
+    {% endif %}
+</div>
 
-<style>
-    .local-sort-btn {
-        background: transparent;
-        border: 1px solid var(--line);
-        border-radius: 4px;
-        width: 24px;
-        height: 24px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 14px;
-        cursor: pointer;
-        color: var(--text-secondary);
-        transition: all 0.2s;
-        padding: 0;
-        line-height: 1;
-    }
-    .local-sort-btn:hover {
-        background: var(--surface-hover);
-        color: var(--text-primary);
-        border-color: var(--text-secondary);
-    }
-    .local-sort-btn[data-sort-dir="asc"] {
-        background: var(--surface-active);
-        color: var(--primary);
-        border-color: var(--primary-light);
-        transform: rotate(180deg);
-    }
-</style>
-
-<script>
-(function () {
-    var COLLAPSE_LIMIT = 4;
-    var grid = document.getElementById('base-grid-container');
-    if (!grid) return;
-
-    var cards = Array.prototype.slice.call(grid.querySelectorAll('.base-card'));
-    var collapseEmptyByDefault = grid.dataset.collapseEmpty === 'true';
-    var showEmpty = !collapseEmptyByDefault;
-
-    var searchInput = document.getElementById('resultados-search');
-    var severitySelect = document.getElementById('resultados-severity-filter');
-    var minAreaInput = document.getElementById('resultados-min-area');
-    var noMatchesEl = document.getElementById('resultados-no-matches');
-    var toggleEmptyBtn = document.getElementById('toggle-empty-bases');
-
-    function refreshCard(card) {
-        var list = card.querySelector('.area-list');
-        var moreBtn = card.querySelector('.show-more-btn');
-        var query = searchInput ? searchInput.value.trim().toLowerCase() : '';
-        var minArea = minAreaInput ? (parseFloat(minAreaInput.value) || 0) : 0;
-        var severityFilter = severitySelect ? severitySelect.value : '';
-        var severityOk = !severityFilter || card.dataset.severity === severityFilter;
-        var nomeBase = card.dataset.nomeBase || '';
-        var nomeMatches = !query || nomeBase.indexOf(query) !== -1;
-        var expanded = card.dataset.expanded === 'true';
-
-        var visibleCount = 0;
-
-        if (list) {
-            var items = Array.prototype.slice.call(list.querySelectorAll('.area-item'));
-            items.forEach(function (item) {
-                var areaVal = parseFloat(item.dataset.area || 0);
-                var matchesQuery = nomeMatches || item.textContent.toLowerCase().indexOf(query) !== -1;
-                var passes = severityOk && matchesQuery && areaVal >= minArea;
-                var withinLimit = expanded || visibleCount < COLLAPSE_LIMIT;
-
-                if (passes) {
-                    visibleCount++;
-                    item.style.display = withinLimit ? '' : 'none';
-                } else {
-                    item.style.display = 'none';
-                }
-            });
-
-            if (moreBtn) {
-                var hiddenCount = visibleCount - COLLAPSE_LIMIT;
-                if (visibleCount <= COLLAPSE_LIMIT) {
-                    moreBtn.style.display = 'none';
-                } else {
-                    moreBtn.style.display = '';
-                    moreBtn.textContent = expanded ? '▲ Mostrar menos' : ('▼ Mostrar mais ' + hiddenCount);
-                }
-            }
-        }
-
-        var hasEmptyState = !!card.querySelector('.empty-state');
-        var cardVisible = hasEmptyState
-            ? (showEmpty && severityOk && nomeMatches)
-            : (visibleCount > 0);
-
-        card.style.display = cardVisible ? '' : 'none';
-        return cardVisible;
-    }
-
-    function refreshAll() {
-        var anyVisible = false;
-        cards.forEach(function (card) {
-            if (refreshCard(card)) anyVisible = true;
-        });
-        if (noMatchesEl) noMatchesEl.style.display = anyVisible ? 'none' : '';
-    }
-
-    // Ordenação local (maior/menor área) por card
-    cards.forEach(function (card) {
-        var btn = card.querySelector('.local-sort-btn');
-        if (!btn) return;
-        btn.addEventListener('click', function () {
-            var list = card.querySelector('.area-list');
-            if (!list) return;
-            var dir = this.dataset.sortDir || 'desc';
-            var newDir = dir === 'desc' ? 'asc' : 'desc';
-            this.dataset.sortDir = newDir;
-
-            var items = Array.prototype.slice.call(list.querySelectorAll('.area-item'));
-            items.sort(function (a, b) {
-                var va = parseFloat(a.dataset.area || 0);
-                var vb = parseFloat(b.dataset.area || 0);
-                return newDir === 'desc' ? vb - va : va - vb;
-            });
-            items.forEach(function (item) { list.appendChild(item); });
-            refreshCard(card);
-        });
-    });
-
-    // Botão "mostrar mais" — substitui o scroll interno da lista
-    cards.forEach(function (card) {
-        var list = card.querySelector('.area-list');
-        if (!list) return;
-        var items = list.querySelectorAll('.area-item');
-        if (items.length <= COLLAPSE_LIMIT) return;
-
-        card.dataset.expanded = 'false';
-        var moreBtn = document.createElement('button');
-        moreBtn.type = 'button';
-        moreBtn.className = 'show-more-btn';
-        list.parentNode.insertBefore(moreBtn, list.nextSibling);
-        moreBtn.addEventListener('click', function () {
-            card.dataset.expanded = card.dataset.expanded === 'true' ? 'false' : 'true';
-            refreshCard(card);
-        });
-    });
-
-    // Alternar exibição das bases sem sobreposição
-    if (toggleEmptyBtn) {
-        toggleEmptyBtn.setAttribute('aria-pressed', showEmpty ? 'true' : 'false');
-        toggleEmptyBtn.addEventListener('click', function () {
-            showEmpty = !showEmpty;
-            this.setAttribute('aria-pressed', showEmpty ? 'true' : 'false');
-            refreshAll();
-        });
-    }
-
-    // Filtro global (busca, gravidade, área mínima)
-    [searchInput, severitySelect, minAreaInput].forEach(function (el) {
-        if (!el) return;
-        el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', refreshAll);
-    });
-
-    // Menus "Baixar": um aberto por vez; fecha ao clicar fora, com Esc ou ao escolher.
-    var downloads = Array.prototype.slice.call(grid.querySelectorAll('.base-download'));
-    downloads.forEach(function (d) {
-        d.addEventListener('toggle', function () {
-            if (!d.open) return;
-            downloads.forEach(function (o) { if (o !== d) o.open = false; });
-        });
-        d.querySelectorAll('.base-download__option').forEach(function (a) {
-            a.addEventListener('click', function () { d.open = false; });
-        });
-    });
-    document.addEventListener('click', function (e) {
-        downloads.forEach(function (d) { if (d.open && !d.contains(e.target)) d.open = false; });
-    });
-    document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') downloads.forEach(function (d) { d.open = false; });
-    });
-
-    // Encaminha o clique em "Ver no mapa" para o mapa (delegação de evento)
-    document.addEventListener('click', function (e) {
-        var btn = e.target.closest ? e.target.closest('.area-item__locate') : null;
-        if (!btn) return;
-        if (typeof window.focusMapLayer !== 'function') return;
-
-        var ok = window.focusMapLayer(btn.dataset.fonte, btn.dataset.label, btn.dataset.areaVal);
-        if (ok) {
-            var mapEl = document.getElementById('map-imoveis');
-            if (mapEl) mapEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-    });
-
-    refreshAll();
-})();
-</script>
+{% endwith %}
+{% endwith %}

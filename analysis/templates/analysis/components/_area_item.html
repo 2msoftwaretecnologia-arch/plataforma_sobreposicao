@@ -1,14 +1,4 @@
-<div class="area-item area-item--generico area-item--{{ severity }}" data-area="{{ area.area|stringformat:'f' }}" title="{{ area.item_info|default:'' }}">
-    <div class="area-item__icon" role="img" aria-label="{% if severity == 'critical' %}Alerta crítico{% elif severity == 'warning' %}Área de atenção{% else %}Informativo{% endif %}">📍</div>
-    <div class="area-item__content">
-        {% if area.area %}
-        <p class="area-item__label">Área sobreposta</p>
-        <p class="area-item__value">{{ area.area|floatformat:4 }} ha</p>
-        {% include "analysis/components/base/_area_item_pct.html" %}
-        {% endif %}
-        {% if area.item_info %}
-        <p class="area-item__meta">{{ area.item_info }}</p>
-        {% endif %}
-        {% include "analysis/components/base/_area_item_map_link.html" %}
-    </div>
-</div>
+<article class="ov-item" data-area="{{ area.area|stringformat:'f' }}">
+    {% include "analysis/components/base/_area_item_head.html" %}
+    {% if area.item_info %}<p class="ov-item__title">{{ area.item_info }}</p>{% endif %}
+</article>

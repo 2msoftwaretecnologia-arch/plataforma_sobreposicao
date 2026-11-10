@@ -1,0 +1,12 @@
+{# Cabeçalho comum a todos os itens: área sobreposta, % do imóvel e "Mapa". #}
+<header class="ov-item__head">
+    <div class="ov-item__area">
+        {% if area.area %}
+        <strong>{{ area.area|floatformat:4 }} ha</strong>
+        {% include "analysis/components/base/_area_item_pct.html" %}
+        {% else %}
+        <strong class="ov-item__area--none">Área não informada</strong>
+        {% endif %}
+    </div>
+    {% include "analysis/components/base/_area_item_map_link.html" %}
+</header>

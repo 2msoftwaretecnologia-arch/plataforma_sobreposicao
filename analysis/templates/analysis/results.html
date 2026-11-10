@@ -1,5 +1,5 @@
 {% load static %}
-{% load l10n %}
+{% load l10n report_extras %}
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -13,6 +13,7 @@
     <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/landing_page.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/results.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/map_3d_view.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/results_workspace.css' %}">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link href='https://unpkg.com/leaflet-fullscreen@1.0.2/dist/leaflet.fullscreen.css' rel='stylesheet' />
 </head>
@@ -57,6 +58,8 @@
             <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3.5 8.5 4.5L12 12.5 3.5 8z"/><path d="m3.5 12.5 8.5 4.5 8.5-4.5M3.5 16.5 12 21l8.5-4.5"/></symbol>
             <symbol id="i-map" viewBox="0 0 24 24"><path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6z"/><path d="M9 4v14M15 6v14"/></symbol>
             <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v10.5M8 11l4 4.5 4-4.5"/><path d="M4.5 15.5v3A1.5 1.5 0 0 0 6 20h12a1.5 1.5 0 0 0 1.5-1.5v-3"/></symbol>
+            <symbol id="i-sidebar" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="2"/><path d="M9.5 4.5v15"/></symbol>
+            <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5.5 8.5 12l6.5 6.5"/></symbol>
         </defs>
     </svg>
 
@@ -86,211 +89,225 @@
         </div>
     </div>
 
-    <!-- ===== Hero de resultados ===== -->
-    <header class="hero hero-results">
-        <div class="container">
-            <div class="hero-grid">
-                <div class="reveal">
-                    <div class="hero-badge">
-                        <svg class="ico"><use href="#i-check"/></svg>
+    {% with overview=resultado.resultados_por_base|bases_overview %}
+    <!-- ===== Cabeçalho do resultado: onde, quanto e o veredito ===== -->
+    <header class="rh">
+        <div class="rh-inner">
+            <div class="rh-id">
+                <p class="rh-eyebrow">
+                    {% if is_historico %}
+                        <svg class="ico" aria-hidden="true"><use href="#i-doc"/></svg>
+                        {{ historico_eyebrow|default:"Histórico de busca" }}
+                        <span class="rh-dot">·</span> {{ historico.created_at|date:"d/m/Y H:i" }}
+                        <span class="rh-dot">·</span> {{ historico.user.username|default:"usuário removido" }}
+                    {% elif erro and not resultado %}
+                        <svg class="ico" aria-hidden="true"><use href="#i-alert"/></svg>
+                        Consulta não concluída
+                    {% else %}
+                        <svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>
                         Consulta concluída
-                    </div>
-                    <h1>Resultados da <em>análise geoambiental</em>.</h1>
-                    <p class="hero-text">
-                        Sobreposições, bases consultadas e mapa interativo da propriedade analisada, organizados para apoio técnico, ambiental e fundiário.
-                    </p>
-                </div>
-
-                {% if municipio or uf %}
-                <div class="hero-status-row reveal reveal-delay-1">
-                    {% if municipio %}
-                        <span class="badge badge-strong">
-                            <svg class="ico" style="width:14px;height:14px;margin-right:6px"><use href="#i-pin"/></svg>
-                            {{ municipio }}
-                        </span>
                     {% endif %}
-                    {% if uf %}
-                        <span class="badge">{{ uf }}</span>
+                </p>
+                <h1 class="rh-title">
+                    {% if municipio %}{{ municipio }}{% if uf %}<span class="rh-uf">{{ uf }}</span>{% endif %}
+                    {% elif resultado %}Área analisada
+                    {% else %}Resultado da análise{% endif %}
+                </h1>
+                {% if car_input or is_historico %}
+                <p class="rh-sub">
+                    {% if is_historico %}<span>{{ historico.get_search_type_display }}</span>{% endif %}
+                    {% if car_input %}
+                    <span class="rh-code" title="{{ car_input }}">
+                        <small>{% if source_model == 'Sigef' %}Parcela SIGEF{% else %}CAR{% endif %}</small>
+                        {{ car_input }}
+                    </span>
                     {% endif %}
-                </div>
+                </p>
                 {% endif %}
 
-                {% if resultado or demonstrativo or recibo %}
-                <div class="hero-actions reveal reveal-delay-2">
-                    <button type="button" onclick="printReport()" class="btn btn-gold">
-                        <svg class="ico" style="width:18px;height:18px"><use href="#i-doc"/></svg>
-                        Gerar Relatório
+                {% if resultado %}
+                <dl class="rh-facts">
+                    <div>
+                        <dt>Área analisada</dt>
+                        <dd>
+                            {% if resultado.tamanho_area != None %}
+                                {% localize on %}{{ resultado.tamanho_area|floatformat:4 }}{% endlocalize %} <small>ha</small>
+                            {% else %}—{% endif %}
+                        </dd>
+                        {% if resultado.tamanho_area %}<dd class="rh-facts__aux">{{ resultado.tamanho_area|alqueires }}</dd>{% endif %}
+                    </div>
+                    <div>
+                        <dt>Sobreposições</dt>
+                        <dd>{{ resultado.total_areas_com_sobreposicao|default:"0" }}</dd>
+                        <dd class="rh-facts__aux">em {{ overview.com_sobreposicao }} de {{ overview.total }} base{{ overview.total|pluralize }}</dd>
+                    </div>
+                    {% if resultado.tempo_execucao_formatado %}
+                    <div>
+                        <dt>Tempo de análise</dt>
+                        <dd>{{ resultado.tempo_execucao_formatado }}</dd>
+                    </div>
+                    {% endif %}
+                </dl>
+                {% endif %}
+            </div>
+
+            <div class="rh-side">
+                {% if resultado %}
+                    {% if not resultado.total_areas_com_sobreposicao %}
+                    <div class="verdict verdict--none">
+                        <svg class="ico" aria-hidden="true"><use href="#i-alert"/></svg>
+                        <div>
+                            <p class="verdict__title">Nenhuma sobreposição</p>
+                            <p class="verdict__text">A área não cruzou com nenhuma base. Confira se ela fica no Tocantins.</p>
+                        </div>
+                    </div>
+                    {% elif overview.criticas %}
+                    <div class="verdict verdict--critical">
+                        <svg class="ico" aria-hidden="true"><use href="#i-alert"/></svg>
+                        <div>
+                            <p class="verdict__title">{{ overview.criticas }} base{{ overview.criticas|pluralize }} crítica{{ overview.criticas|pluralize }}</p>
+                            <p class="verdict__text">{{ overview.criticas_nomes|join:", " }}{% if overview.atencao %} · e {{ overview.atencao }} de atenção{% endif %}</p>
+                        </div>
+                    </div>
+                    {% elif overview.atencao %}
+                    <div class="verdict verdict--warning">
+                        <svg class="ico" aria-hidden="true"><use href="#i-alert"/></svg>
+                        <div>
+                            <p class="verdict__title">{{ overview.atencao }} base{{ overview.atencao|pluralize }} de atenção</p>
+                            <p class="verdict__text">{{ overview.atencao_nomes|join:", " }}</p>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="verdict verdict--ok">
+                        <svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>
+                        <div>
+                            <p class="verdict__title">Nenhuma base crítica ou de atenção</p>
+                            <p class="verdict__text">Só sobreposições informativas (cadastros, zoneamento, vegetação…).</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                {% endif %}
+
+                <div class="rh-actions">
+                    {% if resultado or demonstrativo or recibo %}
+                    <button type="button" onclick="printReport()" class="rh-btn rh-btn--gold">
+                        <svg class="ico" aria-hidden="true"><use href="#i-doc"/></svg>
+                        Gerar relatório
                     </button>
+                    {% endif %}
                     {# SHP/KML ainda saem da última análise da sessão, então ficam fora do histórico. #}
                     {% if resultado and not is_historico %}
-                    <a href="{% url 'download_property_shp' %}" class="btn btn-outline-light">
-                        <svg class="ico" style="width:18px;height:18px"><use href="#i-download"/></svg>
-                        Baixar SHP
+                    <a href="{% url 'download_property_shp' %}" class="rh-btn" title="Polígono da propriedade em Shapefile">
+                        <svg class="ico" aria-hidden="true"><use href="#i-download"/></svg> SHP
                     </a>
-                    <a href="{% url 'download_property_kml' %}" class="btn btn-outline-light">
-                        <svg class="ico" style="width:18px;height:18px"><use href="#i-download"/></svg>
-                        Baixar KML
+                    <a href="{% url 'download_property_kml' %}" class="rh-btn" title="Polígono da propriedade em KML">
+                        <svg class="ico" aria-hidden="true"><use href="#i-download"/></svg> KML
+                    </a>
+                    {% endif %}
+                    {% if historico_back_url %}
+                    <a href="{{ historico_back_url }}" class="rh-btn">
+                        <svg class="ico" aria-hidden="true"><use href="#i-back"/></svg>
+                        {{ historico_back_label|default:"Voltar" }}
                     </a>
                     {% endif %}
                 </div>
-
-                <script>
-                    function printReport() {
-                        // O relatório é aberto pelo id da análise, para não pegar outra
-                        // análise que tenha sido feita em outra aba depois desta.
-                        const url = "{% url 'report_print' %}{% if historico %}?historico={{ historico.pk|stringformat:"d" }}{% elif historico_id %}?historico={{ historico_id|stringformat:"d" }}{% endif %}";
-                        const win = window.open(url, '_blank');
-                        if (win) {
-                            win.focus();
-                        } else {
-                            alert('Por favor, permita popups para este site para visualizar o relatório.');
-                        }
-                    }
-                </script>
-                {% endif %}
             </div>
         </div>
-        <svg class="fence-divider" viewBox="0 0 1440 44" preserveAspectRatio="none" aria-hidden="true">
-            <path d="M0 44 L0 30 Q 360 8 720 22 T 1440 18 L1440 44 Z" fill="#fbf8f0"/>
-        </svg>
+
+        {% if resultado or demonstrativo or recibo %}
+        <script>
+            function printReport() {
+                // O relatório é aberto pelo id da análise, para não pegar outra
+                // análise que tenha sido feita em outra aba depois desta.
+                const url = "{% url 'report_print' %}{% if historico %}?historico={{ historico.pk|stringformat:"d" }}{% elif historico_id %}?historico={{ historico_id|stringformat:"d" }}{% endif %}";
+                const win = window.open(url, '_blank');
+                if (win) {
+                    win.focus();
+                } else {
+                    alert('Por favor, permita popups para este site para visualizar o relatório.');
+                }
+            }
+        </script>
+        {% endif %}
     </header>
 
-    <div class="page">
-
-        {% if is_historico %}
-        <section class="panel reveal">
-            <div class="panel-header">
-                <div>
-                    <p class="eyebrow">{{ historico_eyebrow|default:"Histórico de busca" }}</p>
-                    <h2 class="panel-title">Busca de {{ historico.user.username|default:"usuário removido" }}</h2>
-                </div>
-                <span class="badge badge-strong">{{ historico.created_at|date:"d/m/Y H:i" }}</span>
-            </div>
-            <p style="margin:0;color:#6b7280;">
-                Tipo: {{ historico.get_search_type_display }}
-                {% if historico.car_input %} • {% if historico.search_type == 'sigef' %}Parcela do SIGEF{% else %}CAR{% endif %}: {{ historico.car_input }}{% endif %}
-            </p>
-            {% if historico_back_url %}
-            <p style="margin-top:12px;">
-                <a href="{{ historico_back_url }}" class="btn btn-outline-green" style="display:inline-block;">&laquo; {{ historico_back_label|default:"Voltar" }}</a>
-            </p>
-            {% endif %}
-        </section>
-        {% endif %}
-
-        {% if demonstrativo %}
-            {% include "analysis/components/_demonstrativo_cards.html" %}
-        {% endif %}
-
-        {% if recibo %}
-            {% include "analysis/components/_recibo_cards.html" %}
-        {% endif %}
-
+    {% if aviso or erro %}
+    <div class="rs-alerts">
         {% if aviso %}
-        <section class="alert alert-warn reveal">
-            <div class="alert-icon">
-                <svg class="ico" style="width:24px;height:24px"><use href="#i-alert"/></svg>
-            </div>
+        <section class="alert alert-warn">
+            <div class="alert-icon"><svg class="ico" style="width:24px;height:24px"><use href="#i-alert"/></svg></div>
             <div>
                 <p class="alert-title">Atenção</p>
                 <p class="alert-text">{{ aviso }}</p>
             </div>
         </section>
         {% endif %}
-
         {% if erro %}
-        <section class="alert reveal">
-            <div class="alert-icon">
-                <svg class="ico" style="width:24px;height:24px"><use href="#i-alert"/></svg>
-            </div>
+        <section class="alert">
+            <div class="alert-icon"><svg class="ico" style="width:24px;height:24px"><use href="#i-alert"/></svg></div>
             <div>
                 <p class="alert-title">Algo não deu certo</p>
                 <p class="alert-text">{{ erro }}</p>
             </div>
         </section>
         {% endif %}
+    </div>
+    {% endif %}
 
-        {% if resultado and not resultado.total_areas_com_sobreposicao %}
-        <section class="alert alert-warn reveal">
-            <div class="alert-icon">
-                <svg class="ico" style="width:24px;height:24px"><use href="#i-alert"/></svg>
-            </div>
-            <div>
-                <p class="alert-title">Nenhuma sobreposição encontrada</p>
-                <p class="alert-text">
-                    A área não cruzou com nenhuma das bases consultadas, nem com os limites municipais.
-                    Provavelmente esta propriedade não fica no Tocantins (ou as coordenadas estão erradas).
-                    {% if map_items %}Você ainda pode ver a área e as imagens de satélite no <a href="#map-imoveis">mapa abaixo</a>.{% endif %}
-                </p>
-            </div>
-        </section>
-        {% endif %}
-
-        {% if resultado %}
-        <section class="panel reveal">
-            <div class="panel-header">
-                <div>
-                    <p class="eyebrow">Resumo da execução</p>
-                    <h2 class="panel-title">Resultados da Análise</h2>
-                </div>
-                <span class="badge badge-strong">Consulta concluída</span>
-            </div>
-
-            <div class="summary-grid">
-                <div class="summary-card reveal">
-                    <p class="summary-label">Áreas com Sobreposição</p>
-                    <p class="summary-value">{{ resultado.total_areas_com_sobreposicao }}</p>
-                    <p class="summary-detail">Total de intersecções encontradas</p>
-                </div>
-
-                <div class="summary-card reveal reveal-delay-1">
-                    <p class="summary-label">Tamanho da Área (ha)</p>
-                    <p class="summary-value">
-                        {% if resultado.tamanho_area != None %}
-                            {% localize on %}
-                                {{ resultado.tamanho_area|floatformat:4 }}
-                            {% endlocalize %}
-                        {% else %}
-                            -
-                        {% endif %}
-                    </p>
-                    <p class="summary-detail">Extensão do polígono analisado</p>
-                </div>
-
-                <div class="summary-card reveal reveal-delay-2">
-                    <p class="summary-label">Tempo de Análise</p>
-                    <p class="summary-value">
-                        {% if resultado.tempo_execucao_formatado %}
-                            {{ resultado.tempo_execucao_formatado }}
-                        {% else %}
-                            -
-                        {% endif %}
-                    </p>
-                    <p class="summary-detail">Duração total da execução</p>
+    {% if resultado or map_items or demonstrativo or recibo %}
+    <!-- ===== Área de trabalho: lista à esquerda, mapa fixo à direita ===== -->
+    <main class="ws{% if not map_items %} ws--no-map{% endif %}{% if not resultado and not demonstrativo and not recibo %} ws--map-only{% endif %}" id="ws">
+        {% if resultado or demonstrativo or recibo %}
+        <aside class="ws-list" id="ws_list" aria-label="Resultados">
+            <div class="ws-list__head">
+                <div class="ws-tabs" role="tablist">
+                    {% if resultado %}
+                    <button type="button" class="ws-tab is-active" role="tab" aria-selected="true" data-tab="sobreposicoes">
+                        Sobreposições <b>{{ resultado.total_areas_com_sobreposicao|default:"0" }}</b>
+                    </button>
+                    {% endif %}
+                    {% if demonstrativo %}
+                    <button type="button" class="ws-tab{% if not resultado %} is-active{% endif %}" role="tab" aria-selected="{% if resultado %}false{% else %}true{% endif %}" data-tab="demonstrativo">Demonstrativo</button>
+                    {% endif %}
+                    {% if recibo %}
+                    <button type="button" class="ws-tab{% if not resultado and not demonstrativo %} is-active{% endif %}" role="tab" aria-selected="{% if resultado or demonstrativo %}false{% else %}true{% endif %}" data-tab="recibo">Recibo</button>
+                    {% endif %}
                 </div>
             </div>
 
-            {% include "analysis/components/_resultados_por_base.html" %}
-        </section>
+            {% if resultado %}
+            <div class="ws-pane" data-pane="sobreposicoes" role="tabpanel">
+                {% include "analysis/components/_resultados_por_base.html" %}
+            </div>
+            {% endif %}
+            {% if demonstrativo %}
+            <div class="ws-pane ws-pane--doc" data-pane="demonstrativo" role="tabpanel" {% if resultado %}hidden{% endif %}>
+                {% include "analysis/components/_demonstrativo_cards.html" %}
+            </div>
+            {% endif %}
+            {% if recibo %}
+            <div class="ws-pane ws-pane--doc" data-pane="recibo" role="tabpanel" {% if resultado or demonstrativo %}hidden{% endif %}>
+                {% include "analysis/components/_recibo_cards.html" %}
+            </div>
+            {% endif %}
+        </aside>
         {% endif %}
 
         {% if map_items %}
-        <section class="panel panel--map reveal">
-            <div class="panel-header">
-                <div>
-                    <p class="eyebrow">Mapa</p>
-                    <h2 class="panel-title">Mapa interativo</h2>
-                </div>
-            </div>
-
+        <section class="ws-map" id="ws_map" aria-label="Mapa">
             <div class="map-frame">
-                <div class="map-frame-header">
-                    <div>
+                <div class="map-frame-header" id="map_frame_header">
+                    {% if resultado or demonstrativo or recibo %}
+                    <button type="button" class="ws-toggle" id="ws_toggle" aria-controls="ws_list" aria-expanded="true" title="Esconder a lista e usar a largura toda para o mapa">
+                        <svg class="ico" aria-hidden="true"><use href="#i-sidebar"/></svg>
+                        <span>Lista</span>
+                    </button>
+                    {% endif %}
+                    <div class="map-frame-titles">
                         <div class="map-title">
-                            <svg class="ico" style="width:16px;height:16px;margin-right:8px;vertical-align:-3px"><use href="#i-layers"/></svg>
                             {% if resultado %}Propriedade e bases sobrepostas{% else %}Local do ponto informado{% endif %}
                         </div>
-                        <p class="map-frame-hint">Use o painel <strong>Camadas</strong> no mapa para ligar as bases da análise, trocar a imagem de satélite e adicionar camadas temáticas. Escolha <strong>Só 2D</strong>, <strong>2D + 3D</strong> (os dois mapas andam juntos) ou <strong>Só 3D</strong>. Comparar duas imagens fica no <strong>Só 2D</strong>.</p>
+                        <p class="map-frame-hint">Clique em <strong>Mapa</strong> num item da lista para achá-lo aqui. Bases, imagens e camadas temáticas ficam no painel <strong>Camadas</strong>.</p>
                     </div>
                     <div class="map-frame-actions">
                         <div class="map-view-switch" id="map_view_switch" role="group" aria-label="Visualização do mapa" hidden>
@@ -311,7 +328,6 @@
                             <svg class="ico"><use href="#i-cube"/></svg>
                             Ver em 3D
                         </button>
-                        <span class="online">online</span>
                     </div>
                 </div>
                 <div class="map-stage" id="map_stage">
@@ -320,38 +336,48 @@
                 </div>
             </div>
         </section>
-        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-        <script src='https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/Leaflet.fullscreen.min.js'></script>
-        <!-- Infravermelho do Sentinel-2 (ImageServer da Esri) no mapa interativo. -->
-        <script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
-        <script src="{% static 'analysis/js/maps.js' %}"></script>
-        <script src="{% static 'analysis/js/map_thematic.js' %}"></script>
-        <script src="{% static 'analysis/js/image_export.js' %}"></script>
-        <script src="{% static 'analysis/js/download_area.js' %}"></script>
-        <script src="{% static 'analysis/js/map_3d_view.js' %}"></script>
-        {{ map_items|json_script:"map-items" }}
-        {{ imagery|json_script:"map-imagery" }}
-        <script>
-            const items = JSON.parse(
-                document.getElementById("map-items").textContent
-            );
-
-            const options = {
-                imagery: JSON.parse(document.getElementById("map-imagery").textContent) || {}
-            };
-
-            initImoveisMap(items, options);
-            install3dView({
-                imagery: options.imagery,
-                button: document.getElementById('open_3d'),
-                viewSwitch: document.getElementById('map_view_switch'),
-                stage: document.getElementById('map_stage'),
-                side: document.getElementById('map_3d_side')
-            });
-        </script>
         {% endif %}
+    </main>
+    {% endif %}
+    {% endwith %}
 
-    </div>
+    {% if map_items %}
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src='https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/Leaflet.fullscreen.min.js'></script>
+    <!-- Infravermelho do Sentinel-2 (ImageServer da Esri) no mapa interativo. -->
+    <script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
+    <script src="{% static 'analysis/js/maps.js' %}"></script>
+    <script src="{% static 'analysis/js/map_thematic.js' %}"></script>
+    <script src="{% static 'analysis/js/image_export.js' %}"></script>
+    <script src="{% static 'analysis/js/download_area.js' %}"></script>
+    <script src="{% static 'analysis/js/map_3d_view.js' %}"></script>
+    {{ map_items|json_script:"map-items" }}
+    {{ imagery|json_script:"map-imagery" }}
+    {% endif %}
+    {# Layout (lista/mapa) e lista de sobreposições: antes do mapa, para o #}
+    {# mapa já nascer com a altura certa. #}
+    <script src="{% static 'analysis/js/results_overlaps.js' %}"></script>
+    {% if map_items %}
+    <script>
+        const items = JSON.parse(
+            document.getElementById("map-items").textContent
+        );
+
+        const options = {
+            imagery: JSON.parse(document.getElementById("map-imagery").textContent) || {}
+        };
+
+        initImoveisMap(items, options);
+        install3dView({
+            imagery: options.imagery,
+            button: document.getElementById('open_3d'),
+            viewSwitch: document.getElementById('map_view_switch'),
+            stage: document.getElementById('map_stage'),
+            side: document.getElementById('map_3d_side')
+        });
+        if (window.ResultsOverlaps) window.ResultsOverlaps.mapReady();
+    </script>
+    {% endif %}
 
     <!-- ===== Rodapé ===== -->
     <footer class="site-footer">

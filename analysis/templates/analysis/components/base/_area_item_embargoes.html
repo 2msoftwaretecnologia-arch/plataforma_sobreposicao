@@ -1,76 +1,15 @@
-<div class="area-item area-item--embargo area-item--{{ severity }}" data-area="{{ area.area|stringformat:'f' }}" title="{{ area.item_info|default:'' }}">
-    <div class="area-item__icon" role="img" aria-label="{% if severity == 'critical' %}Alerta crítico{% elif severity == 'warning' %}Área de atenção{% else %}Informativo{% endif %}">🚫</div>
-    <div class="area-item__content">
-        {% if area.area %}
-        <p class="area-item__label">Área sobreposta</p>
-        <p class="area-item__value">{{ area.area|floatformat:4 }} ha</p>
-        {% include "analysis/components/base/_area_item_pct.html" %}
-        {% endif %}
-
-        <div style="margin-top: 8px; border-top: 1px solid #eee; padding-top: 6px;">
-            <!-- Imóvel e Tipo -->
-            {% if area.property_name or area.type_area %}
-            <p class="area-item__meta">
-                {% if area.property_name %}
-                    <strong>Imóvel:</strong> {{ area.property_name }}
-                {% endif %}
-                
-                {% if area.type_area %}
-                    {% if area.property_name %}<br>{% endif %}
-                    <strong>Tipo de Área:</strong> {{ area.type_area }}
-                {% endif %}
-            </p>
-            {% endif %}
-
-            <!-- Embargado e CPF/CNPJ -->
-            {% if area.nome_embargado %}
-            <p class="area-item__meta">
-                <strong>Embargado:</strong> {{ area.nome_embargado }}
-                {% if area.cpf_cnpj_embargado %}<br><strong>CPF/CNPJ: </strong>{{ area.cpf_cnpj_embargado }}{% endif %}
-            </p>
-            {% endif %}
-
-            <!-- Unidade de Controle -->
-            {% if area.control_unity %}
-            <p class="area-item__meta"><strong>Unidade Controladora:</strong> {{ area.control_unity }}</p>
-            {% endif %}
-
-            <!-- Auto e Processo -->
-            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px;">
-                {% if area.number_infraction_act %}
-                <p class="area-item__meta" style="margin: 0;"><strong>Número do Auto:</strong> {{ area.number_infraction_act }}</p>
-                {% endif %}
-                {% if area.process_number %}
-                <p class="area-item__meta" style="margin: 0;"><strong>Número do Processo:</strong> {{ area.process_number }}</p>
-                {% endif %}
-            </div>
-
-            <!-- Datas -->
-            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 2px;">
-                {% if area.embargoe_date %}
-                <p class="area-item__meta" style="margin: 0;"><strong>Data do Embargo:</strong> {{ area.embargoe_date }}</p>
-                {% endif %}
-                {% if area.priting_date %}
-                <p class="area-item__meta" style="margin: 0;"><strong>Data da Impressão:</strong> {{ area.priting_date }}</p>
-                {% endif %}
-            </div>
-            
-            <!-- Descrições -->
-            <div style="margin-top: 6px; font-size: 0.85em; background: #f9f9f9; padding: 4px; border-radius: 4px;">
-                {% if area.infraction_description %}
-                <p class="area-item__meta" style="margin-bottom: 2px;" title="{{ area.infraction_description }}">
-                    <strong>Infração:</strong> {{ area.infraction_description|truncatechars:60 }}
-                </p>
-                {% endif %}
-                
-                {% if area.act_description %}
-                <p class="area-item__meta" style="margin: 0;" title="{{ area.act_description }}">
-                    <strong>Descrição do Ato:</strong> {{ area.act_description|truncatechars:60 }}
-                </p>
-                {% endif %}
-            </div>
-        </div>
-
-        {% include "analysis/components/base/_area_item_map_link.html" %}
-    </div>
-</div>
+<article class="ov-item" data-area="{{ area.area|stringformat:'f' }}">
+    {% include "analysis/components/base/_area_item_head.html" %}
+    <p class="ov-item__title">{% firstof area.property_name area.nome_embargado area.item_info "Área embargada" %}</p>
+    <dl class="ov-facts">
+        {% if area.nome_embargado %}<div class="ov-facts__wide"><dt>Embargado</dt><dd>{{ area.nome_embargado }}{% if area.cpf_cnpj_embargado %} <small>· {{ area.cpf_cnpj_embargado }}</small>{% endif %}</dd></div>{% endif %}
+        {% if area.type_area %}<div><dt>Tipo de área</dt><dd>{{ area.type_area }}</dd></div>{% endif %}
+        {% if area.control_unity %}<div><dt>Unidade controladora</dt><dd>{{ area.control_unity }}</dd></div>{% endif %}
+        {% if area.number_infraction_act %}<div><dt>Nº do auto</dt><dd>{{ area.number_infraction_act }}</dd></div>{% endif %}
+        {% if area.process_number %}<div><dt>Nº do processo</dt><dd>{{ area.process_number }}</dd></div>{% endif %}
+        {% if area.embargoe_date %}<div><dt>Data do embargo</dt><dd>{{ area.embargoe_date }}</dd></div>{% endif %}
+        {% if area.priting_date %}<div><dt>Data da impressão</dt><dd>{{ area.priting_date }}</dd></div>{% endif %}
+        {% if area.infraction_description %}<div class="ov-facts__wide"><dt>Infração</dt><dd class="ov-clamp" title="{{ area.infraction_description }}">{{ area.infraction_description }}</dd></div>{% endif %}
+        {% if area.act_description %}<div class="ov-facts__wide"><dt>Descrição do ato</dt><dd class="ov-clamp" title="{{ area.act_description }}">{{ area.act_description }}</dd></div>{% endif %}
+    </dl>
+</article>
