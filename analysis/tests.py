@@ -193,8 +193,10 @@ class ImageryServiceTests(SimpleTestCase):
         config = svc.imagery_config()
         self.assertEqual(config['providers'], [])
         self.assertEqual(set(config), {'wayback_tile_url', 'wayback_releases_url', 'download_area_url', 'providers',
-                                       'mapbiomas', 'cbers', 'landsat_legacy', 'cbers2b'})
+                                       'mapbiomas', 'cbers', 'landsat_legacy', 'cbers2b', 'sentinel2'})
         self.assertTrue(config['download_area_url'].endswith('/imagens/area-download/'))
+        self.assertTrue(config['sentinel2']['tile_url'].endswith('/imagens/sentinel2/{scene}/{comp}/{z}/{x}/{y}.webp'))
+        self.assertTrue(config['sentinel2']['scenes_url'].endswith('/imagens/sentinel2/cenas/'))
         self.assertTrue(config['landsat_legacy']['tile_url'].endswith('/imagens/landsat-antigo/{scene}/{comp}/{z}/{x}/{y}.png'))
         self.assertEqual(config['landsat_legacy']['enhanced_max_zoom'], 17)
         self.assertTrue(config['cbers2b']['tile_url'].endswith('/imagens/cbers2b/{scene}/{comp}/{z}/{x}/{y}.webp'))
@@ -263,6 +265,211 @@ class ImageryServiceTests(SimpleTestCase):
     def test_landsat_legacy_stretch_falls_back_without_stats(self, http):
         http.get.return_value = http_response(status=500, content_type='application/json')
         self.assertEqual(svc.landsat_legacy_stretch('LT05_L2SP_222067_20080722_02_T1', 'natural'), (7500, 13500))
+
+    # --- Sentinel-2 mês a mês -------------------------------------------------
+
+    @staticmethod
+    def _s2_feature(scene_id, cloud=10, baseline='05.11', orbit=81, ring=None, tile='22LGP', nodata=0):
+        """Item do catálogo; `ring` é o contorno da área imageada (padrão: um
+        quadro de 1° em volta de −48,5/−10,5)."""
+        ring = ring or [[-49, -11], [-48, -11], [-48, -10], [-49, -10], [-49, -11]]
+        day = scene_id.split('_')[2]
+        return {
+            'id': scene_id,
+            'geometry': {'type': 'Polygon', 'coordinates': [ring]},
+            'properties': {
+                'datetime': f'{day[:4]}-{day[4:6]}-{day[6:8]}T13:31:49.024000Z', 'platform': 'Sentinel-' + scene_id[1:3],
+                'eo:cloud_cover': cloud, 's2:mgrs_tile': tile, 's2:nodata_pixel_percentage': nodata,
+                's2:processing_baseline': baseline, 'sat:relative_orbit': orbit,
+            },
+        }
+
+    @patch.object(svc, '_today')
+    def test_sentinel2_month_must_be_within_the_archive(self, today):
+        from datetime import date
+        today.return_value = date(2026, 11, 13)
+        self.assertTrue(svc.sentinel2_valid_month('2026-11'))
+        self.assertTrue(svc.sentinel2_valid_month(svc.SENTINEL2_FIRST_MONTH))
+        for bad in ('2026-12', '2015-06', '2026-13', '2026-1', '2026-11-01', "2026-11' or 1", '', None):
+            self.assertFalse(svc.sentinel2_valid_month(bad), bad)
+        self.assertEqual(svc._previous_month('2026-01'), '2025-12')
+        self.assertEqual(svc._previous_month('2026-11'), '2026-10')
+
+    @patch.object(svc, '_today')
+    @patch.object(svc, '_http')
+    def test_sentinel2_scenes_keep_one_frame_per_pass(self, http, today):
+        from datetime import date
+        today.return_value = date(2026, 11, 13)
+        f = self._s2_feature
+        # Ponto a 0,05° da borda do quadro 22LGP e a 0,45° da do 22LHN.
+        far_ring = [[-48.5, -11.4], [-47.5, -11.4], [-47.5, -10.4], [-48.5, -10.4], [-48.5, -11.4]]
+        http.post.return_value = http_response(json={'links': [], 'features': [
+            f('S2B_MSIL2A_20261012T133149_R081_T22LGP_20261012T184116', cloud=55.9),
+            # Mesma passagem em dois quadros: fica o que tem o ponto mais para dentro.
+            f('S2A_MSIL2A_20261030T133231_R081_T22LGP_20261030T210802', cloud=84.3, nodata=37.6),
+            f('S2A_MSIL2A_20261030T133231_R081_T22LHN_20261030T210802', cloud=77.2, ring=far_ring, tile='22LHN'),
+            # Mesmo quadro processado duas vezes: fica a versão mais nova.
+            f('S2A_MSIL2A_20261020T133231_R081_T22LGP_20261020T195213', cloud=30, baseline='04.00'),
+            f('S2A_MSIL2A_20261020T133231_R081_T22LGP_20270301T101010', cloud=29, baseline='05.11'),
+            # Duas órbitas no mesmo dia são duas cenas.
+            f('S2C_MSIL2A_20261012T134211_R124_T22LGP_20261012T170000', cloud=1, orbit=124),
+            {'id': 'outro-produto', 'properties': {'datetime': '2026-10-01T00:00:00Z'}},
+        ]})
+        result = svc.sentinel2_scenes(-48.05, -10.95, '2026-10')
+        self.assertEqual(result['month'], '2026-10')
+        self.assertEqual([s['id'] for s in result['scenes']], [
+            'S2A_MSIL2A_20261030T133231_R081_T22LHN_20261030T210802',
+            'S2A_MSIL2A_20261020T133231_R081_T22LGP_20270301T101010',
+            'S2C_MSIL2A_20261012T134211_R124_T22LGP_20261012T170000',
+            'S2B_MSIL2A_20261012T133149_R081_T22LGP_20261012T184116',
+        ])
+        self.assertEqual(result['scenes'][0], {
+            'id': 'S2A_MSIL2A_20261030T133231_R081_T22LHN_20261030T210802', 'date': '2026-10-30',
+            'platform': 'Sentinel-2A', 'cloud': 77, 'tile': '22LHN', 'nodata': 0})
+        body = http.post.call_args.kwargs['json']
+        self.assertEqual(body['collections'], ['sentinel-2-l2a'])
+        self.assertEqual(body['datetime'], '2026-10-01T00:00:00Z/2026-10-31T23:59:59Z')
+        self.assertEqual(body['intersects']['coordinates'], [-48.05, -10.95])
+        # Mês passado não muda: a 2ª consulta vem do cache.
+        svc.sentinel2_scenes(-48.05, -10.95, '2026-10')
+        self.assertEqual(http.post.call_count, 1)
+        # A lista já deixa o deslocamento das cenas mostradas para os tiles.
+        self.assertEqual(svc._sentinel2_offset('S2A_MSIL2A_20261020T133231_R081_T22LGP_20270301T101010'), 1000)
+        http.get.assert_not_called()
+
+    @patch.object(svc, '_today')
+    @patch.object(svc, '_http')
+    def test_sentinel2_without_month_uses_latest_month_with_scenes(self, http, today):
+        from datetime import date
+        today.return_value = date(2026, 12, 1)
+        november = self._s2_feature('S2B_MSIL2A_20261112T133149_R081_T22LGP_20261112T184116')
+        http.post.side_effect = [http_response(json={'features': [], 'links': []}),
+                                 http_response(json={'features': [november], 'links': []})]
+        result = svc.sentinel2_scenes(-48.5, -10.5)
+        self.assertEqual(result['month'], '2026-11')
+        self.assertEqual(len(result['scenes']), 1)
+        months = [call.kwargs['json']['datetime'][:7] for call in http.post.call_args_list]
+        self.assertEqual(months, ['2026-12', '2026-11'])
+        # Fevereiro de ano bissexto fecha no dia 29.
+        http.post.side_effect = [http_response(json={'features': [], 'links': []})]
+        self.assertEqual(svc.sentinel2_scenes(-48.5, -10.5, '2024-02'), {'month': '2024-02', 'scenes': []})
+        self.assertTrue(http.post.call_args.kwargs['json']['datetime'].endswith('/2024-02-29T23:59:59Z'))
+
+    @patch.object(svc, '_http')
+    def test_sentinel2_catalog_failure_is_reported(self, http):
+        http.post.return_value = http_response(status=503, content_type='application/json')
+        with self.assertRaises(svc.ImageryError) as ctx:
+            svc.sentinel2_scenes(-48.5, -10.5, '2024-02')
+        self.assertIn('Sentinel-2', str(ctx.exception))
+
+    @patch.object(svc, '_http')
+    def test_sentinel2_tile_validates_scene_composition_and_zoom(self, http):
+        scene = 'S2B_MSIL2A_20261102T133149_R081_T22LGP_20261102T152244'
+        for bad in ('../../etc', 'LT05_L2SP_222067_20080722_02_T1', scene + '/x', scene.replace('L2A', 'L1C'), '', None):
+            self.assertIsNone(svc.sentinel2_tile(bad, 'natural', 12, 1, 1))
+        self.assertIsNone(svc.sentinel2_tile(scene, 'nao_existe', 12, 1, 1))
+        self.assertIsNone(svc.sentinel2_tile(scene, 'natural', svc.SENTINEL2_MAX_NATIVE_ZOOM + 1, 1, 1))
+        http.get.assert_not_called()
+
+    @patch.object(svc, '_http')
+    def test_sentinel2_natural_tile_uses_esa_true_color_and_caches(self, http):
+        scene = 'S2B_MSIL2A_20261102T133149_R081_T22LGP_20261102T152244'
+        http.get.return_value = http_response(content=b'WEBP', content_type='image/webp')
+        self.assertEqual(svc.sentinel2_tile(scene, 'natural', 14, 5992, 8657), (b'WEBP', 'image/webp'))
+        self.assertEqual(http.get.call_args.args[0], svc.PC_WEBP_TILE_URL.format(z=14, x=5992, y=8657))
+        params = http.get.call_args.kwargs['params']
+        self.assertIn(('collection', 'sentinel-2-l2a'), params)
+        self.assertIn(('item', scene), params)
+        self.assertEqual([v for k, v in params if k == 'assets'], ['visual'])
+        self.assertNotIn('rescale', dict(params))  # já vem em 8 bits: sem consultar o deslocamento
+        self.assertEqual(svc.sentinel2_tile(scene, 'natural', 14, 5992, 8657), (b'WEBP', 'image/webp'))
+        self.assertEqual(http.get.call_count, 1)
+
+    @patch.object(svc, '_http')
+    def test_sentinel2_band_tiles_shift_contrast_by_the_scene_offset(self, http):
+        new = 'S2B_MSIL2A_20261102T133149_R081_T22LGP_20261102T152244'
+        old = 'S2A_MSIL2A_20190727T133231_R081_T22LGP_20201106T030345'
+
+        def get(url, params=None, timeout=None):
+            if '/collections/sentinel-2-l2a/items/' in url:
+                baseline = '05.13' if url.endswith(new) else '02.12'
+                return http_response(json={'properties': {'s2:processing_baseline': baseline}}, content_type='application/json')
+            return http_response(content=b'WEBP', content_type='image/webp')
+
+        http.get.side_effect = get
+        svc.sentinel2_tile(new, 'falsa_cor', 13, 2996, 4328)
+        params = http.get.call_args.kwargs['params']
+        self.assertEqual([v for k, v in params if k == 'assets'], ['B08', 'B04', 'B03'])
+        self.assertEqual([v for k, v in params if k == 'rescale'], ['1000,5000', '1000,3500', '1000,3500'])
+        svc.sentinel2_tile(old, 'falsa_cor', 13, 2996, 4328)
+        self.assertEqual([v for k, v in http.get.call_args.kwargs['params'] if k == 'rescale'], ['0,4000', '0,2500', '0,2500'])
+        # NDVI: o deslocamento sai das duas bandas da soma.
+        svc.sentinel2_tile(new, 'ndvi', 13, 2996, 4328)
+        params = dict(http.get.call_args.kwargs['params'])
+        self.assertEqual(params['expression'], '(B08-B04)/(B08+B04-2000)')
+        self.assertEqual((params['asset_as_band'], params['colormap_name']), ('true', 'rdylgn'))
+        svc.sentinel2_tile(old, 'ndvi', 13, 2996, 4328)
+        self.assertEqual(dict(http.get.call_args.kwargs['params'])['expression'], '(B08-B04)/(B08+B04-0)')
+        # Os metadados de cada cena foram consultados uma vez só.
+        items = [c for c in http.get.call_args_list if '/items/' in c.args[0]]
+        self.assertEqual(len(items), 2)
+
+    @patch.object(svc, '_http')
+    def test_sentinel2_offset_falls_back_to_the_date_and_unknown_scene_has_no_tile(self, http):
+        new = 'S2B_MSIL2A_20261102T133149_R081_T22LGP_20261102T152244'
+        old = 'S2A_MSIL2A_20190727T133231_R081_T22LGP_20201106T030345'
+        http.get.return_value = http_response(status=500, content_type='application/json')
+        self.assertEqual((svc._sentinel2_offset(new), svc._sentinel2_offset(old)), (1000, 0))
+        cache.clear()
+        http.get.reset_mock()
+        http.get.return_value = http_response(status=404, content_type='application/json')
+        self.assertIsNone(svc.sentinel2_tile(new, 'swir', 12, 1498, 2164))
+        self.assertEqual(http.get.call_count, 1)  # sem a cena no acervo, nem pede o tile
+
+    @patch.object(svc, '_http')
+    def test_sentinel2_tile_outside_the_scene_is_remembered(self, http):
+        scene = 'S2B_MSIL2A_20261102T133149_R081_T22LGP_20261102T152244'
+        http.get.return_value = http_response(status=404, content_type='application/json')
+        self.assertIsNone(svc.sentinel2_tile(scene, 'natural', 12, 1400, 2165))
+        self.assertIsNone(svc.sentinel2_tile(scene, 'natural', 12, 1400, 2165))
+        self.assertEqual(http.get.call_count, 1)
+        # Erro do servidor de tiles não é "sem imagem": não fica em cache.
+        http.get.return_value = http_response(status=500, content_type='application/json')
+        with self.assertRaises(svc.ImageryError):
+            svc.sentinel2_tile(scene, 'natural', 12, 1498, 2164)
+        http.get.return_value = http_response(content=b'WEBP', content_type='image/webp')
+        self.assertEqual(svc.sentinel2_tile(scene, 'natural', 12, 1498, 2164), (b'WEBP', 'image/webp'))
+
+    @patch.object(svc, '_today')
+    def test_sentinel2_views_validate_month_and_pass_it_on(self, today):
+        from datetime import date
+        from django.test import RequestFactory
+        from analysis import views
+        today.return_value = date(2026, 11, 13)
+        view = views.Sentinel2ScenesView.as_view()
+        factory = RequestFactory()
+        bad = view(factory.get('/', {'lat': '-10.18', 'lon': '-48.33', 'mes': '2026-12'}))
+        self.assertEqual(bad.status_code, 400)
+        self.assertEqual(json.loads(bad.content), {'erro': 'Mês inválido.', 'scenes': []})
+        self.assertEqual(view(factory.get('/', {'mes': '2026-10'})).status_code, 400)  # sem lat/lon
+        found = {'month': '2026-10', 'scenes': [{'id': 'X'}]}
+        with patch.object(views, 'sentinel2_scenes', return_value=found) as scenes:
+            ok = view(factory.get('/', {'lat': '-10.18', 'lon': '-48.33', 'mes': '2026-10'}))
+            self.assertEqual(json.loads(ok.content), found)
+            scenes.assert_called_with(-48.33, -10.18, '2026-10')
+            view(factory.get('/', {'lat': '-10.18', 'lon': '-48.33'}))
+            scenes.assert_called_with(-48.33, -10.18, None)
+        with patch.object(views, 'sentinel2_scenes', side_effect=svc.ImageryError('Catálogo do Sentinel-2 indisponível.')):
+            down = view(factory.get('/', {'lat': '-10.18', 'lon': '-48.33'}))
+        self.assertEqual(down.status_code, 502)
+        self.assertEqual(json.loads(down.content)['erro'], 'Catálogo do Sentinel-2 indisponível.')
+        tile_view = views.Sentinel2TileView.as_view()
+        with patch.object(views, 'sentinel2_tile', return_value=(b'WEBP', 'image/webp')) as tile:
+            response = tile_view(factory.get('/'), scene='S', comp='ndvi', z=12, x=1, y=2)
+            tile.assert_called_with('S', 'ndvi', 12, 1, 2)
+        self.assertEqual((response.status_code, response['Content-Type'], response.content), (200, 'image/webp', b'WEBP'))
+        with patch.object(views, 'sentinel2_tile', return_value=None):
+            self.assertEqual(tile_view(factory.get('/'), scene='S', comp='ndvi', z=12, x=1, y=2).status_code, 204)
 
     @override_settings(PLANET_WMS_URL='https://x/wms?key=SEGREDO', COPERNICUS_WMS_URL='https://c/ogc/wms/CSEGREDO',
                        GOOGLE_MAPS_API_KEY='GSEGREDO')

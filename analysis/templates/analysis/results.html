@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/landing_page.css' %}">
-    <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/results.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/results.css' %}?v=20261113">
     <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/map_3d_view.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/results_workspace.css' %}">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -346,11 +346,11 @@
     <script src='https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/Leaflet.fullscreen.min.js'></script>
     <!-- Infravermelho do Sentinel-2 (ImageServer da Esri) no mapa interativo. -->
     <script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
-    <script src="{% static 'analysis/js/maps.js' %}"></script>
+    <script src="{% static 'analysis/js/maps.js' %}?v=20261113"></script>
     <script src="{% static 'analysis/js/map_thematic.js' %}"></script>
     <script src="{% static 'analysis/js/image_export.js' %}"></script>
     <script src="{% static 'analysis/js/download_area.js' %}"></script>
-    <script src="{% static 'analysis/js/map_3d_view.js' %}"></script>
+    <script src="{% static 'analysis/js/map_3d_view.js' %}?v=20261113"></script>
     {{ map_items|json_script:"map-items" }}
     {{ imagery|json_script:"map-imagery" }}
     {% endif %}

@@ -5,15 +5,20 @@ As chaves ficam só no servidor: o navegador pede os tiles às views de
 `analysis/urls.py`, que repassam a requisição ao provedor. A Esri Wayback é
 pública, então o navegador busca os tiles direto na Esri.
 """
+import calendar
+import json
 import logging
 import math
 import re
 import time
 import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 from urllib.parse import parse_qsl, urlsplit, urlunsplit
 
 import requests
 from django.conf import settings
+from django.contrib.gis.gdal import GDALException
+from django.contrib.gis.geos import GEOSException, GEOSGeometry, Point
 from django.core.cache import cache
 from django.urls import reverse
 
@@ -150,6 +155,16 @@ def imagery_config():
         'enhanced_max_zoom': LANDSAT_LEGACY_ENHANCED_MAX_ZOOM,
         'years': list(LANDSAT_LEGACY_YEARS),
         'compositions': [{'value': k, 'text': v['label']} for k, v in LANDSAT_LEGACY_COMPOSITIONS.items()],
+    }
+    config['sentinel2'] = {
+        'scenes_url': reverse('imagery_sentinel2_scenes'),
+        'tile_url': reverse('imagery_sentinel2_tile', args=('CENA', 'COMP', 0, 0, 0)).replace(
+            '/CENA/COMP/0/0/0.webp', '/{scene}/{comp}/{z}/{x}/{y}.webp'),
+        'max_native_zoom': SENTINEL2_MAX_NATIVE_ZOOM,
+        # Meses do seletor, do primeiro do acervo ao corrente.
+        'first_month': SENTINEL2_FIRST_MONTH,
+        'last_month': sentinel2_last_month(),
+        'compositions': [{'value': k, 'text': v['label'], 'res': v['res']} for k, v in SENTINEL2_COMPOSITIONS.items()],
     }
     from analysis.services.view_services import cbers2b_service
     config['cbers2b'] = {
@@ -543,6 +558,28 @@ LANDSAT_LEGACY_COMPOSITIONS = {
 }
 
 
+def _pc_search(body, name):
+    """Itens da busca no catálogo STAC do Planetary Computer, seguindo a
+    paginação pelo link "next" (POST com o corpo que ele traz). `name` é o
+    acervo nas mensagens de erro."""
+    features = []
+    for _ in range(5):
+        try:
+            response = _http.post(PC_STAC_SEARCH, json=body, timeout=TIMEOUT)
+        except requests.RequestException as e:
+            logger.warning('Falha de conexão com o catálogo do Planetary Computer: %s', type(e).__name__)
+            raise ImageryError(f'Catálogo do {name} indisponível.') from None
+        if response.status_code != 200:
+            raise ImageryError(f'Catálogo do {name} respondeu com erro {response.status_code}.')
+        page = response.json()
+        features.extend(page.get('features', []))
+        nxt = next((link for link in page.get('links', []) if link.get('rel') == 'next'), None)
+        if not nxt or not nxt.get('body'):
+            break
+        body = nxt['body']
+    return features
+
+
 def _landsat_legacy_rank(scene):
     penalty = LANDSAT7_SLC_OFF_PENALTY if scene['platform'] == 'landsat-7' and int(scene['date'][:4]) >= LANDSAT7_SLC_OFF_YEAR else 0
     return scene['cloud'] + penalty
@@ -564,22 +601,7 @@ def landsat_legacy_scenes(lon, lat):
         'fields': {'include': ['id', 'properties.datetime', 'properties.platform', 'properties.eo:cloud_cover']},
         'limit': 1000,
     }
-    features = []
-    # Paginação pelo link "next" (POST com o corpo que ele traz).
-    for _ in range(5):
-        try:
-            response = _http.post(PC_STAC_SEARCH, json=body, timeout=TIMEOUT)
-        except requests.RequestException as e:
-            logger.warning('Falha de conexão com o catálogo do Planetary Computer: %s', type(e).__name__)
-            raise ImageryError('Catálogo do Landsat indisponível.') from None
-        if response.status_code != 200:
-            raise ImageryError(f'Catálogo do Landsat respondeu com erro {response.status_code}.')
-        page = response.json()
-        features.extend(page.get('features', []))
-        nxt = next((link for link in page.get('links', []) if link.get('rel') == 'next'), None)
-        if not nxt or not nxt.get('body'):
-            break
-        body = nxt['body']
+    features = _pc_search(body, 'Landsat')
 
     by_year = {}
     for feature in features:
@@ -665,3 +687,229 @@ def landsat_legacy_tile(scene, composition, z, x, y, enhance=False):
             tile = image_enhance.sharpen_png(tile[0], radius, buffer), 'image/png'
     cache.set(key, tile, LANDSAT_LEGACY_TILE_TTL)
     return tile
+
+
+# ---------------------------------------------------------------------------
+# Sentinel-2 mês a mês (Copernicus) – Microsoft Planetary Computer
+# ---------------------------------------------------------------------------
+# Acervo Sentinel-2 L2A (reflectância de superfície, 10 m) do programa
+# Copernicus, de 2015 em diante. As cenas são as mesmas do catálogo do
+# Copernicus Data Space (a passagem da véspera já aparece nos dois), mas lá
+# os pixels exigem conta e têm cota mensal; no Planetary Computer são
+# públicos, como os do Landsat acima. O serviço Sentinel-2 da Esri (já no
+# mapa) só guarda ~14 meses e escolhe a cena sozinho; aqui quem escolhe o mês
+# e a cena é o usuário.
+
+PC_ITEM_URL = 'https://planetarycomputer.microsoft.com/api/stac/v1/collections/{collection}/items/{item}'
+# WEBP: ~15 KB por tile (o PNG do mesmo tile passa de 100 KB).
+PC_WEBP_TILE_URL = 'https://planetarycomputer.microsoft.com/api/data/v1/item/tiles/WebMercatorQuad/{z}/{x}/{y}@1x.webp'
+SENTINEL2_COLLECTION = 'sentinel-2-l2a'
+# Primeiras imagens do Sentinel-2A; no Tocantins o acervo começa em out/2015.
+SENTINEL2_FIRST_MONTH = '2015-07'
+SENTINEL2_MONTH_RE = re.compile(r'^(\d{4})-(0[1-9]|1[0-2])$')
+SENTINEL2_SCENE_RE = re.compile(r'^S2[A-D]_MSIL2A_(\d{8})T\d{6}_R\d{3}_T\d{2}[A-Z]{3}_\d{8}T\d{6}$')
+# 1 px do tile ≈ 9,5 m no zoom 14; acima disso o navegador amplia.
+SENTINEL2_MAX_NATIVE_ZOOM = 14
+# O mês corrente ganha cena nova a cada 2–5 dias; os anteriores não mudam.
+SENTINEL2_SCENES_TTL = 30 * 60
+SENTINEL2_PAST_SCENES_TTL = 24 * 60 * 60
+SENTINEL2_TILE_TTL = 7 * 24 * 60 * 60
+# Tile fora da cena: o "não tem" também fica em cache (o None não ficaria).
+SENTINEL2_NO_TILE = (b'', '')
+# Desde a versão 04.00 do processamento (jan/2022) o valor digital vem somado
+# de 1000: refl = (DN − 1000) / 10000. Cenas antigas reprocessadas também,
+# então vale a versão de cada cena, não a data.
+SENTINEL2_OFFSET_BASELINE = 4.0
+SENTINEL2_BOA_OFFSET = 1000
+SENTINEL2_OFFSET_DATE = '20220125'
+SENTINEL2_OFFSET_KEY = 'imagery:sentinel2:offset:{scene}'
+SENTINEL2_OFFSET_TTL = 30 * 24 * 60 * 60
+SENTINEL2_OFFSET_RETRY_TTL = 10 * 60
+
+# `res`: resolução das bandas (visível e NIR 10 m; SWIR 20 m). `rescale`: o
+# contraste de cada banda em reflectância × 10000, sem o deslocamento da cena.
+SENTINEL2_COMPOSITIONS = {
+    # TCI: a cor natural de 8 bits que a própria ESA publica com a cena.
+    'natural': {'label': 'Cor natural', 'res': 10, 'assets': ['visual']},
+    'falsa_cor': {'label': 'Infravermelho falsa-cor (vegetação em vermelho)', 'res': 10,
+                  'assets': ['B08', 'B04', 'B03'], 'rescale': [(0, 4000), (0, 2500), (0, 2500)]},
+    'agricultura': {'label': 'Agricultura (SWIR · NIR · azul)', 'res': 20,
+                    'assets': ['B11', 'B08', 'B02'], 'rescale': [(0, 4000), (0, 4500), (0, 2000)]},
+    'swir': {'label': 'Infravermelho de ondas curtas (SWIR – solo exposto e queimada)', 'res': 20,
+             'assets': ['B12', 'B8A', 'B04'], 'rescale': [(0, 3500), (0, 4500), (0, 2500)]},
+    'ndvi': {'label': 'NDVI (vigor da vegetação)', 'res': 10,
+             'expression': '(B08-B04)/(B08+B04-{twice_offset})', 'rescale': '0,0.9', 'colormap': 'rdylgn'},
+}
+
+
+def _today():
+    return datetime.now(timezone.utc).date()
+
+
+def sentinel2_last_month():
+    """Mês corrente ('AAAA-MM'), o último do seletor."""
+    return _today().strftime('%Y-%m')
+
+
+def sentinel2_valid_month(month):
+    return bool(SENTINEL2_MONTH_RE.match(month or '')) and SENTINEL2_FIRST_MONTH <= month <= sentinel2_last_month()
+
+
+def _previous_month(month):
+    year, number = int(month[:4]), int(month[5:])
+    return f'{year - 1}-12' if number == 1 else f'{year}-{number - 1:02d}'
+
+
+def _baseline_offset(baseline):
+    """Deslocamento do valor digital pela versão do processamento ('05.11'),
+    ou None quando ela não veio."""
+    try:
+        return SENTINEL2_BOA_OFFSET if float(baseline) >= SENTINEL2_OFFSET_BASELINE else 0
+    except (TypeError, ValueError):
+        return None
+
+
+def _inside_margin(geometry, point):
+    """Distância (graus) do ponto à borda da área imageada da cena: quanto
+    maior, mais da vizinhança do ponto a cena cobre."""
+    try:
+        return GEOSGeometry(json.dumps(geometry)).boundary.distance(point)
+    except (GEOSException, GDALException, TypeError, ValueError):
+        return 0.0
+
+
+def _sentinel2_month_scenes(lon, lat, month):
+    key = f'imagery:sentinel2:scenes:{month}:{round(lon, 2)}:{round(lat, 2)}'
+    scenes = cache.get(key)
+    if scenes is not None:
+        return scenes
+    last_day = calendar.monthrange(int(month[:4]), int(month[5:]))[1]
+    features = _pc_search({
+        'collections': [SENTINEL2_COLLECTION],
+        'intersects': {'type': 'Point', 'coordinates': [lon, lat]},
+        'datetime': f'{month}-01T00:00:00Z/{month}-{last_day:02d}T23:59:59Z',
+        'fields': {'include': ['id', 'geometry', 'properties.datetime', 'properties.platform',
+                               'properties.eo:cloud_cover', 'properties.s2:mgrs_tile',
+                               'properties.s2:nodata_pixel_percentage', 'properties.s2:processing_baseline',
+                               'properties.sat:relative_orbit']},
+        'limit': 200,
+    }, 'Sentinel-2')
+
+    # O catálogo traz um item por quadro de 110 km (grade MGRS): perto da
+    # divisa o mesmo ponto cai em até 4 quadros da mesma passagem, e cenas
+    # reprocessadas aparecem duas vezes. Fica um por passagem (dia + órbita):
+    # o quadro em que o ponto está mais longe da borda e, no empate, a
+    # versão mais nova do processamento.
+    point = Point(lon, lat)
+    passes = {}
+    offsets = {}
+    for feature in features:
+        props = feature.get('properties', {})
+        scene_id = feature.get('id', '')
+        if not SENTINEL2_SCENE_RE.match(scene_id) or not props.get('datetime'):
+            continue
+        baseline = props.get('s2:processing_baseline') or ''
+        offset = _baseline_offset(baseline)
+        if offset is not None:
+            offsets[SENTINEL2_OFFSET_KEY.format(scene=scene_id)] = offset
+        scene = {
+            'id': scene_id,
+            'date': props['datetime'][:10],
+            'platform': props.get('platform', ''),
+            'cloud': round(props.get('eo:cloud_cover') or 0),
+            'tile': props.get('s2:mgrs_tile', ''),
+            # Parte do quadro sem imagem (borda da faixa do satélite).
+            'nodata': round(props.get('s2:nodata_pixel_percentage') or 0),
+        }
+        rank = (round(_inside_margin(feature.get('geometry'), point), 3), baseline, scene_id)
+        pass_key = (scene['date'], props.get('sat:relative_orbit'))
+        if pass_key not in passes or rank > passes[pass_key][0]:
+            passes[pass_key] = (rank, scene)
+    scenes = sorted((scene for _, scene in passes.values()), key=lambda s: (s['date'], s['id']), reverse=True)
+
+    # Os tiles das composições por banda precisam do deslocamento da cena.
+    kept = {SENTINEL2_OFFSET_KEY.format(scene=s['id']) for s in scenes}
+    cache.set_many({k: v for k, v in offsets.items() if k in kept}, SENTINEL2_OFFSET_TTL)
+    cache.set(key, scenes, SENTINEL2_SCENES_TTL if month >= sentinel2_last_month() else SENTINEL2_PAST_SCENES_TTL)
+    return scenes
+
+
+def sentinel2_scenes(lon, lat, month=None):
+    """{'month', 'scenes'}: as cenas Sentinel-2 do mês ('AAAA-MM') sobre o
+    ponto, uma por passagem do satélite, da mais recente à mais antiga.
+
+    Sem `month`, o mês corrente; se ele ainda não tem cena (primeiros dias do
+    mês), o anterior."""
+    if month:
+        return {'month': month, 'scenes': _sentinel2_month_scenes(lon, lat, month)}
+    current = sentinel2_last_month()
+    scenes = _sentinel2_month_scenes(lon, lat, current)
+    if not scenes:
+        previous = _previous_month(current)
+        previous_scenes = _sentinel2_month_scenes(lon, lat, previous)
+        if previous_scenes:
+            return {'month': previous, 'scenes': previous_scenes}
+    return {'month': current, 'scenes': scenes}
+
+
+def _sentinel2_offset(scene):
+    """Deslocamento do valor digital da cena (0 ou 1000), ou None se a cena
+    não existe no acervo. A lista de cenas já deixa em cache; sem ele (tile
+    pedido depois de o cache expirar), vem dos metadados da cena."""
+    key = SENTINEL2_OFFSET_KEY.format(scene=scene)
+    offset = cache.get(key)
+    if offset is not None:
+        return offset
+    response = _get(PC_ITEM_URL.format(collection=SENTINEL2_COLLECTION, item=scene))
+    if response.status_code == 404:
+        return None
+    baseline = None
+    if response.status_code == 200:
+        try:
+            baseline = (response.json().get('properties') or {}).get('s2:processing_baseline')
+        except (ValueError, AttributeError):
+            pass
+    offset = _baseline_offset(baseline)
+    if offset is None:
+        # Sem a versão (servidor fora do ar): pela data, que acerta as cenas
+        # não reprocessadas; tenta os metadados de novo em alguns minutos.
+        logger.warning('Sem a versão do processamento da cena %s: deslocamento pela data.', scene)
+        sensed = SENTINEL2_SCENE_RE.match(scene).group(1)
+        offset = SENTINEL2_BOA_OFFSET if sensed >= SENTINEL2_OFFSET_DATE else 0
+        cache.set(key, offset, SENTINEL2_OFFSET_RETRY_TTL)
+    else:
+        cache.set(key, offset, SENTINEL2_OFFSET_TTL)
+    return offset
+
+
+def _sentinel2_render_params(comp, offset):
+    """Parâmetros do servidor de tiles para a composição."""
+    if 'expression' in comp:
+        return [('expression', comp['expression'].format(twice_offset=2 * offset)), ('asset_as_band', 'true'),
+                ('rescale', comp['rescale']), ('colormap_name', comp['colormap'])]
+    params = [('assets', asset) for asset in comp['assets']]
+    if 'rescale' not in comp:
+        return params + [('asset_bidx', f'{comp["assets"][0]}|1,2,3')]
+    return params + [('rescale', f'{lo + offset},{hi + offset}') for lo, hi in comp['rescale']]
+
+
+def sentinel2_tile(scene, composition, z, x, y):
+    """(WEBP, content-type) do tile da cena, ou None (cena/composição
+    inválida, fora da cena ou zoom acima do nativo)."""
+    comp = SENTINEL2_COMPOSITIONS.get(composition)
+    if comp is None or not SENTINEL2_SCENE_RE.match(scene or '') or z > SENTINEL2_MAX_NATIVE_ZOOM:
+        return None
+    key = f'imagery:sentinel2:{scene}:{composition}:{z}:{x}:{y}'
+    tile = cache.get(key)
+    if tile is None:
+        offset = 0
+        if 'rescale' in comp:
+            offset = _sentinel2_offset(scene)
+            if offset is None:
+                return None
+        params = [('collection', SENTINEL2_COLLECTION), ('item', scene), ('nodata', '0')]
+        params += _sentinel2_render_params(comp, offset)
+        tile = _image_response(_get(PC_WEBP_TILE_URL.format(z=z, x=x, y=y), params), 'Planetary Computer')
+        tile = tile or SENTINEL2_NO_TILE
+        cache.set(key, tile, SENTINEL2_TILE_TTL)
+    return None if tuple(tile) == SENTINEL2_NO_TILE else tuple(tile)

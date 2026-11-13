@@ -22,7 +22,7 @@ propriedade é opcional e fica na gaveta "Analisar propriedade".
     <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.17.0/dist/leaflet-geoman.css" />
     <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
     <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/landing_page.css' %}">
-    <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/results.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/results.css' %}?v=20261113">
     <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/map_3d_view.css' %}?v=20261110">
     <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/upload.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/loader.css' %}">
@@ -148,11 +148,11 @@ propriedade é opcional e fica na gaveta "Analisar propriedade".
     <script src="https://unpkg.com/shpjs@4.0.4/dist/shp.min.js" defer></script>
     {# `?v=`: estes três mudaram junto com esta página; sem isso, quem tem a versão #}
     {# antiga no cache do navegador (1 h no nginx) abriria o mapa em branco. #}
-    <script src="{% static 'analysis/js/maps.js' %}?v=20261110"></script>
+    <script src="{% static 'analysis/js/maps.js' %}?v=20261113"></script>
     <script src="{% static 'analysis/js/map_thematic.js' %}"></script>
     <script src="{% static 'analysis/js/image_export.js' %}"></script>
     <script src="{% static 'analysis/js/download_area.js' %}"></script>
-    <script src="{% static 'analysis/js/map_3d_view.js' %}?v=20261110"></script>
+    <script src="{% static 'analysis/js/map_3d_view.js' %}?v=20261113"></script>
     <script src="{% static 'analysis/js/property_locate.js' %}?v=20261110"></script>
     <script src="{% static 'analysis/js/explorar.js' %}"></script>
     <script src="{% static 'analysis/js/upload.js' %}" defer></script>

@@ -92,7 +92,8 @@
         SENTINEL2_RENDERINGS: SENTINEL2_RENDERINGS,
         LANDSAT_URL: LANDSAT_URL,
         LANDSAT_RENDERINGS: LANDSAT_RENDERINGS,
-        landsatRenderingRule: landsatRenderingRule
+        landsatRenderingRule: landsatRenderingRule,
+        monthOptions: monthOptions
     };
 
     /**
@@ -144,6 +145,28 @@
     function formatDateBR(isoDate) {
         var p = (isoDate || '').split('-');
         return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : isoDate;
+    }
+
+    var MONTH_NAMES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+        'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+
+    /**
+     * Meses de `first` a `last` ('AAAA-MM'), do mais recente ao mais antigo,
+     * como opções de seletor agrupadas por ano (`group`).
+     */
+    function monthOptions(first, last) {
+        var options = [];
+        var year = +last.slice(0, 4), month = +last.slice(5, 7);
+        var firstYear = +first.slice(0, 4), firstMonth = +first.slice(5, 7);
+        while (year > firstYear || (year === firstYear && month >= firstMonth)) {
+            options.push({
+                value: year + '-' + (month < 10 ? '0' : '') + month,
+                text: MONTH_NAMES[month - 1] + ' de ' + year,
+                group: String(year)
+            });
+            if (--month === 0) { month = 12; year--; }
+        }
+        return options;
     }
 
     /**
@@ -270,6 +293,74 @@
                     }
                 }
             });
+        }
+
+        // Sentinel-2 (Copernicus) mês a mês, 10 m: o usuário escolhe o mês e,
+        // dentro dele, a cena (uma por passagem do satélite no centro do
+        // mapa). Acervo de 2015 até a passagem mais recente, pelo
+        // Planetary Computer (imagery_service.py).
+        if (imagery.sentinel2) {
+            var s2 = imagery.sentinel2;
+            var baseSentinel2 = L.tileLayer(BLANK_TILE, {
+                maxZoom: 19, maxNativeZoom: s2.max_native_zoom, scene: '', comp: s2.compositions[0].value, pane: pane,
+                attribution: 'Contém dados Copernicus Sentinel modificados, via Microsoft Planetary Computer'
+            });
+            baseSentinel2.imageryInfo = { kind: 'sentinel2_scenes' };
+            layers['Sentinel-2 mês a mês (10 m)'] = baseSentinel2;
+            var s2Picker = {
+                layer: baseSentinel2,
+                template: s2.tile_url,
+                param: 'scene',
+                label: 'Cena (dia · satélite · nuvens)',
+                emptyText: 'Nenhuma cena Sentinel-2 deste mês cobre este ponto.',
+                followsCenter: true,
+                // Sem mês escolhido, o servidor devolve o mais recente com cena.
+                period: { label: 'Mês', options: monthOptions(s2.first_month, s2.last_month), selected: '' },
+                listUrl: function (center) {
+                    var month = s2Picker.period.selected;
+                    return s2.scenes_url + '?lat=' + center.lat.toFixed(3) + '&lon=' + center.lng.toFixed(3) +
+                        (month ? '&mes=' + month : '');
+                },
+                parse: function (json) {
+                    var period = s2Picker.period;
+                    if (json.month) {
+                        // Página aberta desde o mês passado: a lista ganha o mês novo.
+                        if (json.month > period.options[0].value) period.options = monthOptions(s2.first_month, json.month);
+                        period.selected = json.month;
+                    }
+                    return (json.scenes || []).map(function (s) {
+                        return {
+                            value: s.id,
+                            date: s.date,
+                            cloud: s.cloud,
+                            nodata: s.nodata,
+                            tile: s.tile,
+                            // "S2B" na lista (o nome inteiro não cabe no seletor); por extenso nos detalhes.
+                            text: formatDateBR(s.date) + ' · ' + s.platform.replace('Sentinel-', 'S') + ' · ' + s.cloud + '% nuvens',
+                            sceneText: formatDateBR(s.date) + ' · ' + s.platform,
+                            maxZoom: s2.max_native_zoom
+                        };
+                    });
+                },
+                // Mapa arrastado para o quadro vizinho: a cena do mesmo dia.
+                // Mês novo: a de menos nuvem (a lista segue por data).
+                initial: function (options) {
+                    var day = /_MSIL2A_(\d{4})(\d{2})(\d{2})T/.exec(s2Picker.selected || '');
+                    var sameDay = day && options.find(function (o) { return o.date === day.slice(1).join('-'); });
+                    if (sameDay) return sameDay.value;
+                    return options.reduce(function (best, o) { return o.cloud < best.cloud ? o : best; }).value;
+                },
+                secondary: {
+                    label: 'Composição',
+                    options: s2.compositions,
+                    selected: s2.compositions[0].value,
+                    onSelect: function (comp) {
+                        baseSentinel2.options.comp = comp;
+                        baseSentinel2.redraw();
+                    }
+                }
+            };
+            pickers.push(s2Picker);
         }
 
         // CBERS-4A (INPE), 2 m: tiles gerados no servidor a partir da cena
@@ -764,6 +855,7 @@
         var infoSeq = 0, infoTimer = null;
 
         var container, chooserEl, labelEl, selectEl, subLabelEl, subSelectEl, enhanceEl, enhanceInput, statusEl, infoEl;
+        var periodLabelEl, periodRowEl, periodSelectEl, periodPrevBtn, periodNextBtn, periodFilled = null;
         var previewEl, previewImg, previewCaption, prepareBtn, prepareHint;
         var current = null;
 
@@ -785,6 +877,26 @@
                     opts.onChoose(opts.chooser[chooserEl.value]);
                 });
             }
+            // Período (mês do Sentinel-2), só nas fontes com `period`: vem
+            // antes do seletor principal porque trocar refaz a lista dele.
+            // As setas passam ao mês vizinho sem abrir a lista.
+            periodLabelEl = L.DomUtil.create('label', 'imagery-picker-label', container);
+            periodRowEl = L.DomUtil.create('div', 'imagery-picker-period', container);
+            periodPrevBtn = L.DomUtil.create('button', 'imagery-picker-step', periodRowEl);
+            periodPrevBtn.type = 'button';
+            periodPrevBtn.textContent = '‹';
+            periodSelectEl = L.DomUtil.create('select', 'imagery-picker-select', periodRowEl);
+            periodSelectEl.id = 'imagery-picker-period' + suffix;
+            periodLabelEl.setAttribute('for', periodSelectEl.id);
+            periodNextBtn = L.DomUtil.create('button', 'imagery-picker-step', periodRowEl);
+            periodNextBtn.type = 'button';
+            periodNextBtn.textContent = '›';
+            periodSelectEl.addEventListener('change', function () {
+                if (current) setPeriod(current, periodSelectEl.value);
+            });
+            // A lista vai do mais recente ao mais antigo: "anterior" é o seguinte nela.
+            periodPrevBtn.addEventListener('click', function () { stepPeriod(1); });
+            periodNextBtn.addEventListener('click', function () { stepPeriod(-1); });
             labelEl = L.DomUtil.create('label', 'imagery-picker-label', container);
             selectEl = L.DomUtil.create('select', 'imagery-picker-select', container);
             // Segundo seletor (ex.: ano do Landsat), só nas fontes com `secondary`.
@@ -1085,8 +1197,25 @@
                 return;
             }
 
+            if (info.kind === 'sentinel2_scenes') {
+                var s2Scene = selectedOption(current);
+                var s2Comp = current.secondary.options.find(function (o) { return o.value === current.secondary.selected; }) || {};
+                var s2Res = s2Comp.res || 10;
+                var s2Lines = ['Resolução: ' + formatMeters(s2Res) + (s2Res > 10 ? ' (bandas SWIR)' : '')];
+                if (s2Scene) {
+                    s2Lines.push('Cena: ' + s2Scene.sceneText + ' · quadro ' + s2Scene.tile, 'Nuvens na cena: ' + s2Scene.cloud + '%');
+                    if (s2Scene.nodata >= 5) {
+                        s2Lines.push('Cena parcial: ' + s2Scene.nodata + '% do quadro sem imagem (borda da faixa do satélite).');
+                    }
+                    if (s2Comp.value === 'ndvi') s2Lines.push('Escala: vermelho (sem vegetação) → verde (vegetação densa)');
+                }
+                s2Lines.push('Fonte: Copernicus Sentinel-2 L2A (ESA) – Microsoft Planetary Computer');
+                setInfo(s2Lines.concat(zoomLine(s2Res)));
+                return;
+            }
+
             if (info.kind === 'mapbiomas') {
-                var mbLines = ['Resolução: 30 m', 'Ano: ' + (current && current.selected || ''), 'Fonte: MapBiomas Coleção 11'];
+                var mbLines =['Resolução: 30 m', 'Ano: ' + (current && current.selected || ''), 'Fonte: MapBiomas Coleção 11'];
                 if (map.getZoom() < info.minZoom) mbLines.push('Aproxime o mapa (zoom ' + info.minZoom + '+) para ver o mapa.');
                 mbLines.push('Legenda: em "Camadas temáticas".');
                 setInfo(mbLines.concat(zoomLine(30)));
@@ -1190,6 +1319,67 @@
             if (current === picker) fillSecondary(picker);
         }
 
+        function fillPeriod(picker) {
+            var period = picker && picker.period;
+            periodLabelEl.style.display = period ? '' : 'none';
+            periodRowEl.style.display = period ? '' : 'none';
+            if (!period) return;
+            periodLabelEl.textContent = period.label;
+            if (periodFilled !== period.options) {
+                // Só quando a lista muda: refazer fecharia a lista aberta.
+                periodFilled = period.options;
+                periodSelectEl.innerHTML = '';
+                var parent = periodSelectEl, groupName = null;
+                period.options.forEach(function (opt) {
+                    if (opt.group && opt.group !== groupName) {
+                        groupName = opt.group;
+                        parent = document.createElement('optgroup');
+                        parent.label = groupName;
+                        periodSelectEl.appendChild(parent);
+                    }
+                    var o = document.createElement('option');
+                    o.value = opt.value;
+                    o.textContent = opt.text;
+                    parent.appendChild(o);
+                });
+            }
+            // Antes da 1ª resposta ainda não há período escolhido: mostra o mais recente.
+            periodSelectEl.value = period.selected || period.options[0].value;
+            var index = periodSelectEl.selectedIndex;
+            var name = period.label.toLowerCase();
+            periodPrevBtn.disabled = index < 0 || index >= period.options.length - 1;
+            periodNextBtn.disabled = index <= 0;
+            periodPrevBtn.title = period.label + ' anterior';
+            periodNextBtn.title = period.label + ' seguinte';
+            periodPrevBtn.setAttribute('aria-label', 'Ir para o ' + name + ' anterior');
+            periodNextBtn.setAttribute('aria-label', 'Ir para o ' + name + ' seguinte');
+        }
+
+        function setPeriod(picker, value) {
+            var period = picker.period;
+            if (!period || value === period.selected) return;
+            if (!period.options.some(function (o) { return o.value === value; })) return;
+            period.selected = value;
+            reload(picker);
+        }
+
+        function stepPeriod(delta) {
+            var period = current && current.period;
+            if (!period) return;
+            var target = period.options[periodSelectEl.selectedIndex + delta];
+            if (target) setPeriod(current, target.value);
+        }
+
+        // Refaz a lista do seletor principal (mudou o período). A resposta de
+        // um pedido ainda em andamento, do período antigo, é descartada.
+        function reload(picker) {
+            picker.loadSeq = (picker.loadSeq || 0) + 1;
+            picker.loading = false;
+            picker.options = null;
+            if (current === picker) show(picker); else load(picker);
+            refreshInfo();
+        }
+
         function fillSecondary(picker) {
             var sec = picker && picker.secondary;
             subLabelEl.style.display = sec ? '' : 'none';
@@ -1220,6 +1410,7 @@
             } else {
                 labelEl.textContent = 'Detalhes da imagem';
                 selectEl.style.display = 'none';
+                fillPeriod(null);
                 fillSecondary(null);
                 fillEnhance(null);
                 fillPrepare(null);
@@ -1249,6 +1440,7 @@
             current = picker;
             container.style.display = '';
             labelEl.textContent = picker.label;
+            fillPeriod(picker);
             fillSecondary(picker);
             fillEnhance(picker);
 
@@ -1269,6 +1461,8 @@
         function load(picker) {
             if (picker.loading || picker.options) return;
             picker.loading = true;
+            // `reload` avança o número: a resposta deste pedido deixa de valer.
+            var seq = picker.loadSeq = (picker.loadSeq || 0) + 1;
             var url = picker.listUrl;
             if (typeof url === 'function') {
                 // Lista que depende do lugar (cenas CBERS no centro do mapa).
@@ -1286,11 +1480,13 @@
                     });
                 })
                 .then(function (res) {
+                    if (seq !== picker.loadSeq) return;
                     picker.options = picker.parse(res.json);
                     picker.error = res.json.erro || picker.emptyText || 'Nenhuma imagem cobre este ponto.';
                     picker.failed = !res.ok;
                 })
                 .catch(function (err) {
+                    if (seq !== picker.loadSeq) return;
                     picker.options = [];
                     picker.failed = true;
                     // Sem resposta nenhuma (TypeError do fetch): servidor fora do ar ou reiniciando.
@@ -1299,12 +1495,18 @@
                     if (global.console) console.warn('[imagens] lista', url, err);
                 })
                 .then(function () {
+                    if (seq !== picker.loadSeq) return;
                     picker.loading = false;
                     if (picker.options.length) {
                         // Numa lista recarregada (CBERS), mantém a escolha se ela continua lá.
                         var kept = picker.options.find(function (o) { return o.value === picker.selected; });
                         var initial = !kept && picker.initial ? picker.initial(picker.options) : null;
                         apply(picker, kept ? kept.value : (initial || picker.options[0].value));
+                    } else if (picker.period) {
+                        // Período sem cena: a do período anterior sairia da
+                        // tela com o seletor dizendo outro mês.
+                        picker.selected = null;
+                        picker.layer.setUrl(BLANK_TILE);
                     } else if (picker.backdrop && map.hasLayer(picker.backdrop)) {
                         // Sem datas, o fundo passaria pela imagem histórica.
                         map.removeLayer(picker.backdrop);

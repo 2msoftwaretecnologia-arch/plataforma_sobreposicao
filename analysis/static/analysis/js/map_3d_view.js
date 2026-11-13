@@ -194,11 +194,19 @@
         el.imgSelect = create('select', 'm3d-select m3d-select-main', el.imagery);
         el.imgSelect.setAttribute('aria-label', 'Imagem de satélite');
         el.imgSelect.title = 'Imagem de satélite';
+        // Período (mês do Sentinel-2): trocar refaz a lista de cenas.
+        el.periodSelect = create('select', 'm3d-select', el.imagery);
+        el.periodSelect.hidden = true;
         el.subSelect = create('select', 'm3d-select', el.imagery);
         el.subSelect.hidden = true;
         el.secSelect = create('select', 'm3d-select', el.imagery);
         el.secSelect.hidden = true;
         el.imgSelect.addEventListener('change', function () { selectSource(el.imgSelect.value); });
+        el.periodSelect.addEventListener('change', function () {
+            if (!state.source || !state.source.period) return;
+            state.source.period.selected = el.periodSelect.value;
+            selectSource(state.source.key);
+        });
         el.subSelect.addEventListener('change', function () {
             if (!state.source) return;
             state.source.selected = el.subSelect.value;
@@ -451,8 +459,9 @@
      * Fontes do seletor. Cada uma: `name`, `note` (subtítulo), `tiles(opção,
      * composição)` (null = a Esri do estilo), `options` ou `load()` (lista de
      * datas/cenas/composições), `label`, `initial(opções)`, `secondary`
-     * (segundo seletor), `backdrop` (Esri por baixo), `minzoom`/`maxzoom`,
-     * `tileSize` e `centered` (lista depende do lugar).
+     * (segundo seletor), `period` (seletor do mês, que refaz a lista),
+     * `backdrop` (Esri por baixo), `minzoom`/`maxzoom`, `tileSize` e
+     * `centered` (lista depende do lugar).
      */
     function imageryCatalog() {
         var im = state.imagery || {};
@@ -520,6 +529,46 @@
                 options: defs.LANDSAT_RENDERINGS,
                 tiles: function (o) { return imageServerTiles(defs.LANDSAT_URL, defs.landsatRenderingRule(o.value)); }
             });
+        }
+
+        // Sentinel-2 mês a mês: o mês (`period`) e, dentro dele, a cena.
+        if (im.sentinel2 && defs) {
+            var s2 = im.sentinel2;
+            var s2Source = {
+                key: 'sentinel2-scenes', name: 'Sentinel-2 mês a mês (10 m)',
+                label: 'Cena (dia · satélite · nuvens)', centered: true,
+                note: 'Sentinel-2 · 10 m',
+                emptyText: 'Nenhuma cena Sentinel-2 deste mês cobre este ponto.',
+                backdrop: true, maxzoom: s2.max_native_zoom,
+                attribution: 'Contém dados Copernicus Sentinel modificados, via Microsoft Planetary Computer',
+                // Sem mês escolhido, o servidor devolve o mais recente com cena.
+                period: { label: 'Mês', options: defs.monthOptions(s2.first_month, s2.last_month), selected: '' },
+                load: function () {
+                    var period = s2Source.period;
+                    var url = centerQuery(absoluteUrl(s2.scenes_url)) + (period.selected ? '&mes=' + period.selected : '');
+                    return getJson(url).then(function (j) {
+                        if (j.month) {
+                            if (j.month > period.options[0].value) period.options = defs.monthOptions(s2.first_month, j.month);
+                            period.selected = j.month;
+                        }
+                        return (j.scenes || []).map(function (s) {
+                            return {
+                                value: s.id, cloud: s.cloud,
+                                text: formatDateBR(s.date) + ' · ' + s.platform.replace('Sentinel-', 'S') + ' · ' + s.cloud + '% nuvens'
+                            };
+                        });
+                    });
+                },
+                // A de menos nuvem do mês, como no 2D.
+                initial: function (options) {
+                    return options.reduce(function (best, o) { return o.cloud < best.cloud ? o : best; }).value;
+                },
+                secondary: { label: 'Composição', options: s2.compositions, selected: s2.compositions[0].value },
+                tiles: function (o, comp) {
+                    return [absoluteUrl(s2.tile_url.replace('{scene}', o.value).replace('{comp}', comp))];
+                }
+            };
+            list.push(s2Source);
         }
 
         if (im.cbers) {
@@ -729,6 +778,14 @@
         setNote(src.note + (opt && src.list.length > 1 ? ' · ' + opt.text : ''));
     }
 
+    // Seletor do período (mês), só nas fontes com `period`.
+    function fillPeriod(src) {
+        var period = src.period;
+        fillSelect(el.periodSelect, period ? period.options : null, period && (period.selected || period.options[0].value));
+        el.periodSelect.setAttribute('aria-label', period ? period.label : '');
+        el.periodSelect.title = period ? period.label : '';
+    }
+
     function selectSource(key) {
         var src = state.catalog.find(function (s) { return s.key === key; }) || state.catalog[0];
         var seq = ++state.imgSeq;
@@ -738,6 +795,7 @@
         fillSelect(el.subSelect, null);
         fillSelect(el.secSelect, src.secondary ? src.secondary.options : null, src.secondary && src.secondary.selected);
         el.secSelect.setAttribute('aria-label', src.secondary ? src.secondary.label : '');
+        fillPeriod(src);
 
         if (!src.options && !src.load) {
             src.list = [];
@@ -750,6 +808,7 @@
             var c = imageryCenter();
             cacheKey += '@' + c.lat.toFixed(2) + ',' + c.lng.toFixed(2);
         }
+        if (src.period) cacheKey += '#' + src.period.selected;
         var pending = src.options ? Promise.resolve(src.options) : state.lists[cacheKey];
         if (!pending) {
             pending = state.lists[cacheKey] = src.load();
@@ -760,6 +819,8 @@
         pending.then(function (options) {
             if (seq !== state.imgSeq) return;
             src.list = options;
+            // O mês que o servidor escolheu (pedido sem mês) ou um mês novo na lista.
+            fillPeriod(src);
             if (!options.length) {
                 showTiles(null);
                 fillSelect(el.secSelect, null);

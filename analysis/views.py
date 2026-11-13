@@ -38,6 +38,9 @@ from analysis.services.view_services.imagery_service import (
     provider_layers,
     provider_source_url,
     provider_tile,
+    sentinel2_scenes,
+    sentinel2_tile,
+    sentinel2_valid_month,
     wayback_releases,
 )
 from analysis.services.view_services.raster_tiles import cbers_scenes, cbers_tile, mapbiomas_tile
@@ -1331,7 +1334,8 @@ def _enhance(request):
 
 
 def _scenes_response(request, scenes):
-    """Lista de cenas que cobrem o ponto ?lat=&lon=, de `scenes(lon, lat)`."""
+    """Lista de cenas que cobrem o ponto ?lat=&lon=, de `scenes(lon, lat)`
+    (a lista, ou o dicionário da resposta já com ela em 'scenes')."""
     try:
         lat = float(request.GET.get('lat', ''))
         lon = float(request.GET.get('lon', ''))
@@ -1340,7 +1344,8 @@ def _scenes_response(request, scenes):
     if not (-90 <= lat <= 90 and -180 <= lon <= 180):
         return JsonResponse({'erro': 'Coordenadas inválidas.', 'scenes': []}, status=400)
     try:
-        return JsonResponse({'scenes': scenes(lon, lat)})
+        found = scenes(lon, lat)
+        return JsonResponse(found if isinstance(found, dict) else {'scenes': found})
     except ImageryError as e:
         return JsonResponse({'erro': str(e), 'scenes': []}, status=502)
     except Exception as e:  # noqa: BLE001 - o painel mostra o motivo em vez de uma página de erro
@@ -1424,6 +1429,23 @@ class LandsatLegacyScenesView(View):
 class LandsatLegacyTileView(View):
     def get(self, request, scene, comp, z, x, y):
         return _image_tile_response(lambda: landsat_legacy_tile(scene, comp, z, x, y, _enhance(request)))
+
+
+class Sentinel2ScenesView(View):
+    """Cenas Sentinel-2 de um mês (?mes=AAAA-MM) que cobrem o ponto
+    (?lat=&lon=). Sem `mes`, o mês mais recente com cena; a resposta diz qual
+    em 'month'."""
+
+    def get(self, request):
+        month = request.GET.get('mes', '')
+        if month and not sentinel2_valid_month(month):
+            return JsonResponse({'erro': 'Mês inválido.', 'scenes': []}, status=400)
+        return _scenes_response(request, lambda lon, lat: sentinel2_scenes(lon, lat, month or None))
+
+
+class Sentinel2TileView(View):
+    def get(self, request, scene, comp, z, x, y):
+        return _image_tile_response(lambda: sentinel2_tile(scene, comp, z, x, y))
 
 
 class WaybackReleasesView(View):
