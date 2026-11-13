@@ -696,9 +696,9 @@ def landsat_legacy_tile(scene, composition, z, x, y, enhance=False):
 # Copernicus, de 2015 em diante. As cenas são as mesmas do catálogo do
 # Copernicus Data Space (a passagem da véspera já aparece nos dois), mas lá
 # os pixels exigem conta e têm cota mensal; no Planetary Computer são
-# públicos, como os do Landsat acima. O serviço Sentinel-2 da Esri (já no
-# mapa) só guarda ~14 meses e escolhe a cena sozinho; aqui quem escolhe o mês
-# e a cena é o usuário.
+# públicos, como os do Landsat acima. É a camada "Infravermelho (Sentinel-2)"
+# do mapa: o usuário escolhe o mês e a cena (o serviço Sentinel-2 da Esri,
+# usado antes, só guarda ~14 meses e escolhe a cena sozinho).
 
 PC_ITEM_URL = 'https://planetarycomputer.microsoft.com/api/stac/v1/collections/{collection}/items/{item}'
 # WEBP: ~15 KB por tile (o PNG do mesmo tile passa de 100 KB).
@@ -728,17 +728,18 @@ SENTINEL2_OFFSET_RETRY_TTL = 10 * 60
 
 # `res`: resolução das bandas (visível e NIR 10 m; SWIR 20 m). `rescale`: o
 # contraste de cada banda em reflectância × 10000, sem o deslocamento da cena.
+# A 1ª é a que o mapa 2D abre (a camada se chama "Infravermelho (Sentinel-2)").
 SENTINEL2_COMPOSITIONS = {
-    # TCI: a cor natural de 8 bits que a própria ESA publica com a cena.
-    'natural': {'label': 'Cor natural', 'res': 10, 'assets': ['visual']},
     'falsa_cor': {'label': 'Infravermelho falsa-cor (vegetação em vermelho)', 'res': 10,
                   'assets': ['B08', 'B04', 'B03'], 'rescale': [(0, 4000), (0, 2500), (0, 2500)]},
-    'agricultura': {'label': 'Agricultura (SWIR · NIR · azul)', 'res': 20,
-                    'assets': ['B11', 'B08', 'B02'], 'rescale': [(0, 4000), (0, 4500), (0, 2000)]},
-    'swir': {'label': 'Infravermelho de ondas curtas (SWIR – solo exposto e queimada)', 'res': 20,
-             'assets': ['B12', 'B8A', 'B04'], 'rescale': [(0, 3500), (0, 4500), (0, 2500)]},
     'ndvi': {'label': 'NDVI (vigor da vegetação)', 'res': 10,
              'expression': '(B08-B04)/(B08+B04-{twice_offset})', 'rescale': '0,0.9', 'colormap': 'rdylgn'},
+    'agricultura': {'label': 'Agricultura (SWIR · NIR · azul)', 'res': 20,
+                    'assets': ['B11', 'B08', 'B02'], 'rescale': [(0, 4000), (0, 4500), (0, 2000)]},
+    'swir': {'label': 'Infravermelho de ondas curtas (SWIR)', 'res': 20,
+             'assets': ['B12', 'B8A', 'B04'], 'rescale': [(0, 3500), (0, 4500), (0, 2500)]},
+    # TCI: a cor natural de 8 bits que a própria ESA publica com a cena.
+    'natural': {'label': 'Cor natural', 'res': 10, 'assets': ['visual']},
 }
 
 

@@ -2,7 +2,7 @@
  * Baixa como GeoTIFF (EPSG:3857) a imagem de satélite que está no mapa base,
  * no retângulo da área escolhida (imóvel, tela, desenho, polígono do mapa ou
  * arquivo; ver download_area.js). Camadas de tiles viram um mosaico montado
- * no navegador; os ImageServers da Esri (Sentinel-2, Landsat) já devolvem o
+ * no navegador; o ImageServer da Esri (Landsat) já devolve o
  * TIFF georreferenciado pelo exportImage.
  *
  * Com `clip` (GeoJSON Polygon/MultiPolygon em lon/lat), o que fica fora do
@@ -89,7 +89,7 @@
     }
 
     // ------------------------------------------------------------------
-    // Camadas de tiles (Esri, Wayback, Planet, CBERS, Landsat 5/7…)
+    // Camadas de tiles (Esri, Wayback, Planet, Sentinel-2, CBERS, Landsat 5/7…)
     // ------------------------------------------------------------------
 
     function tileUrl(layer, x, y, z) {

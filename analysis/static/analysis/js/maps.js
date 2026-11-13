@@ -29,18 +29,6 @@
         return match ? decodeURIComponent(match[1]) : '';
     }
 
-    // Sentinel-2 (Copernicus) no Living Atlas da Esri: público, cenas dos
-    // últimos ~14 meses, com composições de banda prontas no servidor.
-    var SENTINEL2_URL = 'https://sentinel.arcgis.com/arcgis/rest/services/Sentinel2/ImageServer';
-    // `res`: resolução das bandas usadas (visível e NIR 10 m; SWIR 20 m).
-    var SENTINEL2_RENDERINGS = [
-        { value: 'Color Infrared with DRA', text: 'Infravermelho falsa-cor (vegetação em vermelho)', res: 10 },
-        { value: 'NDVI Colormap', text: 'NDVI (vigor da vegetação)', res: 10 },
-        { value: 'Agriculture with DRA', text: 'Agricultura (SWIR · NIR · azul)', res: 20 },
-        { value: 'Short-wave Infrared with DRA', text: 'Infravermelho de ondas curtas (SWIR)', res: 20 },
-        { value: 'Natural Color with DRA', text: 'Cor natural', res: 10 }
-    ];
-
     // Landsat (USGS/NASA) no Living Atlas da Esri: Landsat 8/9 de 2013 em
     // diante e, antes disso, só as épocas do Global Land Survey (~1990, 2000,
     // 2005, 2010). Os anos do seletor vêm do catálogo no centro do mapa.
@@ -88,8 +76,6 @@
 
     // Os mesmos serviços e composições na visão 3D (map_3d_view.js).
     global.IMAGERY_DEFS = {
-        SENTINEL2_URL: SENTINEL2_URL,
-        SENTINEL2_RENDERINGS: SENTINEL2_RENDERINGS,
         LANDSAT_URL: LANDSAT_URL,
         LANDSAT_RENDERINGS: LANDSAT_RENDERINGS,
         landsatRenderingRule: landsatRenderingRule,
@@ -250,63 +236,19 @@
             });
         }
 
-        if (global.L.esri && L.esri.imageMapLayer) {
-            var baseInfrared = imageServerLayer(SENTINEL2_URL, SENTINEL2_RENDERINGS[0].value, 'Sentinel-2 (Copernicus) &copy; Esri', pane);
-            baseInfrared.imageryInfo = { kind: 'sentinel2' };
-            layers['Infravermelho (Sentinel-2)'] = baseInfrared;
-            pickers.push({
-                layer: baseInfrared,
-                label: 'Composição',
-                options: SENTINEL2_RENDERINGS,
-                selected: SENTINEL2_RENDERINGS[0].value,
-                // Imagem lenta: o painel mostra "Carregando imagem…".
-                slow: true,
-                onSelect: function (value) {
-                    baseInfrared.setRenderingRule({ rasterFunction: value });
-                }
-            });
-
-            var baseLandsat = imageServerLayer(LANDSAT_URL, LANDSAT_RENDERINGS[0].value, 'Landsat (USGS/NASA) &copy; Esri', pane);
-            baseLandsat.imageryInfo = { kind: 'landsat' };
-            layers['Landsat (histórico)'] = baseLandsat;
-            pickers.push({
-                layer: baseLandsat,
-                label: 'Composição',
-                options: LANDSAT_RENDERINGS,
-                selected: LANDSAT_RENDERINGS[0].value,
-                slow: true,
-                onSelect: function (value) {
-                    baseLandsat.setRenderingRule(landsatRenderingRule(value));
-                },
-                // Ano da imagem; as opções vêm do catálogo no centro do mapa
-                // (renderInfo, tipo 'landsat'). Sem ano: a melhor cena recente.
-                secondary: {
-                    label: 'Ano',
-                    options: [{ value: '', text: 'Melhor cena recente' }],
-                    selected: '',
-                    onSelect: function (year) {
-                        if (year) {
-                            baseLandsat.setTimeRange(new Date(Date.UTC(+year, 0, 1)), new Date(Date.UTC(+year + 1, 0, 1)));
-                        } else {
-                            baseLandsat.setTimeRange(null, null);
-                        }
-                    }
-                }
-            });
-        }
-
-        // Sentinel-2 (Copernicus) mês a mês, 10 m: o usuário escolhe o mês e,
-        // dentro dele, a cena (uma por passagem do satélite no centro do
-        // mapa). Acervo de 2015 até a passagem mais recente, pelo
-        // Planetary Computer (imagery_service.py).
+        // Sentinel-2 (Copernicus), 10 m: o usuário escolhe o mês, dentro dele
+        // a cena (uma por passagem do satélite no centro do mapa) e a
+        // composição. Acervo de 2015 até a passagem mais recente, pelo
+        // Planetary Computer (imagery_service.py). Abre no infravermelho
+        // falsa-cor, a 1ª composição da lista (daí o nome da camada).
         if (imagery.sentinel2) {
             var s2 = imagery.sentinel2;
             var baseSentinel2 = L.tileLayer(BLANK_TILE, {
                 maxZoom: 19, maxNativeZoom: s2.max_native_zoom, scene: '', comp: s2.compositions[0].value, pane: pane,
                 attribution: 'Contém dados Copernicus Sentinel modificados, via Microsoft Planetary Computer'
             });
-            baseSentinel2.imageryInfo = { kind: 'sentinel2_scenes' };
-            layers['Sentinel-2 mês a mês (10 m)'] = baseSentinel2;
+            baseSentinel2.imageryInfo = { kind: 'sentinel2' };
+            layers['Infravermelho (Sentinel-2)'] = baseSentinel2;
             var s2Picker = {
                 layer: baseSentinel2,
                 template: s2.tile_url,
@@ -361,6 +303,37 @@
                 }
             };
             pickers.push(s2Picker);
+        }
+
+        if (global.L.esri && L.esri.imageMapLayer) {
+            var baseLandsat = imageServerLayer(LANDSAT_URL, LANDSAT_RENDERINGS[0].value, 'Landsat (USGS/NASA) &copy; Esri', pane);
+            baseLandsat.imageryInfo = { kind: 'landsat' };
+            layers['Landsat (histórico)'] = baseLandsat;
+            pickers.push({
+                layer: baseLandsat,
+                label: 'Composição',
+                options: LANDSAT_RENDERINGS,
+                selected: LANDSAT_RENDERINGS[0].value,
+                // Imagem lenta: o painel mostra "Carregando imagem…".
+                slow: true,
+                onSelect: function (value) {
+                    baseLandsat.setRenderingRule(landsatRenderingRule(value));
+                },
+                // Ano da imagem; as opções vêm do catálogo no centro do mapa
+                // (renderInfo, tipo 'landsat'). Sem ano: a melhor cena recente.
+                secondary: {
+                    label: 'Ano',
+                    options: [{ value: '', text: 'Melhor cena recente' }],
+                    selected: '',
+                    onSelect: function (year) {
+                        if (year) {
+                            baseLandsat.setTimeRange(new Date(Date.UTC(+year, 0, 1)), new Date(Date.UTC(+year + 1, 0, 1)));
+                        } else {
+                            baseLandsat.setTimeRange(null, null);
+                        }
+                    }
+                }
+            });
         }
 
         // CBERS-4A (INPE), 2 m: tiles gerados no servidor a partir da cena
@@ -601,25 +574,6 @@
                 });
         }
         return attempt(first);
-    }
-
-    /**
-     * Cena do Sentinel-2 desenhada no ponto: o serviço monta o mosaico pelo
-     * campo `best` (menor primeiro), então a primeira por `best` é a visível.
-     */
-    function querySentinel2Scene(latlng) {
-        var params = pointQuery(latlng, {
-            where: 'category = 1',
-            outFields: 'acquisitiondate,cloudcover',
-            orderByFields: 'best',
-            resultRecordCount: '1'
-        });
-        return fetch(SENTINEL2_URL + '/query?' + params)
-            .then(function (r) { return r.json(); })
-            .then(function (json) {
-                var f = json.features && json.features[0];
-                return f ? f.attributes : null;
-            });
     }
 
     /**
@@ -1197,7 +1151,7 @@
                 return;
             }
 
-            if (info.kind === 'sentinel2_scenes') {
+            if (info.kind === 'sentinel2') {
                 var s2Scene = selectedOption(current);
                 var s2Comp = current.secondary.options.find(function (o) { return o.value === current.secondary.selected; }) || {};
                 var s2Res = s2Comp.res || 10;
@@ -1215,35 +1169,10 @@
             }
 
             if (info.kind === 'mapbiomas') {
-                var mbLines =['Resolução: 30 m', 'Ano: ' + (current && current.selected || ''), 'Fonte: MapBiomas Coleção 11'];
+                var mbLines = ['Resolução: 30 m', 'Ano: ' + (current && current.selected || ''), 'Fonte: MapBiomas Coleção 11'];
                 if (map.getZoom() < info.minZoom) mbLines.push('Aproxime o mapa (zoom ' + info.minZoom + '+) para ver o mapa.');
                 mbLines.push('Legenda: em "Camadas temáticas".');
                 setInfo(mbLines.concat(zoomLine(30)));
-                return;
-            }
-
-            if (info.kind === 'sentinel2') {
-                var rendering = selectedOption(current) || {};
-                var resLine = 'Resolução: ' + formatMeters(rendering.res) + (rendering.res > 10 ? ' (bandas SWIR)' : '');
-                setInfo([resLine, 'Consultando data da cena…', zoomLine(rendering.res)]);
-                querySentinel2Scene(map.getCenter())
-                    .then(function (a) {
-                        if (seq !== infoSeq) return;
-                        var lines = [resLine];
-                        if (a && a.acquisitiondate) {
-                            lines.push('Cena: ' + new Date(a.acquisitiondate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }));
-                            if (a.cloudcover !== null && a.cloudcover !== undefined) {
-                                lines.push('Nuvens na cena: ' + Math.round(a.cloudcover * 100) + '%');
-                            }
-                        } else {
-                            lines.push('Sem cena para este ponto.');
-                        }
-                        lines.push('Fonte: Sentinel-2 (Copernicus/ESA)');
-                        setInfo(lines.concat(zoomLine(rendering.res)));
-                    })
-                    .catch(function () {
-                        if (seq === infoSeq) setInfo([resLine, 'Data da cena indisponível.', zoomLine(rendering.res)]);
-                    });
                 return;
             }
 

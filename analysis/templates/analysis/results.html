@@ -344,13 +344,13 @@
     {% if map_items %}
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src='https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/Leaflet.fullscreen.min.js'></script>
-    <!-- Infravermelho do Sentinel-2 (ImageServer da Esri) no mapa interativo. -->
+    <!-- Landsat (ImageServer da Esri) no mapa interativo. -->
     <script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
-    <script src="{% static 'analysis/js/maps.js' %}?v=20261113"></script>
+    <script src="{% static 'analysis/js/maps.js' %}?v=20261113b"></script>
     <script src="{% static 'analysis/js/map_thematic.js' %}"></script>
     <script src="{% static 'analysis/js/image_export.js' %}"></script>
     <script src="{% static 'analysis/js/download_area.js' %}"></script>
-    <script src="{% static 'analysis/js/map_3d_view.js' %}?v=20261113"></script>
+    <script src="{% static 'analysis/js/map_3d_view.js' %}?v=20261113b"></script>
     {{ map_items|json_script:"map-items" }}
     {{ imagery|json_script:"map-imagery" }}
     {% endif %}

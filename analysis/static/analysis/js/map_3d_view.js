@@ -510,32 +510,11 @@
             });
         });
 
-        if (defs) {
-            list.push({
-                key: 'sentinel2', name: 'Sentinel-2 (10 m)', label: 'Composição',
-                note: 'Sentinel-2 · imagem gerada na hora, pode levar alguns segundos',
-                backdrop: true, tileSize: IMAGE_SERVER_TILE, maxzoom: 16,
-                attribution: 'Sentinel-2 (Copernicus) &copy; Esri',
-                options: defs.SENTINEL2_RENDERINGS,
-                // Em 3D a cor natural é a leitura mais direta; as outras ficam no seletor.
-                initial: function () { return 'Natural Color with DRA'; },
-                tiles: function (o) { return imageServerTiles(defs.SENTINEL2_URL, { rasterFunction: o.value }); }
-            });
-            list.push({
-                key: 'landsat', name: 'Landsat 8/9 (30 m)', label: 'Composição',
-                note: 'Landsat 8/9 · melhor cena recente, gerada na hora',
-                backdrop: true, tileSize: IMAGE_SERVER_TILE, maxzoom: 14,
-                attribution: 'Landsat (USGS/NASA) &copy; Esri',
-                options: defs.LANDSAT_RENDERINGS,
-                tiles: function (o) { return imageServerTiles(defs.LANDSAT_URL, defs.landsatRenderingRule(o.value)); }
-            });
-        }
-
-        // Sentinel-2 mês a mês: o mês (`period`) e, dentro dele, a cena.
+        // Sentinel-2: o mês (`period`), dentro dele a cena e a composição.
         if (im.sentinel2 && defs) {
             var s2 = im.sentinel2;
             var s2Source = {
-                key: 'sentinel2-scenes', name: 'Sentinel-2 mês a mês (10 m)',
+                key: 'sentinel2', name: 'Sentinel-2 (10 m)',
                 label: 'Cena (dia · satélite · nuvens)', centered: true,
                 note: 'Sentinel-2 · 10 m',
                 emptyText: 'Nenhuma cena Sentinel-2 deste mês cobre este ponto.',
@@ -563,12 +542,27 @@
                 initial: function (options) {
                     return options.reduce(function (best, o) { return o.cloud < best.cloud ? o : best; }).value;
                 },
-                secondary: { label: 'Composição', options: s2.compositions, selected: s2.compositions[0].value },
+                // Em 3D a cor natural é a leitura mais direta; as outras ficam no seletor.
+                secondary: {
+                    label: 'Composição', options: s2.compositions,
+                    selected: s2.compositions.some(function (c) { return c.value === 'natural'; }) ? 'natural' : s2.compositions[0].value
+                },
                 tiles: function (o, comp) {
                     return [absoluteUrl(s2.tile_url.replace('{scene}', o.value).replace('{comp}', comp))];
                 }
             };
             list.push(s2Source);
+        }
+
+        if (defs) {
+            list.push({
+                key: 'landsat', name: 'Landsat 8/9 (30 m)', label: 'Composição',
+                note: 'Landsat 8/9 · melhor cena recente, gerada na hora',
+                backdrop: true, tileSize: IMAGE_SERVER_TILE, maxzoom: 14,
+                attribution: 'Landsat (USGS/NASA) &copy; Esri',
+                options: defs.LANDSAT_RENDERINGS,
+                tiles: function (o) { return imageServerTiles(defs.LANDSAT_URL, defs.landsatRenderingRule(o.value)); }
+            });
         }
 
         if (im.cbers) {

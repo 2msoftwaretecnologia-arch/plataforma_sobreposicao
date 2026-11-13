@@ -146,11 +146,12 @@ Landsat 5/7 da data (correlação de fase, ajuste afim; erro restante de
 guarda tudo em `IMAGERY_CACHE_DIR` (~20–30 s, metade no download; o painel
 mostra a etapa). As seguintes abrem na hora.
 
-Sentinel-2 mês a mês (10 m, de 2015 até a passagem mais recente; sem chave):
-no painel Imagem o usuário escolhe o mês (lista ou setas ‹ ›), depois a cena
-daquele mês que cobre o centro do mapa (uma por passagem do satélite, com a
-data e a nuvem; abre na de menos nuvem) e a composição (cor natural, falsa
-cor, agricultura, SWIR ou NDVI). O catálogo e os tiles vêm do acervo
+"Infravermelho (Sentinel-2)" (10 m, de 2015 até a passagem mais recente; sem
+chave; na visão 3D, "Sentinel-2 (10 m)"): no painel Imagem o usuário escolhe
+o mês (lista ou setas ‹ ›), depois a cena daquele mês que cobre o centro do
+mapa (uma por passagem do satélite, com a data e a nuvem; abre na de menos
+nuvem) e a composição (infravermelho falsa-cor, NDVI, agricultura, SWIR ou
+cor natural). O catálogo e os tiles vêm do acervo
 Copernicus Sentinel-2 L2A no Microsoft Planetary Computer, o mesmo serviço do
 Landsat 5/7: as cenas são as do Copernicus Data Space, mas lá os pixels
 exigem conta e têm cota mensal. A lista do mês corrente é renovada a cada
