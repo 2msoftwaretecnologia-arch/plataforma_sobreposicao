@@ -45,7 +45,16 @@ SECRET_KEY = config('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config_bool('DEBUG', default=False)
 
+# Domínio público (DuckDNS → 82.25.66.238); o HTTPS termina no Caddy da VPS.
+PUBLIC_DOMAIN = "terra-view.duckdns.org"
+
+# O Caddy repassa para o nginx do compose por HTTP e avisa o esquema original
+# neste cabeçalho; sem isso as URLs absolutas (tiles do mapa) sairiam em http
+# e o navegador as bloquearia na página https.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 ALLOWED_HOSTS = [
+    PUBLIC_DOMAIN,
     "82.25.66.238",
     "localhost",
     "127.0.0.1",
@@ -231,6 +240,7 @@ IMAGERY_CACHE_MAX_MB = config('IMAGERY_CACHE_MAX_MB', default=6000, cast=int)
 OVERLAY_HTTP_PORT = config('OVERLAY_HTTP_PORT', default='8020')
 
 CSRF_TRUSTED_ORIGINS = [
+    f"https://{PUBLIC_DOMAIN}",
     f"http://82.25.66.238:{OVERLAY_HTTP_PORT}",
     f"http://localhost:{OVERLAY_HTTP_PORT}",
     "http://82.25.66.238:8000",
