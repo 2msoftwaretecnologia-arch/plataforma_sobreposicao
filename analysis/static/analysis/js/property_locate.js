@@ -223,10 +223,56 @@
             return out;
         }
 
-        function parseCoordinates(text) {
+        // UTM (SIRGAS 2000, hemisfério sul) -> [lon, lat]: inversa da
+        // projeção transversa de Mercator no elipsoide GRS80 (Snyder), com
+        // erro de milímetros dentro do fuso.
+        function utmToLonLat(east, north, zone) {
+            var a = 6378137, f = 1 / 298.257222101, k0 = 0.9996, rad = Math.PI / 180;
+            var e2 = f * (2 - f), ep2 = e2 / (1 - e2);
+            var x = east - 500000, y = north - 10000000;
+            var mu = y / k0 / (a * (1 - e2 / 4 - 3 * e2 * e2 / 64 - 5 * e2 * e2 * e2 / 256));
+            var e1 = (1 - Math.sqrt(1 - e2)) / (1 + Math.sqrt(1 - e2));
+            var phi1 = mu + (3 * e1 / 2 - 27 * Math.pow(e1, 3) / 32) * Math.sin(2 * mu)
+                + (21 * e1 * e1 / 16 - 55 * Math.pow(e1, 4) / 32) * Math.sin(4 * mu)
+                + (151 * Math.pow(e1, 3) / 96) * Math.sin(6 * mu)
+                + (1097 * Math.pow(e1, 4) / 512) * Math.sin(8 * mu);
+            var sin1 = Math.sin(phi1), cos1 = Math.cos(phi1), tan1 = Math.tan(phi1);
+            var C1 = ep2 * cos1 * cos1, T1 = tan1 * tan1;
+            var N1 = a / Math.sqrt(1 - e2 * sin1 * sin1);
+            var R1 = a * (1 - e2) / Math.pow(1 - e2 * sin1 * sin1, 1.5);
+            var D = x / (N1 * k0);
+            var lat = phi1 - (N1 * tan1 / R1) * (D * D / 2
+                - (5 + 3 * T1 + 10 * C1 - 4 * C1 * C1 - 9 * ep2) * Math.pow(D, 4) / 24
+                + (61 + 90 * T1 + 298 * C1 + 45 * T1 * T1 - 252 * ep2 - 3 * C1 * C1) * Math.pow(D, 6) / 720);
+            var lon = (D - (1 + 2 * T1 + C1) * Math.pow(D, 3) / 6
+                + (5 - 2 * C1 + 28 * T1 - 3 * C1 * C1 + 8 * ep2 + 24 * T1 * T1) * Math.pow(D, 5) / 120) / cos1;
+            return [(zone * 6 - 183) + lon / rad, lat / rad];
+        }
+
+        // Metros com ou sem separador de milhar: 785123.45, 785123,45 ou 785.123,45.
+        // Abaixo de 100 000 (nome do vértice, altitude) não é E nem N.
+        function utmValues(line) {
+            return (line.match(/\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:[.,]\d+)?/g) || []).map(function (t) {
+                if (/^\d{1,3}(?:\.\d{3})+(?:,\d+)?$/.test(t)) t = t.replace(/\./g, '');
+                return parseFloat(t.replace(',', '.'));
+            }).filter(function (v) { return v >= 100000; });
+        }
+
+        // `opts.utmZone`: as linhas são E/N em UTM daquele fuso (o N, na casa
+        // dos milhões, é o maior dos dois).
+        function parseCoordinates(text, opts) {
+            var zone = opts && opts.utmZone ? +opts.utmZone : 0;
             var ring = [], lines = String(text || '').split(/\r?\n/);
             for (var i = 0; i < lines.length; i++) {
                 if (!lines[i].trim()) continue;
+                if (zone) {
+                    var en = utmValues(lines[i]).sort(function (p, q) { return p - q; });
+                    if (en.length !== 2) return { error: 'Linha ' + (i + 1) + ': esperava E e N em UTM (metros).' };
+                    if (en[0] > 900000 || en[1] > 10000000) return { error: 'Linha ' + (i + 1) + ': coordenada UTM fora do intervalo.' };
+                    var p = utmToLonLat(en[0], en[1], zone), prev = ring[ring.length - 1];
+                    if (!prev || prev[0] !== p[0] || prev[1] !== p[1]) ring.push(p);
+                    continue;
+                }
                 var vals = coordValues(lines[i]);
                 if (vals.length !== 2 && vals.length !== 3) return { error: 'Linha ' + (i + 1) + ': esperava latitude e longitude.' };
                 var a = vals[0], b = vals[1];
@@ -236,7 +282,10 @@
                     || (!LAT_HEMI.test(a[1]) && !LON_HEMI.test(b[1]) && Math.abs(a[0]) > Math.abs(b[0]))) {
                     var t = a; a = b; b = t;
                 }
-                if (Math.abs(a[0]) > 90 || Math.abs(b[0]) > 180) return { error: 'Linha ' + (i + 1) + ': coordenada fora do intervalo.' };
+                if (Math.abs(a[0]) > 90 || Math.abs(b[0]) > 180) {
+                    return { error: 'Linha ' + (i + 1) + (Math.max(Math.abs(a[0]), Math.abs(b[0])) >= 1000
+                        ? ': parece estar em UTM; escolha o formato UTM e o fuso.' : ': coordenada fora do intervalo.') };
+                }
                 var last = ring[ring.length - 1];
                 if (!last || last[0] !== b[0] || last[1] !== a[0]) ring.push([b[0], a[0]]);
             }
@@ -281,8 +330,8 @@
                 });
         }
 
-        function locateCoordinates(text) {
-            var parsed = parseCoordinates(text);
+        function locateCoordinates(text, utmZone) {
+            var parsed = parseCoordinates(text, { utmZone: utmZone });
             if (parsed.error) return Promise.resolve({ status: 'invalid', message: parsed.error });
             if (parsed.point) return locatePoint(parsed.point);
             if (ringCrosses(parsed.ring)) {
@@ -294,7 +343,9 @@
 
         function keyFor(req) {
             if (req.mode === 'car' && req.car) return 'car:' + req.car.toUpperCase();
-            if (req.mode === 'coord' && req.text && req.text.trim()) return 'coord:' + req.text.trim();
+            if (req.mode === 'coord' && req.text && req.text.trim()) {
+                return 'coord:' + (req.utmZone ? 'utm' + req.utmZone + ':' : '') + req.text.trim();
+            }
             if ((req.mode === 'zip' || req.mode === 'kml') && req.file) {
                 return req.mode + ':' + [req.file.name, req.file.size, req.file.lastModified].join(':');
             }
@@ -310,7 +361,7 @@
             if (!located[key]) {
                 var locator = { car: function () { return locateCar(req.car); },
                     kml: function () { return locateKml(req.file); },
-                    coord: function () { return locateCoordinates(req.text); } }[req.mode] || function () { return locateZip(req.file); };
+                    coord: function () { return locateCoordinates(req.text, req.utmZone); } }[req.mode] || function () { return locateZip(req.file); };
                 located[key] = locator()
                     .catch(function () { return null; })
                     .then(function (target) {

@@ -71,13 +71,34 @@ do mapa 3D da página inicial; o comportamento vem de upload.js.
     </div>
 
     <div class="form-group" id="group_coord" style="display:none;">
-        <label class="field-label" for="coord_input">Coordenadas (uma por linha)</label>
+        {# Formato das coordenadas: grau decimal e graus/min/seg são lidos do texto; UTM precisa do fuso. #}
+        <label class="field-label">Formato das coordenadas</label>
+        <div class="mode-switch coord-format-switch" role="radiogroup" aria-label="Formato das coordenadas">
+            <input class="mode-input" id="coord_format_decimal" type="radio" name="coord_format" value="decimal"{% if not coord_format or coord_format == 'decimal' %} checked{% endif %} />
+            <label class="mode-pill" for="coord_format_decimal">Grau decimal</label>
+            <input class="mode-input" id="coord_format_gms" type="radio" name="coord_format" value="gms"{% if coord_format == 'gms' %} checked{% endif %} />
+            <label class="mode-pill" for="coord_format_gms">Graus, min, seg</label>
+            <input class="mode-input" id="coord_format_utm" type="radio" name="coord_format" value="utm"{% if coord_format == 'utm' %} checked{% endif %} />
+            <label class="mode-pill" for="coord_format_utm">UTM</label>
+        </div>
+        <div class="coord-zone-row" id="coord_zone_row"{% if coord_format != 'utm' %} hidden{% endif %}>
+            <label class="field-label" for="coord_zone">Fuso UTM (SIRGAS 2000, hemisfério sul)</label>
+            <select class="text-input" id="coord_zone" name="coord_zone">
+                {% with zone=coord_zone|default:'22' %}
+                <option value="21"{% if zone == '21' %} selected{% endif %}>21 S (meridiano 57° O)</option>
+                <option value="22"{% if zone == '22' %} selected{% endif %}>22 S (meridiano 51° O) · oeste do Tocantins</option>
+                <option value="23"{% if zone == '23' %} selected{% endif %}>23 S (meridiano 45° O) · leste do Tocantins</option>
+                <option value="24"{% if zone == '24' %} selected{% endif %}>24 S (meridiano 39° O)</option>
+                {% endwith %}
+            </select>
+        </div>
+        <label class="field-label coord-input-label" for="coord_input">Coordenadas (uma por linha)</label>
         <textarea class="text-input" id="coord_input" name="coord_input" rows="5" spellcheck="false"
-            placeholder="-9.581852, -48.526588&#10;ou 9°35'03.1&quot;S 48°31'33.0&quot;W">{% if coord_input %}{{ coord_input }}{% endif %}</textarea>
+            placeholder="-9.581852, -48.526588">{% if coord_input %}{{ coord_input }}{% endif %}</textarea>
         <div id="coord_preview" class="preview-note" role="status" hidden></div>
         <div class="note-box coord-warning-message">
             <svg class="ico"><use href="#i-alert"/></svg>
-            <p><strong>1 coordenada</strong> analisa o imóvel do SICAR onde o ponto cai; <strong>3 ou mais</strong> formam a área, na ordem do perímetro. Aceita os formatos do Google Maps: <strong>-9.581852, -48.526588</strong> ou <strong>9°35'03.1"S 48°31'33.0"W</strong>.</p>
+            <p><strong>1 coordenada</strong> analisa o imóvel do SICAR onde o ponto cai; <strong>3 ou mais</strong> formam a área, na ordem do perímetro. <span id="coord_format_hint">Latitude e longitude em graus decimais, como o Google Maps copia: <strong>-9.581852, -48.526588</strong>.</span></p>
         </div>
     </div>
 

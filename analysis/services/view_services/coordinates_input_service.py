@@ -7,6 +7,11 @@ deduzida pelo tamanho: no Brasil a latitude nunca passa de 34° e a longitude
 nunca fica abaixo disso. Sem hemisfério (N/S/L/O),
 o valor é tratado como sul/oeste, onde fica o Tocantins, com ou sem o sinal.
 
+Em UTM (SIRGAS 2000, hemisfério sul) o fuso vem à parte, escolhido no
+formulário (`utm_zone`): cada linha traz o E e o N em metros, em qualquer
+ordem (o N, na casa dos milhões, é o maior). Números abaixo de 100 000 (nome
+do vértice, altitude) são ignorados.
+
 Uma coordenada só é um ponto: a análise vai para o imóvel do SICAR que o
 contém (ver `UploadZipCarView._handle_coordinates_input`).
 
@@ -16,15 +21,20 @@ pré-visualização no mapa; este é o que vale para a análise.
 import re
 
 from django.contrib.gis.geos import GEOSGeometry
+from pyproj import Transformer
 from shapely.geometry import Polygon
 
 SRID = 4674
+# Fusos UTM do Brasil; SIRGAS 2000 / UTM <fuso>S = EPSG 31960 + fuso.
+UTM_ZONES = range(18, 26)
 
 _DMS_RE = re.compile(
     r"(-)?\s*(\d{1,3})\s*[°º]\s*(\d{1,2})\s*['’′]\s*(?:(\d{1,2}(?:[.,]\d+)?)\s*(?:\"|''|”|″)?)?\s*([NSEWOL])?",
     re.I,
 )
 _DECIMAL_RE = re.compile(r'-?\d+(?:[.,]\d+)?')
+# Metros com ou sem separador de milhar: 785123.45, 785123,45 ou 785.123,45.
+_METERS_RE = re.compile(r'\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:[.,]\d+)?')
 
 
 class CoordinatesInputError(ValueError):
@@ -61,17 +71,50 @@ def _vertex(line, number):
     lat, lon = a, b
 
     if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        if max(abs(lat), abs(lon)) >= 1000:
+            raise CoordinatesInputError(
+                f'Linha {number}: "{line.strip()}" parece estar em UTM; escolha o formato UTM e o fuso.')
         raise CoordinatesInputError(f'Linha {number}: coordenada fora do intervalo ("{line.strip()}").')
     return lon, lat
 
 
-def parse_vertices(text: str) -> list:
-    """[(lon, lat)] na ordem digitada, sem repetidos seguidos nem o fechamento do anel."""
+def _meters(token):
+    if re.fullmatch(r'\d{1,3}(?:\.\d{3})+(?:,\d+)?', token):
+        token = token.replace('.', '')
+    return float(token.replace(',', '.'))
+
+
+def _utm_vertex(line, number, transformer):
+    values = [v for v in map(_meters, _METERS_RE.findall(line)) if v >= 100_000]
+    if len(values) != 2:
+        raise CoordinatesInputError(f'Linha {number}: esperava E e N em UTM (metros), achei "{line.strip()}".')
+    east, north = sorted(values)
+    if not (100_000 <= east <= 900_000 and north <= 10_000_000):
+        raise CoordinatesInputError(f'Linha {number}: coordenada UTM fora do intervalo ("{line.strip()}").')
+    lon, lat = transformer.transform(east, north)
+    return lon, lat
+
+
+def utm_transformer(zone):
+    try:
+        zone = int(zone)
+    except (TypeError, ValueError):
+        zone = 0
+    if zone not in UTM_ZONES:
+        raise CoordinatesInputError('Escolha o fuso UTM (18 a 25).')
+    return Transformer.from_crs(31960 + zone, SRID, always_xy=True)
+
+
+def parse_vertices(text: str, utm_zone=None) -> list:
+    """[(lon, lat)] na ordem digitada, sem repetidos seguidos nem o fechamento do anel.
+
+    Com `utm_zone` (fuso, hemisfério sul), as linhas são E/N em UTM."""
+    transformer = utm_transformer(utm_zone) if utm_zone is not None else None
     vertices = []
     for number, line in enumerate((text or '').splitlines(), start=1):
         if not line.strip():
             continue
-        vertex = _vertex(line, number)
+        vertex = _utm_vertex(line, number, transformer) if transformer else _vertex(line, number)
         if not vertices or vertices[-1] != vertex:
             vertices.append(vertex)
     if len(vertices) > 1 and vertices[0] == vertices[-1]:

@@ -1168,6 +1168,19 @@ class CoordinatesInputTests(SimpleTestCase):
         self.assertAlmostEqual(lon, -(48 + 31 / 60 + 33 / 3600))
         self.assertEqual(parse_vertices('-9.581852, -48.526588'), [(-48.526588, -9.581852)])
 
+    def test_utm_com_fuso(self):
+        from analysis.services.view_services.coordinates_input_service import (
+            CoordinatesInputError, parse_vertices)
+        # Mesmo ponto em três grafias (E/N em qualquer ordem, milhar com ponto, nome e altitude ignorados).
+        for text in ('785123.45 8875432.10', '8875432,10; 785123,45', 'P1 785.123,45 8.875.432,10 250'):
+            (lon, lat), = parse_vertices(text, utm_zone='22')
+            self.assertAlmostEqual(lon, -48.3979398, places=6)
+            self.assertAlmostEqual(lat, -10.1629140, places=6)
+        with self.assertRaisesMessage(CoordinatesInputError, 'fuso'):
+            parse_vertices('785123 8875432', utm_zone='')
+        with self.assertRaisesMessage(CoordinatesInputError, 'parece estar em UTM'):
+            parse_vertices('785123 8875432')
+
     def _assert_square(self, geom):
         self.assertEqual(geom.srid, 4674)
         xs = sorted({round(x, 4) for x, _ in geom.coords[0]})

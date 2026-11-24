@@ -153,20 +153,66 @@
         return ['warn', t.message || 'Não deu para ler as coordenadas.'];
     }
 
+    // Formato das coordenadas: grau decimal e graus/min/seg são lidos do
+    // próprio texto (o seletor só troca exemplo e dica); UTM precisa do fuso.
+    const coordZone = document.getElementById('coord_zone');
+    const coordZoneRow = document.getElementById('coord_zone_row');
+    const coordFormatHint = document.getElementById('coord_format_hint');
+    const COORD_FORMATS = {
+        decimal: {
+            placeholder: '-9.581852, -48.526588\n-9.585120, -48.520310\n-9.590004, -48.527771',
+            hint: 'Latitude e longitude em graus decimais, como o Google Maps copia: <strong>-9.581852, -48.526588</strong>.'
+        },
+        gms: {
+            placeholder: '9°35\'03.1"S 48°31\'33.0"W\n9°35\'06.4"S 48°31\'13.1"W\n9°35\'24.0"S 48°31\'40.0"W',
+            hint: 'Graus, minutos e segundos: <strong>9°35\'03.1"S 48°31\'33.0"W</strong>. Sem S/O, vale sul e oeste.'
+        },
+        utm: {
+            placeholder: '785123.45  8875432.10\n785480.00  8875120.50\n785010.20  8874790.00',
+            hint: '<strong>E</strong> e <strong>N</strong> em metros (SIRGAS 2000), um vértice por linha: <strong>785123.45 8875432.10</strong>. Escolha o fuso acima.'
+        }
+    };
+
+    function coordFormat() {
+        const checked = document.querySelector('input[name="coord_format"]:checked');
+        return checked ? checked.value : 'decimal';
+    }
+
+    function coordUtmZone() {
+        return coordFormat() === 'utm' && coordZone ? coordZone.value : '';
+    }
+
+    function applyCoordFormat() {
+        const fmt = COORD_FORMATS[coordFormat()] || COORD_FORMATS.decimal;
+        if (coordInput) coordInput.placeholder = fmt.placeholder;
+        if (coordFormatHint) coordFormatHint.innerHTML = fmt.hint;
+        if (coordZoneRow) coordZoneRow.hidden = coordFormat() !== 'utm';
+    }
+
+    document.querySelectorAll('input[name="coord_format"]').forEach(function (el) {
+        el.addEventListener('change', function () {
+            applyCoordFormat();
+            scheduleCoordPreview();
+        });
+    });
+    if (coordZone) coordZone.addEventListener('change', function () { scheduleCoordPreview(); });
+    applyCoordFormat();
+
     let coordPreviewTimer = null;
 
     function scheduleCoordPreview() {
         if (!canPreview || !coordInput) return;
         clearTimeout(coordPreviewTimer);
         const text = coordInput.value;
+        const utmZone = coordUtmZone();
         coordPreviewTimer = setTimeout(function () {
             if (!text.trim()) {
                 showNote(coordPreview);
                 window.clearPropertyPreview();
                 return;
             }
-            window.previewPropertyOnMap({ mode: 'coord', text: text }).then(function (t) {
-                if (coordInput.value !== text) return;
+            window.previewPropertyOnMap({ mode: 'coord', text: text, utmZone: utmZone }).then(function (t) {
+                if (coordInput.value !== text || coordUtmZone() !== utmZone) return;
                 const note = coordNote(t);
                 showNote(coordPreview, note[0], note[1]);
             });
@@ -526,6 +572,7 @@
                 mode: mode,
                 car: carValue,
                 text: coordInput ? coordInput.value : '',
+                utmZone: coordUtmZone(),
                 file: mode === 'kml' ? kmlInput.files && kmlInput.files[0] : zipInput.files && zipInput.files[0],
                 jobId: jobId,
             });

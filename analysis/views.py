@@ -550,7 +550,8 @@ class UploadZipCarView(View):
             return self._handle_kml_upload(request, request.FILES.get('kml_file'), car_input, context)
 
         if mode == 'coord':
-            return self._handle_coordinates_input(request, request.POST.get('coord_input', ''), car_input, context)
+            return self._handle_coordinates_input(request, request.POST.get('coord_input', ''), car_input, context,
+                                                  request.POST.get('coord_format', ''), request.POST.get('coord_zone', ''))
 
         # --------------------------------------
         # 1) Busca pelo número do CAR (sem ZIP): o número é obrigatório e
@@ -720,15 +721,19 @@ class UploadZipCarView(View):
 
         return self._process_coordinates(request, coordenadas_input, car_input, SearchHistory.SearchType.KML)
 
-    def _handle_coordinates_input(self, request, text, car_input, context):
+    def _handle_coordinates_input(self, request, text, car_input, context, coord_format='', coord_zone=''):
         """Coordenadas digitadas (uma por linha): um ponto leva ao imóvel do
-        SICAR que o contém; três ou mais vértices viram o polígono da análise."""
+        SICAR que o contém; três ou mais vértices viram o polígono da análise.
+        Em UTM (`coord_format` 'utm') o fuso vem em `coord_zone`."""
+        utm = coord_format == 'utm'
         context['coord_input'] = text
+        context['coord_format'] = coord_format if coord_format in ('decimal', 'gms', 'utm') else 'decimal'
+        context['coord_zone'] = coord_zone
         if not text.strip():
             context['erro'] = 'Por favor, informe as coordenadas.'
             return self._render_form(request, context)
         try:
-            vertices = parse_vertices(text)
+            vertices = parse_vertices(text, utm_zone=coord_zone if utm else None)
             if len(vertices) == 1:
                 return self._handle_point(request, vertices[0], context)
             coordenadas_input = build_polygon(vertices)

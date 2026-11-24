@@ -296,3 +296,24 @@
     padding: 20px 16px 22px;
   }
 }
+
+/* ===== Formato das coordenadas (grau decimal, GMS, UTM) ===== */
+/* Pelo id: vence o número de colunas que cada página dá ao seletor de modo. */
+#group_coord .coord-format-switch {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+#group_coord .coord-format-switch .mode-pill {
+  padding: 8px 4px;
+  font-size: 12px;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.2;
+}
+
+#group_coord .coord-zone-row { margin-bottom: 10px; }
+#group_coord .coord-zone-row[hidden] { display: none; }
+#group_coord select.text-input { cursor: pointer; }
+#group_coord select.text-input option { color: #1f2a22; background: #fbf8f0; }
