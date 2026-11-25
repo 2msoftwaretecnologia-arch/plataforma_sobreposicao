@@ -354,10 +354,28 @@ def _scene_covers_gdal(scene, lon, lat):
         return False
 
 
+INPE_DATA_PREFIX = 'https://data.inpe.br/bdc/data/'
+
+
+def stac_thumbnail(feature):
+    """Miniatura da cena inteira publicada pelo INPE (PNG), que o painel
+    mostra como prévia; só endereços do próprio acervo."""
+    href = (feature.get('assets', {}).get('thumbnail') or {}).get('href', '')
+    return href if href.startswith(INPE_DATA_PREFIX) and href.endswith('.png') and '..' not in href else ''
+
+
+def stac_bbox(feature):
+    """[oeste, sul, leste, norte] da cena (marca o ponto na miniatura), ou None."""
+    bbox = feature.get('bbox')
+    if isinstance(bbox, list) and len(bbox) == 4 and all(isinstance(v, (int, float)) for v in bbox):
+        return [round(v, 5) for v in bbox]
+    return None
+
+
 def cbers_scenes(lon, lat):
     """Cenas CBERS-4A WPM com imagem no ponto, da mais recente à mais
     antiga."""
-    key = f'raster:cbers:scenes:{round(lon, 2)}:{round(lat, 2)}'
+    key = f'raster:cbers:scenes:v2:{round(lon, 2)}:{round(lat, 2)}'
     scenes = cache.get(key)
     if scenes is not None:
         return scenes
@@ -375,7 +393,8 @@ def cbers_scenes(lon, lat):
     candidates = []
     for feature in response.json().get('features', []):
         if cbers_scene_url(feature.get('id')):
-            candidates.append({'id': feature['id'], 'date': (feature.get('properties', {}).get('datetime') or '')[:10]})
+            candidates.append({'id': feature['id'], 'date': (feature.get('properties', {}).get('datetime') or '')[:10],
+                               'thumbnail': stac_thumbnail(feature), 'bbox': stac_bbox(feature)})
     candidates.sort(key=lambda s: s['date'], reverse=True)
     scenes = [s for s in candidates if _scene_covers(s['id'], lon, lat)]
     cache.set(key, scenes, CBERS_SCENES_TTL)

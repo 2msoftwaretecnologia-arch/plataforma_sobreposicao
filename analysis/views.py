@@ -35,6 +35,8 @@ from analysis.services.view_services.imagery_service import (
     imagery_config,
     landsat_legacy_scenes,
     landsat_legacy_tile,
+    landsat_valid_year,
+    landsat_year_scenes,
     provider_layers,
     provider_source_url,
     provider_tile,
@@ -1425,9 +1427,16 @@ class ImageDownloadAreaView(View):
 
 
 class LandsatLegacyScenesView(View):
-    """Cenas Landsat 4/5/7 (1984–2012) que cobrem o ponto (?lat=&lon=)."""
+    """Cenas Landsat que cobrem o ponto (?lat=&lon=). Com ?ano=AAAA, todas as
+    passagens do ano (Landsat 4 a 9, a resposta diz o ano em 'year'; vazio = o
+    mais recente com cena); sem `ano`, as melhores de cada ano de 1984–2012."""
 
     def get(self, request):
+        if 'ano' in request.GET:
+            year = request.GET.get('ano', '')
+            if year and not landsat_valid_year(year):
+                return JsonResponse({'erro': 'Ano inválido.', 'scenes': []}, status=400)
+            return _scenes_response(request, lambda lon, lat: landsat_year_scenes(lon, lat, int(year) if year else None))
         return _scenes_response(request, landsat_legacy_scenes)
 
 

@@ -137,6 +137,13 @@
     var MONTH_NAMES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
         'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 
+    /** Anos de `last` a `first`, como opções do seletor de período. */
+    function yearOptions(first, last) {
+        var options = [];
+        for (var y = +last; y >= +first; y--) options.push({ value: String(y), text: String(y) });
+        return options;
+    }
+
     /**
      * Meses de `first` a `last` ('AAAA-MM'), do mais recente ao mais antigo,
      * como opções de seletor agrupadas por ano (`group`).
@@ -293,6 +300,7 @@
                 label: 'Cena',
                 emptyText: 'Nenhuma cena Sentinel-2 deste mês cobre este ponto.',
                 followsCenter: true,
+                gallery: true,
                 // Sem mês escolhido, o servidor devolve o mais recente com cena.
                 period: { label: 'Mês', options: monthOptions(s2.first_month, s2.last_month), selected: '' },
                 listUrl: function (center) {
@@ -317,6 +325,8 @@
                             // "S2B" na lista (o nome inteiro não cabe no seletor); por extenso nos detalhes.
                             text: formatDateBR(s.date) + ' · ' + s.platform.replace('Sentinel-', 'S') + ' · ' + s.cloud + '% nuvens',
                             sceneText: formatDateBR(s.date) + ' · ' + s.platform,
+                            short: formatDateBR(s.date).slice(0, 5) + ' · ' + s.platform.replace('Sentinel-', 'S'),
+                            preview: s.preview,
                             maxZoom: s2.max_native_zoom
                         };
                     });
@@ -357,13 +367,17 @@
                 param: 'scene',
                 label: 'Cena',
                 followsCenter: true,
+                gallery: true,
                 enhance: {},
                 listUrl: function (center) {
                     return imagery.cbers.scenes_url + '?lat=' + center.lat.toFixed(3) + '&lon=' + center.lng.toFixed(3);
                 },
                 parse: function (json) {
                     return (json.scenes || []).map(function (s) {
-                        return { value: s.id, text: formatDateBR(s.date) };
+                        return {
+                            value: s.id, text: formatDateBR(s.date), short: formatDateBR(s.date),
+                            thumbnail: s.thumbnail, bbox: s.bbox
+                        };
                     });
                 }
             });
@@ -387,6 +401,7 @@
                 label: 'Cena (câmera HRC)',
                 emptyText: 'Nenhuma cena CBERS-2B HRC (' + c2.years[0] + '–' + c2.years[1] + ') cobre este ponto.',
                 followsCenter: true,
+                gallery: true,
                 enhance: {},
                 listUrl: function (center) {
                     return c2.scenes_url + '?lat=' + center.lat.toFixed(3) + '&lon=' + center.lng.toFixed(3);
@@ -398,6 +413,9 @@
                             date: s.date,
                             ready: s.ready,
                             thumbnail: s.thumbnail,
+                            bbox: s.bbox,
+                            short: formatDateBR(s.date),
+                            sceneText: formatDateBR(s.date) + ' · cena ' + s.name.replace(/_/g, '-'),
                             text: formatDateBR(s.date) + ' · cena ' + s.name.replace(/_/g, '-') + (s.ready ? ' · já baixada' : '')
                         };
                     });
@@ -460,61 +478,71 @@
             pickers.push(c2Picker);
         }
 
-        // Landsat 4/5/7 de 1984 a 2012 (Planetary Computer), 30 m: as cenas
-        // de menos nuvem de cada ano no centro do mapa; começa na melhor de
-        // 2008 (marco de 22/07/2008 do Código Florestal).
+        // Landsat cena a cena (Planetary Computer), 30 m: o usuário escolhe o
+        // ano e, dentro dele, a passagem (todas as do ano no centro do mapa,
+        // com prévia), de 1984 (Landsat 4/5) até hoje (Landsat 8/9).
         if (imagery.landsat_legacy) {
             var ll = imagery.landsat_legacy;
-            var baseLandsatLegacy = L.tileLayer(BLANK_TILE, {
+            var baseLandsatScenes = L.tileLayer(BLANK_TILE, {
                 maxZoom: 19, maxNativeZoom: ll.max_native_zoom, scene: '', comp: ll.compositions[0].value, realce: '0', pane: pane,
                 attribution: 'Landsat (USGS/NASA) via Microsoft Planetary Computer'
             });
-            baseLandsatLegacy.imageryInfo = { kind: 'landsat_legacy', years: ll.years };
-            layers['Landsat 5/7 (' + ll.years[0] + '–' + ll.years[1] + ')'] = baseLandsatLegacy;
-            pickers.push({
-                layer: baseLandsatLegacy,
+            baseLandsatScenes.imageryInfo = { kind: 'landsat_legacy' };
+            layers['Landsat cena a cena'] = baseLandsatScenes;
+            var lsPicker = {
+                layer: baseLandsatScenes,
                 template: ll.tile_url + ENHANCE_QUERY,
                 param: 'scene',
                 label: 'Cena',
+                emptyText: 'Nenhuma cena Landsat deste ano cobre este ponto.',
                 followsCenter: true,
+                gallery: true,
                 // Com realce o servidor interpola até o zoom 17 (sem ele, o
                 // navegador amplia o pixel de 30 m a partir do 15).
                 enhance: { maxZoom: ll.enhanced_max_zoom },
+                // Sem ano escolhido, o servidor devolve o mais recente com cena.
+                period: { label: 'Ano', options: yearOptions(ll.first_year, ll.last_year), selected: '' },
                 listUrl: function (center) {
-                    return ll.scenes_url + '?lat=' + center.lat.toFixed(3) + '&lon=' + center.lng.toFixed(3);
+                    return ll.scenes_url + '?lat=' + center.lat.toFixed(3) + '&lon=' + center.lng.toFixed(3) +
+                        '&ano=' + (lsPicker.period.selected || '');
                 },
                 parse: function (json) {
+                    var period = lsPicker.period;
+                    if (json.year) {
+                        if (json.year > +period.options[0].value) period.options = yearOptions(ll.first_year, json.year);
+                        period.selected = String(json.year);
+                    }
                     return (json.scenes || []).map(function (s) {
                         var sat = s.platform.replace('landsat-', 'Landsat ');
                         var stripes = s.platform === 'landsat-7' && +s.date.slice(0, 4) >= 2003 ? ' (com faixas)' : '';
                         return {
                             value: s.id,
-                            year: s.date.slice(0, 4),
-                            text: s.date.slice(0, 4) + ' · ' + formatDateBR(s.date).slice(0, 5) + ' · ' + sat + stripes + ' · ' + s.cloud + '% nuvens',
+                            date: s.date,
+                            text: formatDateBR(s.date) + ' · ' + sat + stripes + ' · ' + s.cloud + '% nuvens',
                             sceneText: formatDateBR(s.date) + ' · ' + sat + stripes,
+                            short: formatDateBR(s.date).slice(0, 5) + ' · ' + s.platform.replace('landsat-', 'L'),
                             cloud: s.cloud,
+                            preview: s.preview,
                             // apply() copia para o maxNativeZoom da camada.
                             maxZoom: ll.max_native_zoom
                         };
                     });
                 },
-                // Primeira cena de 2008 da lista (a de menos nuvem fica entre
-                // as 5 do ano); sem 2008 ali, a mais recente.
+                // Ano novo: a cena de menos nuvem (a lista segue por data).
                 initial: function (options) {
-                    var y2008 = options.filter(function (o) { return o.year === '2008'; });
-                    if (!y2008.length) return null;
-                    return y2008.reduce(function (best, o) { return o.cloud < best.cloud ? o : best; }).value;
+                    return options.reduce(function (best, o) { return o.cloud < best.cloud ? o : best; }).value;
                 },
                 secondary: {
                     label: 'Composição',
                     options: ll.compositions,
                     selected: ll.compositions[0].value,
                     onSelect: function (comp) {
-                        baseLandsatLegacy.options.comp = comp;
-                        baseLandsatLegacy.redraw();
+                        baseLandsatScenes.options.comp = comp;
+                        baseLandsatScenes.redraw();
                     }
                 }
-            });
+            };
+            pickers.push(lsPicker);
         }
 
         // Uso do solo do MapBiomas como mapa base: só no lado direito da
@@ -597,9 +625,9 @@
             {
                 key: 'landsat', name: 'Landsat', meta: 'USGS/NASA · desde 1984', badge: '30 m',
                 variants: [
-                    { layer: layers['Landsat 8/9 (2013–hoje)'], label: '2013 – hoje', sub: 'Landsat 8/9', name: 'Landsat 8-9' },
-                    { layer: ll && layers['Landsat 5/7 (' + ll.years[0] + '–' + ll.years[1] + ')'],
-                      label: ll ? ll.years[0] + ' – ' + ll.years[1] : '', sub: 'Landsat 4/5/7', name: 'Landsat 4-5-7' }
+                    { layer: layers['Landsat cena a cena'], label: 'Cena a cena',
+                      sub: (ll ? ll.first_year : 1984) + ' – hoje', name: 'Landsat' },
+                    { layer: layers['Landsat 8/9 (2013–hoje)'], label: 'Mosaico', sub: 'temperatura · 2013+', name: 'Landsat 8-9 mosaico' }
                 ]
             },
             {
@@ -966,6 +994,11 @@
         var container, labelEl, selectEl, subLabelEl, subSelectEl, enhanceEl, enhanceInput, statusEl, infoEl;
         var periodLabelEl, periodRowEl, periodSelectEl, periodPrevBtn, periodNextBtn, periodFilled = null;
         var previewEl, previewImg, previewCaption, prepareBtn, prepareHint;
+        // Galeria de cenas (ver buildGallery), montada junto com o painel.
+        var galleryEl, galleryCount, galleryFilter, galleryGrid, zoomEl, zoomImg, zoomMarker, zoomCaption;
+        var galleryKey = null, zoomTimer = null;
+        var CLOUD_FILTERS = [{ max: 100, text: 'Todas' }, { max: 50, text: '≤50%' }, { max: 20, text: '≤20%' }];
+        var THUMB_SIZE = '240x160', ZOOM_SIZE = '480x320';
         var current = null;
 
         (function build() {
@@ -992,6 +1025,7 @@
             periodNextBtn.addEventListener('click', function () { stepPeriod(-1); });
             labelEl = L.DomUtil.create('label', 'imagery-picker-label', container);
             selectEl = L.DomUtil.create('select', 'imagery-picker-select', container);
+            buildGallery();
             // Segundo seletor (ex.: ano do Landsat), só nas fontes com `secondary`.
             subLabelEl = L.DomUtil.create('label', 'imagery-picker-label', container);
             subSelectEl = L.DomUtil.create('select', 'imagery-picker-select', container);
@@ -1022,6 +1056,7 @@
             L.DomEvent.disableScrollPropagation(container);
             selectEl.addEventListener('change', function () {
                 if (current) apply(current, selectEl.value);
+                markGallery(current, true);
             });
             subSelectEl.addEventListener('change', function () {
                 if (!current || !current.secondary) return;
@@ -1041,6 +1076,225 @@
         function selectedOption(picker) {
             if (!picker || !picker.options) return null;
             return picker.options.find(function (o) { return o.value === picker.selected; }) || null;
+        }
+
+        // ------------------------------------------------------------------
+        // Galeria de cenas (fontes com `gallery`): uma miniatura por cena,
+        // para ver nuvem e fumaça antes de escolher. Sentinel-2 e Landsat
+        // mostram a área do mapa (o navegador pede o recorte direto ao
+        // Planetary Computer, ver PC_PREVIEW_URL em imagery_service.py); o
+        // CBERS, a miniatura da cena inteira do INPE com o ponto marcado.
+        // O seletor fica escondido (só para leitores de tela) e em sincronia.
+        // ------------------------------------------------------------------
+        function buildGallery() {
+            galleryEl = L.DomUtil.create('div', 'scene-gallery', container);
+            var head = L.DomUtil.create('div', 'scene-gallery-head', galleryEl);
+            galleryCount = L.DomUtil.create('span', 'scene-gallery-count', head);
+            galleryFilter = L.DomUtil.create('div', 'scene-filter', head);
+            galleryFilter.setAttribute('role', 'group');
+            galleryFilter.setAttribute('aria-label', 'Filtrar pelas nuvens na cena');
+            L.DomUtil.create('span', 'scene-filter-label', galleryFilter).textContent = 'Nuvens';
+            CLOUD_FILTERS.forEach(function (f) {
+                var b = L.DomUtil.create('button', 'scene-filter-btn', galleryFilter);
+                b.type = 'button';
+                b.textContent = f.text;
+                b.dataset.max = f.max;
+                b.title = f.max >= 100 ? 'Mostrar todas as cenas' : 'Só cenas com até ' + f.max + '% de nuvens';
+                b.addEventListener('click', function () {
+                    if (!current) return;
+                    current.cloudMax = f.max;
+                    fillGallery(current);
+                });
+            });
+            galleryGrid = L.DomUtil.create('div', 'scene-grid', galleryEl);
+            galleryGrid.addEventListener('scroll', hideZoom, { passive: true });
+            galleryEl.style.display = 'none';
+
+            // Prévia ampliada ao passar o mouse, ao lado do painel. Fica no
+            // mapa (posição fixa) para continuar visível em tela cheia.
+            zoomEl = L.DomUtil.create('figure', 'scene-zoom', map.getContainer());
+            var zoomFrame = L.DomUtil.create('div', 'scene-zoom-frame', zoomEl);
+            zoomImg = L.DomUtil.create('img', '', zoomFrame);
+            zoomImg.alt = '';
+            zoomMarker = L.DomUtil.create('span', 'scene-marker', zoomFrame);
+            zoomCaption = L.DomUtil.create('figcaption', '', zoomEl);
+            zoomEl.hidden = true;
+        }
+
+        // Retângulo (lon/lat) das prévias: a largura do mapa na hora da
+        // lista (entre 2 e 30 km), na proporção 3:2 das miniaturas.
+        function previewBox(center) {
+            var b = map.getBounds();
+            var widthKm = Math.min(30, Math.max(2, b.getSouthWest().distanceTo(b.getSouthEast()) / 1000));
+            var halfLon = widthKm / 2 / (111.32 * Math.cos(center.lat * Math.PI / 180));
+            var halfLat = widthKm / 3 / 110.57;
+            return [center.lng - halfLon, center.lat - halfLat, center.lng + halfLon, center.lat + halfLat]
+                .map(function (v) { return v.toFixed(4); }).join(',');
+        }
+
+        function previewSrc(picker, opt, big) {
+            if (opt.preview && picker.previewBox) {
+                return opt.preview.replace('{bbox}', picker.previewBox).replace('{size}', big ? ZOOM_SIZE : THUMB_SIZE);
+            }
+            return opt.thumbnail || '';
+        }
+
+        // Onde fica o centro do mapa na miniatura (% de largura/altura):
+        // no meio do recorte, ou pela extensão da cena inteira (aproximado).
+        function markerPos(picker, opt) {
+            if (opt.preview) return [50, 50];
+            var c = picker.listCenter, b = opt.bbox;
+            if (!c || !b || b[2] <= b[0] || b[3] <= b[1]) return null;
+            var x = (c.lng - b[0]) / (b[2] - b[0]) * 100, y = (b[3] - c.lat) / (b[3] - b[1]) * 100;
+            return [Math.min(100, Math.max(0, x)), Math.min(100, Math.max(0, y))];
+        }
+
+        function cloudLevel(cloud) {
+            return cloud <= 20 ? 'low' : cloud <= 50 ? 'mid' : 'high';
+        }
+
+        function fillGallery(picker) {
+            var on = !!(picker && picker.gallery && picker.options && picker.options.length);
+            galleryEl.style.display = on ? '' : 'none';
+            selectEl.classList.toggle('is-sr-only', on);
+            if (!on) { galleryKey = null; hideZoom(); return; }
+            var max = picker.cloudMax || 100;
+            var key = [picker.options, max, picker.previewBox, picker.optionsVersion || 0];
+            var same = galleryKey && galleryKey.length === key.length && galleryKey.every(function (k, i) { return k === key[i]; });
+            if (!same) {
+                galleryKey = key;
+                renderGallery(picker, max);
+            }
+            markGallery(picker, !same);
+        }
+
+        function renderGallery(picker, max) {
+            hideZoom();
+            galleryGrid.innerHTML = '';
+            var whole = !picker.options.some(function (o) { return o.preview; });
+            galleryGrid.classList.toggle('scene-grid--whole', whole);
+            var withCloud = picker.options.some(function (o) { return typeof o.cloud === 'number'; });
+            galleryFilter.style.display = withCloud ? '' : 'none';
+            [].forEach.call(galleryFilter.querySelectorAll('.scene-filter-btn'), function (b) {
+                var on = +b.dataset.max === max;
+                b.classList.toggle('is-active', on);
+                b.setAttribute('aria-pressed', String(on));
+            });
+
+            var shown = 0;
+            picker.options.forEach(function (opt) {
+                var hasCloud = typeof opt.cloud === 'number';
+                if (hasCloud && opt.cloud > max && opt.value !== picker.selected) return;
+                shown++;
+                var cell = L.DomUtil.create('button', 'scene-cell', galleryGrid);
+                cell.type = 'button';
+                cell.dataset.value = opt.value;
+                cell.setAttribute('aria-label', (opt.sceneText || opt.text) + (hasCloud ? ' · ' + opt.cloud + '% de nuvens na cena' : ''));
+                var frame = L.DomUtil.create('span', 'scene-thumb', cell);
+                var src = previewSrc(picker, opt, false);
+                if (src) {
+                    var img = L.DomUtil.create('img', '', frame);
+                    img.alt = '';
+                    img.loading = 'lazy';
+                    img.decoding = 'async';
+                    img.addEventListener('load', function () { frame.classList.add('is-loaded'); });
+                    img.addEventListener('error', function () { frame.classList.add('is-error'); });
+                    img.src = src;
+                } else {
+                    frame.classList.add('is-error');
+                }
+                var pos = markerPos(picker, opt);
+                if (pos) {
+                    var mk = L.DomUtil.create('span', 'scene-marker', frame);
+                    mk.style.left = pos[0] + '%';
+                    mk.style.top = pos[1] + '%';
+                }
+                if (hasCloud) {
+                    var cl = L.DomUtil.create('span', 'scene-cloud scene-cloud--' + cloudLevel(opt.cloud), frame);
+                    cl.textContent = opt.cloud + '%';
+                }
+                if (opt.ready) L.DomUtil.create('span', 'scene-ready', frame).textContent = 'baixada';
+                L.DomUtil.create('span', 'scene-caption', cell).textContent = opt.short || opt.text;
+                // A troca passa pelo seletor (escondido): o mesmo caminho da
+                // lista, e o cartão de download ouve o 'change' dele.
+                cell.addEventListener('click', function () {
+                    if (current !== picker || picker.selected === opt.value) return;
+                    hideZoom();
+                    selectEl.value = opt.value;
+                    selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+                cell.addEventListener('mouseenter', function () { showZoom(cell, picker, opt); });
+                cell.addEventListener('mouseleave', hideZoom);
+                cell.addEventListener('focus', function () { showZoom(cell, picker, opt); });
+                cell.addEventListener('blur', hideZoom);
+            });
+            var total = picker.options.length;
+            galleryCount.textContent = (shown === total ? total : shown + ' de ' + total) + (total === 1 ? ' cena' : ' cenas');
+        }
+
+        // Destaca a cena escolhida (e a traz para a vista, se `scroll`).
+        function markGallery(picker, scroll) {
+            if (!picker || !picker.gallery || galleryEl.style.display === 'none') return;
+            var active = null;
+            [].forEach.call(galleryGrid.children, function (cell) {
+                var on = cell.dataset.value === picker.selected;
+                cell.classList.toggle('is-active', on);
+                cell.setAttribute('aria-pressed', String(on));
+                if (on) active = cell;
+            });
+            if (scroll && active) {
+                var top = active.offsetTop - galleryGrid.offsetTop;
+                if (top < galleryGrid.scrollTop || top + active.offsetHeight > galleryGrid.scrollTop + galleryGrid.clientHeight) {
+                    galleryGrid.scrollTop = Math.max(0, top - 8);
+                }
+            }
+        }
+
+        function showZoom(cell, picker, opt) {
+            clearTimeout(zoomTimer);
+            // Só com mouse (no toque, o toque já escolhe a cena).
+            if (!global.matchMedia || !global.matchMedia('(hover: hover)').matches) return;
+            var src = previewSrc(picker, opt, true);
+            if (!src) return;
+            var whole = !opt.preview;
+            var w = 360, h = whole ? 360 : 240;
+            var box = (container.closest && container.closest('.map-panel-box')) || container;
+            var r = box.getBoundingClientRect(), c = cell.getBoundingClientRect();
+            var left = r.left - w - 14;
+            if (left < 8) {
+                left = r.right + 14;
+                if (left + w > global.innerWidth - 8) return;
+            }
+            var top = Math.min(Math.max(8, c.top + c.height / 2 - h / 2 - 20), global.innerHeight - h - 70);
+            zoomEl.classList.toggle('is-whole', whole);
+            if (zoomImg.getAttribute('src') !== src) {
+                zoomEl.classList.remove('is-loaded');
+                zoomImg.onload = function () { zoomEl.classList.add('is-loaded'); };
+                zoomImg.src = src;
+            }
+            var pos = markerPos(picker, opt);
+            zoomMarker.style.display = pos ? '' : 'none';
+            if (pos) {
+                zoomMarker.style.left = pos[0] + '%';
+                zoomMarker.style.top = pos[1] + '%';
+            }
+            var lines = [opt.sceneText || opt.text];
+            if (typeof opt.cloud === 'number') lines.push(opt.cloud + '% de nuvens na cena inteira');
+            lines.push(whole ? 'Cena inteira · o ponto marca o centro do mapa (posição aproximada)'
+                : 'Área do mapa, em cor natural · clique para usar esta cena');
+            zoomCaption.innerHTML = '';
+            lines.forEach(function (t, i) {
+                L.DomUtil.create(i ? 'span' : 'strong', '', zoomCaption).textContent = t;
+            });
+            zoomEl.style.left = left + 'px';
+            zoomEl.style.top = top + 'px';
+            zoomEl.style.width = w + 'px';
+            zoomEl.hidden = false;
+        }
+
+        function hideZoom() {
+            clearTimeout(zoomTimer);
+            zoomTimer = setTimeout(function () { if (zoomEl) zoomEl.hidden = true; }, 60);
         }
 
         // Zoom nativo da opção, ou o do realce (Landsat: 17) com ele ligado.
@@ -1120,7 +1374,11 @@
                 if (!opt.ready && opt.text) {
                     opt.ready = true;
                     opt.text += ' · já baixada';
-                    if (current === picker) fillSelect(picker);
+                    picker.optionsVersion = (picker.optionsVersion || 0) + 1;
+                    if (current === picker) {
+                        fillSelect(picker);
+                        fillGallery(picker);
+                    }
                 }
                 if (picker.onPrepared) picker.onPrepared(info);
                 if (current === picker) {
@@ -1140,8 +1398,10 @@
         // `prepareOnDemand`, enquanto a cena não está pronta).
         function fillPrepare(picker) {
             var opt = picker && picker.prepareOnDemand ? selectedOption(picker) : null;
-            previewEl.style.display = opt && opt.thumbnail ? '' : 'none';
-            if (opt && opt.thumbnail) {
+            // Com a galeria, a miniatura já aparece nela.
+            var showPreview = !!(opt && opt.thumbnail && !picker.gallery);
+            previewEl.style.display = showPreview ? '' : 'none';
+            if (showPreview) {
                 if (previewImg.src !== opt.thumbnail) previewImg.src = opt.thumbnail;
                 previewCaption.textContent = picker.previewCaption;
             }
@@ -1283,7 +1543,7 @@
                     legacyLines.push('Cena: ' + legacyScene.sceneText, 'Nuvens na cena: ' + legacyScene.cloud + '%');
                     if (/com faixas/.test(legacyScene.sceneText)) legacyLines.push('Landsat 7 após 2003: faixas sem imagem (falha do SLC).');
                 } else if (legacy.options && !legacy.options.length) {
-                    legacyLines.push('Nenhuma cena de ' + info.years[0] + '–' + info.years[1] + ' com menos de 40% de nuvens neste ponto.');
+                    legacyLines.push('Nenhuma cena Landsat de ' + (legacy.period.selected || 'este ano') + ' neste ponto.');
                 }
                 legacyLines.push('Fonte: Landsat Collection 2 (USGS/NASA) – Microsoft Planetary Computer');
                 setInfo(legacyLines.concat(zoomLine(30)));
@@ -1483,6 +1743,7 @@
                 fillSecondary(null);
                 fillEnhance(null);
                 fillPrepare(null);
+                fillGallery(null);
                 setStatus('');
             }
             refreshInfo();
@@ -1516,6 +1777,7 @@
             fillPrepare(picker);
             if (picker.options) {
                 fillSelect(picker);
+                fillGallery(picker);
                 // `status`: preparo da cena no servidor (CBERS-2B) ou o erro dele.
                 setStatus(!picker.options.length ? picker.error
                     : (picker.status || (picker.isLoading ? 'Carregando imagem…' : '')));
@@ -1523,6 +1785,7 @@
             }
 
             selectEl.style.display = 'none';
+            fillGallery(null);
             setStatus('Carregando…');
             load(picker);
         }
@@ -1536,6 +1799,7 @@
             if (typeof url === 'function') {
                 // Lista que depende do lugar (cenas CBERS no centro do mapa).
                 picker.listCenter = map.getCenter();
+                picker.previewBox = previewBox(picker.listCenter);
                 url = url(picker.listCenter);
             }
             picker.failed = false;
@@ -1631,6 +1895,7 @@
                     if (p.backdrop && map.hasLayer(p.backdrop)) map.removeLayer(p.backdrop);
                 });
                 L.DomUtil.remove(container);
+                L.DomUtil.remove(zoomEl);
             }
         };
     }

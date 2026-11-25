@@ -221,6 +221,74 @@ class ImageryServiceTests(SimpleTestCase):
         self.assertEqual(body['query']['platform']['in'], ['landsat-4', 'landsat-5', 'landsat-7'])
         self.assertTrue(body['datetime'].startswith('1984-01-01'))
 
+    @patch.object(svc, '_today')
+    @patch.object(svc, '_http')
+    def test_landsat_year_scenes_lists_every_pass_with_preview(self, http, today):
+        from datetime import date
+        today.return_value = date(2026, 11, 25)
+
+        def feature(scene_id, date_, platform, cloud, ring=None):
+            ring = ring or [[-49, -11], [-48, -11], [-48, -10], [-49, -10], [-49, -11]]
+            return {'id': scene_id, 'geometry': {'type': 'Polygon', 'coordinates': [ring]},
+                    'properties': {'datetime': date_ + 'T13:00:00Z', 'platform': platform, 'eo:cloud_cover': cloud}}
+        edge = [[-48.52, -11], [-48, -11], [-48, -10], [-48.52, -10], [-48.52, -11]]
+        http.post.return_value = http_response(json={'links': [], 'features': [
+            feature('LC09_L2SP_222067_20250830_02_T1', '2025-08-30', 'landsat-9', 88.6),
+            feature('LC08_L2SP_222067_20250822_02_T1', '2025-08-22', 'landsat-8', 2),
+            # Mesma passagem na linha vizinha: fica a que tem o ponto mais para dentro.
+            feature('LC08_L2SP_222068_20250822_02_T1', '2025-08-22', 'landsat-8', 40, ring=edge),
+            feature('LE07_L2SP_222067_20250701_02_T1', '2025-07-01', 'landsat-7', -1),
+            feature('nao-landsat', '2025-01-01', 'landsat-8', 0),
+        ]})
+        result = svc.landsat_year_scenes(-48.5, -10.5, 2025)
+        self.assertEqual(result['year'], 2025)
+        self.assertEqual([(s['id'], s['cloud']) for s in result['scenes']], [
+            ('LC09_L2SP_222067_20250830_02_T1', 89),
+            ('LC08_L2SP_222067_20250822_02_T1', 2),
+            ('LE07_L2SP_222067_20250701_02_T1', 0),
+        ])
+        query = parse_qs(urlsplit(result['scenes'][0]['preview']).query)
+        self.assertEqual(query['collection'], ['landsat-c2-l2'])
+        self.assertEqual(query['assets'], ['red', 'green', 'blue'])
+        body = http.post.call_args.kwargs['json']
+        self.assertEqual(body['datetime'], '2025-01-01T00:00:00Z/2025-12-31T23:59:59Z')
+        self.assertIn('landsat-9', body['query']['platform']['in'])
+        self.assertNotIn('eo:cloud_cover', body['query'])  # todas as passagens, com ou sem nuvem
+        # As cenas do Landsat 8/9 também abrem como tile.
+        http.get.return_value = http_response(content=b'PNG')
+        self.assertEqual(svc.landsat_legacy_tile('LC09_L2SP_222067_20250830_02_T1', 'natural', 12, 1, 1), (b'PNG', 'image/png'))
+
+    @patch.object(svc, '_today')
+    @patch.object(svc, '_http')
+    def test_landsat_year_defaults_to_latest_year_with_scenes(self, http, today):
+        from datetime import date
+        today.return_value = date(2027, 1, 3)
+        http.post.side_effect = [http_response(json={'features': [], 'links': []}),
+                                 http_response(json={'features': [], 'links': []})]
+        self.assertEqual(svc.landsat_year_scenes(-48.5, -10.5), {'year': 2026, 'scenes': []})
+        years = [call.kwargs['json']['datetime'][:4] for call in http.post.call_args_list]
+        self.assertEqual(years, ['2027', '2026'])
+        self.assertTrue(svc.landsat_valid_year('1984'))
+        for bad in ('1983', '2028', '20x6', '', None):
+            self.assertFalse(svc.landsat_valid_year(bad), bad)
+
+    def test_landsat_scenes_view_year_mode(self):
+        from django.test import RequestFactory
+        from analysis import views
+        view = views.LandsatLegacyScenesView.as_view()
+        factory = RequestFactory()
+        bad = view(factory.get('/', {'lat': '-10.2', 'lon': '-48.3', 'ano': '1900'}))
+        self.assertEqual(bad.status_code, 400)
+        with patch.object(views, 'landsat_year_scenes', return_value={'year': 2008, 'scenes': []}) as by_year, \
+                patch.object(views, 'landsat_legacy_scenes', return_value=[]) as legacy:
+            self.assertEqual(json.loads(view(factory.get('/', {'lat': '-10.2', 'lon': '-48.3', 'ano': '2008'})).content)['year'], 2008)
+            self.assertEqual(by_year.call_args.args[2], 2008)
+            view(factory.get('/', {'lat': '-10.2', 'lon': '-48.3', 'ano': ''}))
+            self.assertIsNone(by_year.call_args.args[2])
+            # Sem `ano`, a lista antiga (a visão 3D e o conector MCP usam).
+            view(factory.get('/', {'lat': '-10.2', 'lon': '-48.3'}))
+            legacy.assert_called_once()
+
     @patch.object(svc, '_http')
     def test_landsat_legacy_tile_validates_scene_and_composition(self, http):
         http.get.return_value = http_response(content=b'PNG')
@@ -323,9 +391,16 @@ class ImageryServiceTests(SimpleTestCase):
             'S2C_MSIL2A_20261012T134211_R124_T22LGP_20261012T170000',
             'S2B_MSIL2A_20261012T133149_R081_T22LGP_20261012T184116',
         ])
-        self.assertEqual(result['scenes'][0], {
+        first = dict(result['scenes'][0])
+        preview = first.pop('preview')
+        self.assertEqual(first, {
             'id': 'S2A_MSIL2A_20261030T133231_R081_T22LHN_20261030T210802', 'date': '2026-10-30',
             'platform': 'Sentinel-2A', 'cloud': 77, 'tile': '22LHN', 'nodata': 0})
+        # Prévia pedida pelo navegador ao Planetary Computer: o painel troca {bbox} e {size}.
+        self.assertTrue(preview.startswith('https://planetarycomputer.microsoft.com/api/data/v1/item/bbox/{bbox}/{size}.webp?'))
+        query = parse_qs(urlsplit(preview).query)
+        self.assertEqual(query['item'], ['S2A_MSIL2A_20261030T133231_R081_T22LHN_20261030T210802'])
+        self.assertEqual(query['assets'], ['visual'])
         body = http.post.call_args.kwargs['json']
         self.assertEqual(body['collections'], ['sentinel-2-l2a'])
         self.assertEqual(body['datetime'], '2026-10-01T00:00:00Z/2026-10-31T23:59:59Z')
@@ -546,14 +621,20 @@ class RasterTilesTests(SimpleTestCase):
     @patch.object(rt, '_scene_covers', side_effect=lambda scene, lon, lat: not scene.endswith('_207_126'))
     @patch.object(rt.requests, 'post')
     def test_cbers_scenes_sorted_filtered_and_cached(self, post, covers):
+        thumb = 'https://data.inpe.br/bdc/data/CB4A-WPM-PCA-FUSED/v001/208/126/2025/9/CBERS4A_WPM_PCA_RGB321_20250907_208_126.png'
         post.return_value = http_response(json={'features': [
-            {'id': 'CBERS4A_WPM_PCA_RGB321_20240731_208_126', 'properties': {'datetime': '2024-07-31T00:00:00Z'}},
+            {'id': 'CBERS4A_WPM_PCA_RGB321_20240731_208_126', 'properties': {'datetime': '2024-07-31T00:00:00Z'},
+             'assets': {'thumbnail': {'href': 'https://evil/x.png'}}},
             {'id': 'CBERS4A_WPM_PCA_RGB321_20260819_207_126', 'properties': {'datetime': '2026-08-19T00:00:00Z'}},
-            {'id': 'CBERS4A_WPM_PCA_RGB321_20250907_208_126', 'properties': {'datetime': '2025-09-07T00:00:00Z'}},
+            {'id': 'CBERS4A_WPM_PCA_RGB321_20250907_208_126', 'properties': {'datetime': '2025-09-07T00:00:00Z'},
+             'bbox': [-48.4, -10.9, -47.5, -10.0], 'assets': {'thumbnail': {'href': thumb}}},
             {'id': 'outro-produto', 'properties': {'datetime': '2026-01-01T00:00:00Z'}},
         ]})
         scenes = rt.cbers_scenes(-47.95, -10.44)
         self.assertEqual([s['date'] for s in scenes], ['2025-09-07', '2024-07-31'])
+        # Miniatura do INPE e extensão da cena para a prévia; endereço de fora é descartado.
+        self.assertEqual((scenes[0]['thumbnail'], scenes[0]['bbox']), (thumb, [-48.4, -10.9, -47.5, -10.0]))
+        self.assertEqual((scenes[1]['thumbnail'], scenes[1]['bbox']), ('', None))
         self.assertEqual(post.call_args.kwargs['json']['intersects']['coordinates'], [-47.95, -10.44])
         rt.cbers_scenes(-47.95, -10.44)
         self.assertEqual(post.call_count, 1)

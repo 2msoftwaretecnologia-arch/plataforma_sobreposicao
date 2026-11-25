@@ -13,7 +13,7 @@ import re
 import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
-from urllib.parse import parse_qsl, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import requests
 from django.conf import settings
@@ -154,6 +154,9 @@ def imagery_config():
         'max_native_zoom': LANDSAT_LEGACY_MAX_NATIVE_ZOOM,
         'enhanced_max_zoom': LANDSAT_LEGACY_ENHANCED_MAX_ZOOM,
         'years': list(LANDSAT_LEGACY_YEARS),
+        # Seletor de ano do Landsat cena a cena (?ano= na lista de cenas).
+        'first_year': LANDSAT_FIRST_YEAR,
+        'last_year': landsat_last_year(),
         'compositions': [{'value': k, 'text': v['label']} for k, v in LANDSAT_LEGACY_COMPOSITIONS.items()],
     }
     config['sentinel2'] = {
@@ -548,7 +551,21 @@ LANDSAT_LEGACY_STATS_RETRY_TTL = 10 * 60
 # Faixa mínima do contraste (DN; ≈ 4 % de reflectância): numa cena muito
 # uniforme, esticar menos que isso só realça ruído.
 LANDSAT_LEGACY_MIN_SPAN = 1500
-LANDSAT_SCENE_RE = re.compile(r'^L[TE]0[457]_L2SP_\d{6}_(\d{8})_\d{2}_T[12]$')
+# Landsat 4/5 (LT04/LT05), 7 (LE07) e 8/9 (LC08/LC09): mesmas bandas e escala
+# na Collection 2, então os tiles e composições valem para todos.
+LANDSAT_SCENE_RE = re.compile(r'^L[TEC]0[45789]_L2SP_\d{6}_(\d{8})_\d{2}_T[12]$')
+
+# Landsat cena a cena (todas as passagens de um ano, 1984 até hoje).
+LANDSAT_FIRST_YEAR = 1984
+LANDSAT_PLATFORMS = ['landsat-4', 'landsat-5', 'landsat-7', 'landsat-8', 'landsat-9']
+LANDSAT_YEAR_SCENES_TTL = 6 * 60 * 60
+LANDSAT_PAST_YEAR_SCENES_TTL = 24 * 60 * 60
+
+# Prévia de uma cena na área do mapa, pedida pelo navegador direto ao
+# Planetary Computer (público): não ocupa o servidor, que tem poucos
+# processos. O painel troca {bbox} (oeste,sul,leste,norte em lon/lat) e
+# {size} (LxA em px). Sempre em cor natural: é o que mostra nuvem e fumaça.
+PC_PREVIEW_URL = 'https://planetarycomputer.microsoft.com/api/data/v1/item/bbox/{bbox}/{size}.webp'
 
 # Bandas e contraste (valores digitais da Collection 2: refl = DN·0,0000275 − 0,2).
 LANDSAT_LEGACY_COMPOSITIONS = {
@@ -621,6 +638,78 @@ def landsat_legacy_scenes(lon, lat):
         scenes.extend(sorted(best, key=lambda s: s['date'], reverse=True))
     cache.set(key, scenes, LANDSAT_LEGACY_SCENES_TTL)
     return scenes
+
+
+def pc_preview_url(collection, scene, params):
+    """Endereço-modelo da prévia da cena (ver PC_PREVIEW_URL)."""
+    return PC_PREVIEW_URL + '?' + urlencode([('collection', collection), ('item', scene), ('nodata', '0'), *params])
+
+
+def _landsat_preview(scene):
+    comp = LANDSAT_LEGACY_COMPOSITIONS['natural']
+    return pc_preview_url(LANDSAT_LEGACY_COLLECTION, scene,
+                          [('assets', a) for a in comp['assets']] + [('rescale', comp['rescale'])])
+
+
+def landsat_last_year():
+    return _today().year
+
+
+def landsat_valid_year(year):
+    return bool(re.fullmatch(r'\d{4}', year or '')) and LANDSAT_FIRST_YEAR <= int(year) <= landsat_last_year()
+
+
+def _landsat_year_scenes(lon, lat, year):
+    key = f'imagery:landsat:year:{year}:{round(lon, 2)}:{round(lat, 2)}'
+    scenes = cache.get(key)
+    if scenes is not None:
+        return scenes
+    features = _pc_search({
+        'collections': [LANDSAT_LEGACY_COLLECTION],
+        'intersects': {'type': 'Point', 'coordinates': [lon, lat]},
+        'datetime': f'{year}-01-01T00:00:00Z/{year}-12-31T23:59:59Z',
+        'query': {'platform': {'in': LANDSAT_PLATFORMS}},
+        'fields': {'include': ['id', 'geometry', 'properties.datetime', 'properties.platform', 'properties.eo:cloud_cover']},
+        'limit': 200,
+    }, 'Landsat')
+    # Cenas vizinhas da mesma passagem (linhas da grade WRS-2) se sobrepõem:
+    # fica uma por dia e satélite, a que tem o ponto mais longe da borda.
+    point = Point(lon, lat)
+    passes = {}
+    for feature in features:
+        props = feature.get('properties', {})
+        if not LANDSAT_SCENE_RE.match(feature.get('id', '')) or not props.get('datetime'):
+            continue
+        scene = {
+            'id': feature['id'],
+            'date': props['datetime'][:10],
+            'platform': props.get('platform', ''),
+            'cloud': max(0, round(props.get('eo:cloud_cover') or 0)),
+        }
+        rank = (round(_inside_margin(feature.get('geometry'), point), 3), scene['id'])
+        pass_key = (scene['date'], scene['platform'])
+        if pass_key not in passes or rank > passes[pass_key][0]:
+            passes[pass_key] = (rank, scene)
+    scenes = sorted((s for _, s in passes.values()), key=lambda s: (s['date'], s['id']), reverse=True)
+    cache.set(key, scenes, LANDSAT_YEAR_SCENES_TTL if year >= landsat_last_year() else LANDSAT_PAST_YEAR_SCENES_TTL)
+    return scenes
+
+
+def landsat_year_scenes(lon, lat, year=None):
+    """{'year', 'scenes'}: todas as cenas Landsat (4 a 9) do ano sobre o
+    ponto, uma por passagem, da mais recente à mais antiga, com a prévia.
+
+    Sem `year`, o ano corrente; sem cena nele ainda (começo de janeiro), o
+    anterior."""
+    if year is None:
+        year = landsat_last_year()
+        scenes = _landsat_year_scenes(lon, lat, year)
+        if not scenes and year > LANDSAT_FIRST_YEAR:
+            year -= 1
+            scenes = _landsat_year_scenes(lon, lat, year)
+    else:
+        scenes = _landsat_year_scenes(lon, lat, year)
+    return {'year': year, 'scenes': [{**s, 'preview': _landsat_preview(s['id'])} for s in scenes]}
 
 
 def landsat_legacy_stretch(scene, composition):
@@ -841,15 +930,22 @@ def sentinel2_scenes(lon, lat, month=None):
     Sem `month`, o mês corrente; se ele ainda não tem cena (primeiros dias do
     mês), o anterior."""
     if month:
-        return {'month': month, 'scenes': _sentinel2_month_scenes(lon, lat, month)}
+        return {'month': month, 'scenes': _sentinel2_previewed(_sentinel2_month_scenes(lon, lat, month))}
     current = sentinel2_last_month()
     scenes = _sentinel2_month_scenes(lon, lat, current)
     if not scenes:
         previous = _previous_month(current)
         previous_scenes = _sentinel2_month_scenes(lon, lat, previous)
         if previous_scenes:
-            return {'month': previous, 'scenes': previous_scenes}
-    return {'month': current, 'scenes': scenes}
+            return {'month': previous, 'scenes': _sentinel2_previewed(previous_scenes)}
+    return {'month': current, 'scenes': _sentinel2_previewed(scenes)}
+
+
+def _sentinel2_previewed(scenes):
+    """As cenas com a prévia (cor natural de 8 bits da ESA, sem deslocamento)."""
+    return [{**s, 'preview': pc_preview_url(SENTINEL2_COLLECTION, s['id'], [('assets', 'visual'),
+                                                                            ('asset_bidx', 'visual|1,2,3')])}
+            for s in scenes]
 
 
 def _sentinel2_offset(scene):

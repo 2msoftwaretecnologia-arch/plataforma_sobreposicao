@@ -145,7 +145,7 @@ def _scene_name(scene):
 
 def hrc_scenes(lon, lat):
     """Cenas HRC que cobrem o ponto, da mais recente à mais antiga."""
-    key = f'raster:cbers2b:scenes:v2:{round(lon, 3)}:{round(lat, 3)}'
+    key = f'raster:cbers2b:scenes:v3:{round(lon, 3)}:{round(lat, 3)}'
     scenes = cache.get(key)
     if scenes is None:
         m = SEARCH_MARGIN
@@ -157,7 +157,7 @@ def hrc_scenes(lon, lat):
         })
         scenes = [
             {'id': f['id'], 'date': (f.get('properties', {}).get('datetime') or '')[:10], 'name': _scene_name(f['id']),
-             'thumbnail': _thumbnail_href(f)}
+             'thumbnail': _thumbnail_href(f), 'bbox': rt.stac_bbox(f)}
             for f in features if HRC_SCENE_RE.match(f.get('id', ''))
         ]
         scenes.sort(key=lambda s: (s['date'], s['id']), reverse=True)
