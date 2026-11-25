@@ -54,8 +54,8 @@ propriedade é opcional e fica na gaveta "Analisar propriedade".
         <form class="ex-search" id="ex_search" role="search" autocomplete="off">
             <svg class="ico" aria-hidden="true"><use href="#i-search"/></svg>
             <input type="search" id="ex_search_input" list="ex_cities"
-                aria-label="Ir para um município, uma coordenada ou um número do CAR"
-                placeholder="Ir para: município, coordenada ou CAR" />
+                aria-label="Ir para um município, um número do CAR ou uma coordenada em graus decimais, graus/minutos/segundos ou UTM"
+                placeholder="Ir para: município, CAR ou coordenada (decimal, GMS ou UTM)" />
             <datalist id="ex_cities"></datalist>
             <button type="submit">Ir</button>
             <p id="ex_search_msg" class="ex-search-msg" role="status" hidden></p>
@@ -153,8 +153,8 @@ propriedade é opcional e fica na gaveta "Analisar propriedade".
     <script src="{% static 'analysis/js/image_export.js' %}"></script>
     <script src="{% static 'analysis/js/download_area.js' %}"></script>
     <script src="{% static 'analysis/js/map_3d_view.js' %}?v=20261124"></script>
-    <script src="{% static 'analysis/js/property_locate.js' %}?v=20261124"></script>
-    <script src="{% static 'analysis/js/explorar.js' %}"></script>
+    <script src="{% static 'analysis/js/property_locate.js' %}?v=20261125"></script>
+    <script src="{% static 'analysis/js/explorar.js' %}?v=20261125"></script>
     <script src="{% static 'analysis/js/upload.js' %}?v=20261124" defer></script>
 </body>
 

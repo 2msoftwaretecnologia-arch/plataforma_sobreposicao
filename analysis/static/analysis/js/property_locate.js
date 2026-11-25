@@ -295,6 +295,92 @@
             return { ring: ring.concat([ring[0]]) };
         }
 
+        // Um ponto digitado numa busca, em qualquer formato, sem o usuário
+        // dizer qual: UTM (dois números em metros, fuso escrito ou deduzido),
+        // graus/min/seg (com ou sem ° ' ", minutos ou segundos decimais,
+        // hemisfério antes ou depois) ou graus decimais. Devolve
+        // { point: [lon, lat], format: 'utm'|'gms'|'decimal', zone? },
+        // { error } quando parece coordenada mas não fecha, ou null.
+        var HEMI_RE = /(^|[^A-Za-zÀ-ÿ])([NSEWOL])(?![A-Za-zÀ-ÿ])/gi;
+
+        function insideTocantins(p) {
+            return p[0] >= TO_BOUNDS[0][0] - 0.3 && p[0] <= TO_BOUNDS[1][0] + 0.3
+                && p[1] >= TO_BOUNDS[0][1] - 0.3 && p[1] <= TO_BOUNDS[1][1] + 0.3;
+        }
+
+        function utmZoneIn(text) {
+            var m = /(?:fuso|zona|zone)\s*:?\s*(\d{1,2})/i.exec(text)
+                || /(?:^|[\s,;])(\d{2})\s?[C-HJ-NP-X](?=$|[\s,;])/i.exec(text)
+                || /^\s*(\d{2})\s+\d{5,}/.exec(text);
+            var z = m ? +m[1] : 0;
+            return z >= 18 && z <= 25 ? z : 0;
+        }
+
+        function parseUtmPoint(text) {
+            var en = utmValues(text).sort(function (p, q) { return p - q; });
+            if (!en.length) return null;
+            if (en.length !== 2 || en[0] > 900000 || en[1] < 1000000 || en[1] > 10000000) {
+                return { error: 'Coordenada UTM incompleta: informe E e N em metros (ex.: 785123 8876543).' };
+            }
+            var zone = utmZoneIn(text);
+            if (zone) return { point: utmToLonLat(en[0], en[1], zone), format: 'utm', zone: zone };
+            var hits = [22, 23].map(function (z) { return { zone: z, point: utmToLonLat(en[0], en[1], z) }; })
+                .filter(function (c) { return insideTocantins(c.point); });
+            if (hits.length !== 1) return { error: 'Não consegui deduzir o fuso UTM. Escreva-o junto, ex.: 22L 785123 8876543.' };
+            return { point: hits[0].point, format: 'utm', zone: hits[0].zone };
+        }
+
+        // Um eixo: números (graus, minutos, segundos) + sinal + hemisfério.
+        function axisValue(nums, neg, hemi) {
+            var v = 0;
+            for (var k = 0; k < nums.length; k++) v += nums[k] / Math.pow(60, k);
+            if (nums.length > 1 && (nums[1] >= 60 || (nums[2] || 0) >= 60)) return null;
+            return [neg || /^[SWO]$/.test(hemi) ? -v : (hemi ? v : -v), hemi];
+        }
+
+        function parseGeoPoint(text) {
+            var hemis = [], m;
+            HEMI_RE.lastIndex = 0;
+            while ((m = HEMI_RE.exec(text))) hemis.push({ at: m.index + m[1].length, h: m[2].toUpperCase() });
+            var nums = [], re = /(-)?\s*(\d+(?:[.,]\d+)?)\s*([°º]?)/g;
+            while ((m = re.exec(text))) {
+                nums.push({ at: m.index, v: parseFloat(m[2].replace(',', '.')), neg: !!m[1], deg: !!m[3] });
+            }
+            if (!nums.length) return null;
+            // Separa os dois eixos: pelo símbolo de grau, ou ao meio (2, 4 ou 6 números).
+            var groups;
+            var degs = nums.filter(function (n) { return n.deg; });
+            if (degs.length === 2) {
+                var cut = nums.indexOf(degs[1]);
+                if (nums.indexOf(degs[0]) !== 0) return null;
+                groups = [nums.slice(0, cut), nums.slice(cut)];
+            } else if (nums.length === 2 || nums.length === 4 || nums.length === 6) {
+                groups = [nums.slice(0, nums.length / 2), nums.slice(nums.length / 2)];
+            } else {
+                return null;
+            }
+            if (groups[0].length > 3 || groups[1].length > 3) return null;
+            // Hemisfério de cada eixo: as letras na ordem em que aparecem.
+            var hs = hemis.length === 2 ? [hemis[0].h, hemis[1].h] : ['', ''];
+            if (hemis.length === 1) hs[hemis[0].at < groups[1][0].at ? 0 : 1] = hemis[0].h;
+            var a = axisValue(groups[0].map(function (n) { return n.v; }), groups[0][0].neg, hs[0]);
+            var b = axisValue(groups[1].map(function (n) { return n.v; }), groups[1][0].neg, hs[1]);
+            if (!a || !b) return { error: 'Minutos e segundos vão de 0 a 59.' };
+            if (LON_HEMI.test(a[1]) || LAT_HEMI.test(b[1])
+                || (!LAT_HEMI.test(a[1]) && !LON_HEMI.test(b[1]) && Math.abs(a[0]) > Math.abs(b[0]))) {
+                var t = a; a = b; b = t;
+            }
+            if (Math.abs(a[0]) > 90 || Math.abs(b[0]) > 180) return null;
+            var gms = degs.length || groups[0].length > 1 || groups[1].length > 1;
+            return { point: [b[0], a[0]], format: gms ? 'gms' : 'decimal' };
+        }
+
+        function parsePoint(text) {
+            text = String(text || '').trim();
+            if (!/\d/.test(text)) return null;
+            return parseUtmPoint(text) || parseGeoPoint(text);
+        }
+
         function segmentsCross(p, q, r, s) {
             function side(a, b, c) { return Math.sign((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])); }
             return side(p, q, r) * side(p, q, s) < 0 && side(r, s, p) * side(r, s, q) < 0;
@@ -381,7 +467,8 @@
             targetFrom: targetFrom,
             polygonsOf: polygonsOf,
             cityOfCar: cityOfCar,
-            parseCoordinates: parseCoordinates
+            parseCoordinates: parseCoordinates,
+            parsePoint: parsePoint
         };
     }
 

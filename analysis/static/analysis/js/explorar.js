@@ -1391,17 +1391,18 @@
         if (!text) return;
         var car = text.replace(/[\s​-‍﻿.]/g, '').replace(/[‐-―−]/g, '-').toUpperCase();
         if (CAR_REGEX.test(car)) { goToCar(car); return; }
-        if (/\d/.test(text)) {
-            var parsed = locator.parseCoordinates(text);
-            if (parsed.point) { goToPoint(parsed.point[0], parsed.point[1]); return; }
-        }
+        // Coordenada em qualquer formato (decimal, graus/min/seg ou UTM):
+        // o formato é deduzido do que foi digitado.
+        var parsed = locator.parsePoint(text);
+        if (parsed && parsed.point) { goToPoint(parsed.point[0], parsed.point[1]); return; }
+        if (parsed && parsed.error) { say(parsed.error, 'warn'); return; }
         var city = findCity(text);
         if (city) {
             say('');
             map.setView([city.lat, city.lon], 12);
             return;
         }
-        say('Não achei. Digite um município do Tocantins, uma coordenada (ex.: -10.18, -48.33) ou um número do CAR.', 'warn');
+        say('Não achei. Digite um município do Tocantins, um número do CAR ou uma coordenada: -10.18, -48.33 · 10°11\'30"S 48°20\'10"W · UTM 785123 8876543.', 'warn');
     }
 
     if (searchForm) {
