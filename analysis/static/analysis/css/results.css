@@ -1122,51 +1122,212 @@ body { background: var(--cream-50); color: var(--ink-900); }
 .map-panel-compare-only { display: none; }
 .map-panel.is-comparing .map-panel-compare-only { display: inline; color: var(--gold-500); }
 
-/* Lista de mapas base. */
-.base-list {
+/* ----- Aba Imagem: um cartão por satélite (maps.js, setupBaseList) -----
+   O cartão escolhido abre com as versões do satélite (controle
+   segmentado) e os seletores de data/cena da imagem. Cada satélite tem a
+   sua cor (--sat), usada no ícone e na borda do cartão aberto. */
+.map-panel-heading--spaced { margin-top: 18px; }
+
+.sat-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 6px;
+  margin-top: 10px;
 }
 
-.base-option {
+.sat-card {
+  --sat: var(--green-700);
+  --sat-soft: rgba(43, 90, 56, 0.1);
+  border: 1px solid var(--cream-200);
+  border-radius: 14px;
+  background: #fff;
+  transition: border-color .15s ease, box-shadow .2s ease;
+}
+
+.sat-card--google   { --sat: #1a73e8; --sat-soft: rgba(26, 115, 232, 0.1); }
+.sat-card--esri     { --sat: #00796b; --sat-soft: rgba(0, 121, 107, 0.1); }
+.sat-card--planet   { --sat: #6a4cc2; --sat-soft: rgba(106, 76, 194, 0.1); }
+.sat-card--sentinel2 { --sat: #0b6aa2; --sat-soft: rgba(11, 106, 162, 0.1); }
+.sat-card--landsat  { --sat: #b4532a; --sat-soft: rgba(180, 83, 42, 0.1); }
+.sat-card--cbers    { --sat: #2e7d32; --sat-soft: rgba(46, 125, 50, 0.1); }
+
+.sat-card:hover { border-color: color-mix(in srgb, var(--sat) 35%, var(--cream-200)); }
+
+.sat-card.is-active {
+  border-color: var(--sat);
+  box-shadow: 0 0 0 1px var(--sat), 0 6px 18px rgba(23, 48, 31, 0.12);
+}
+
+.sat-card-head {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  font-size: 13.5px;
+  gap: 11px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 13px;
+  background: transparent;
+  font: inherit;
+  text-align: left;
   color: var(--ink-900);
   cursor: pointer;
-  transition: background .15s ease;
 }
 
-.base-option:hover { background: var(--cream-100); }
+.sat-card-head:focus-visible { outline: 2px solid var(--sat); outline-offset: -2px; }
 
-.base-option input {
-  margin: 0;
-  accent-color: var(--green-700);
-  cursor: pointer;
+.sat-card-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--sat-soft);
+  color: var(--sat);
+  transition: background .15s ease, color .15s ease;
 }
 
-.base-option.is-active {
-  background: var(--green-100);
+.sat-card-icon svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sat-card.is-active .sat-card-icon { background: var(--sat); color: #fff; }
+
+.sat-card-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sat-card-name {
+  font-size: 13.5px;
   font-weight: 700;
   color: var(--green-900);
 }
 
-/* Detalhes da imagem ativa (seletor de data/composição e resolução),
-   logo abaixo da opção escolhida na lista. */
+.sat-card-meta {
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--ink-500);
+}
+
+.sat-card-badge {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--cream-100);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--ink-600);
+}
+
+.sat-card.is-active .sat-card-badge { background: var(--sat-soft); color: var(--sat); }
+
+/* Só o cartão escolhido mostra as versões e os seletores. */
+.sat-card-body { display: none; padding: 0 10px 10px; }
+.sat-card.is-active .sat-card-body { display: block; }
+
+.sat-variants {
+  display: flex;
+  gap: 3px;
+  margin-bottom: 8px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--cream-100);
+}
+
+.sat-variant {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 0;
+  padding: 6px 4px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  color: var(--ink-600);
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease, box-shadow .15s ease;
+}
+
+.sat-variant:hover { color: var(--green-900); }
+.sat-variant:focus-visible { outline: 2px solid var(--sat); outline-offset: 1px; }
+
+.sat-variant.is-active {
+  background: #fff;
+  color: var(--sat);
+  box-shadow: 0 1px 3px rgba(36, 31, 20, 0.16);
+}
+
+.sat-variant-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sat-variant-sub {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-500);
+}
+
+/* Mapas de referência: botões compactos. */
+.ref-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.ref-chip {
+  padding: 6px 12px;
+  border: 1px solid var(--cream-200);
+  border-radius: 999px;
+  background: #fff;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-600);
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+
+.ref-chip:hover { border-color: var(--green-600); color: var(--green-900); }
+.ref-chip:focus-visible { outline: 2px solid var(--primary-light); outline-offset: 1px; }
+
+.ref-chip.is-active {
+  border-color: var(--green-800);
+  background: var(--green-800);
+  color: #fff;
+}
+
+.ref-slot:not(:empty) { margin-top: 8px; }
+
+/* Detalhes da imagem ativa (seletores de data/cena/composição e
+   resolução), dentro do cartão do satélite escolhido. */
 .imagery-picker {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin: 4px 0 8px 28px;
-  padding: 10px 12px;
-  border: 1px solid var(--cream-200);
-  border-radius: 12px;
+  padding: 10px 11px;
+  border-radius: 10px;
   background: var(--cream-50);
 }
+
+.ref-slot .imagery-picker { border: 1px solid var(--cream-200); }
 
 .imagery-picker-label {
   font-size: 11px;
@@ -1314,9 +1475,6 @@ body { background: var(--cream-50); color: var(--ink-900); }
   font-size: 11.5px;
   color: var(--ink-500);
 }
-
-/* Seletor "Lado direito" do painel da comparação. */
-.imagery-picker-side { color: var(--gold-500); }
 
 /* ----- Camadas temáticas (map_thematic.js) ----- */
 .thematic-list {
@@ -1604,7 +1762,10 @@ body { background: var(--cream-50); color: var(--ink-900); }
 
 @media (prefers-reduced-motion: reduce) {
   .legend-item,
-  .base-option,
+  .sat-card,
+  .sat-card-icon,
+  .sat-variant,
+  .ref-chip,
   .map-panel-tab,
   .thematic-item {
     transition: none;

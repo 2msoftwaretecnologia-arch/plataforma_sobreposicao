@@ -29,21 +29,10 @@
         return match ? decodeURIComponent(match[1]) : '';
     }
 
-    // Sentinel-2 (Copernicus) no Living Atlas da Esri: público, cenas dos
-    // últimos ~14 meses, com composições de banda prontas no servidor.
-    var SENTINEL2_URL = 'https://sentinel.arcgis.com/arcgis/rest/services/Sentinel2/ImageServer';
-    // `res`: resolução das bandas usadas (visível e NIR 10 m; SWIR 20 m).
-    var SENTINEL2_RENDERINGS = [
-        { value: 'Color Infrared with DRA', text: 'Infravermelho falsa-cor (vegetação em vermelho)', res: 10 },
-        { value: 'NDVI Colormap', text: 'NDVI (vigor da vegetação)', res: 10 },
-        { value: 'Agriculture with DRA', text: 'Agricultura (SWIR · NIR · azul)', res: 20 },
-        { value: 'Short-wave Infrared with DRA', text: 'Infravermelho de ondas curtas (SWIR)', res: 20 },
-        { value: 'Natural Color with DRA', text: 'Cor natural', res: 10 }
-    ];
-
     // Landsat (USGS/NASA) no Living Atlas da Esri: Landsat 8/9 de 2013 em
-    // diante e, antes disso, só as épocas do Global Land Survey (~1990, 2000,
-    // 2005, 2010). Os anos do seletor vêm do catálogo no centro do mapa.
+    // diante (antes disso, só as épocas do Global Land Survey, que o seletor
+    // esconde: 1984–2012 vem completo do Planetary Computer). Os anos do
+    // seletor vêm do catálogo no centro do mapa. `res`: resolução das bandas.
     var LANDSAT_URL = 'https://landsat2.arcgis.com/arcgis/rest/services/Landsat/MS/ImageServer';
     var LANDSAT_THERMAL = 'Band 10 Surface Temperature in Celsius';
     var LANDSAT_RENDERINGS = [
@@ -88,8 +77,6 @@
 
     // Os mesmos serviços e composições na visão 3D (map_3d_view.js).
     global.IMAGERY_DEFS = {
-        SENTINEL2_URL: SENTINEL2_URL,
-        SENTINEL2_RENDERINGS: SENTINEL2_RENDERINGS,
         LANDSAT_URL: LANDSAT_URL,
         LANDSAT_RENDERINGS: LANDSAT_RENDERINGS,
         landsatRenderingRule: landsatRenderingRule,
@@ -201,7 +188,7 @@
                 pane: pane,
                 attribution: 'Imagens &copy; Google'
             });
-            baseGoogle.imageryInfo = { kind: 'text', name: 'Satélite (Google)', text: 'Resolução não informada pelo Google.' };
+            baseGoogle.imageryInfo = { kind: 'google', text: 'Resolução não informada pelo Google.' };
             layers['Satélite (Google)'] = baseGoogle;
         }
 
@@ -250,30 +237,19 @@
             });
         }
 
+        // Landsat 8/9 (2013 em diante) gerado na hora pela Esri. O Sentinel-2
+        // do mesmo servidor saiu: o Sentinel-2 mês a mês (abaixo) tem as
+        // mesmas composições, de 2015 até hoje, com a cena escolhida.
         if (global.L.esri && L.esri.imageMapLayer) {
-            var baseInfrared = imageServerLayer(SENTINEL2_URL, SENTINEL2_RENDERINGS[0].value, 'Sentinel-2 (Copernicus) &copy; Esri', pane);
-            baseInfrared.imageryInfo = { kind: 'sentinel2' };
-            layers['Infravermelho (Sentinel-2)'] = baseInfrared;
-            pickers.push({
-                layer: baseInfrared,
-                label: 'Composição',
-                options: SENTINEL2_RENDERINGS,
-                selected: SENTINEL2_RENDERINGS[0].value,
-                // Imagem lenta: o painel mostra "Carregando imagem…".
-                slow: true,
-                onSelect: function (value) {
-                    baseInfrared.setRenderingRule({ rasterFunction: value });
-                }
-            });
-
             var baseLandsat = imageServerLayer(LANDSAT_URL, LANDSAT_RENDERINGS[0].value, 'Landsat (USGS/NASA) &copy; Esri', pane);
             baseLandsat.imageryInfo = { kind: 'landsat' };
-            layers['Landsat (histórico)'] = baseLandsat;
+            layers['Landsat 8/9 (2013–hoje)'] = baseLandsat;
             pickers.push({
                 layer: baseLandsat,
                 label: 'Composição',
                 options: LANDSAT_RENDERINGS,
                 selected: LANDSAT_RENDERINGS[0].value,
+                // Imagem lenta: o painel mostra "Carregando imagem…".
                 slow: true,
                 onSelect: function (value) {
                     baseLandsat.setRenderingRule(landsatRenderingRule(value));
@@ -283,6 +259,9 @@
                 secondary: {
                     label: 'Ano',
                     options: [{ value: '', text: 'Melhor cena recente' }],
+                    // Antes de 2013 o serviço só tem as épocas do Global Land
+                    // Survey: o acervo completo de 1984–2012 é a outra versão.
+                    minYear: 2013,
                     selected: '',
                     onSelect: function (year) {
                         if (year) {
@@ -311,7 +290,7 @@
                 layer: baseSentinel2,
                 template: s2.tile_url,
                 param: 'scene',
-                label: 'Cena (dia · satélite · nuvens)',
+                label: 'Cena',
                 emptyText: 'Nenhuma cena Sentinel-2 deste mês cobre este ponto.',
                 followsCenter: true,
                 // Sem mês escolhido, o servidor devolve o mais recente com cena.
@@ -376,7 +355,7 @@
                 layer: baseCbers,
                 template: imagery.cbers.tile_url + ENHANCE_QUERY,
                 param: 'scene',
-                label: 'Cena CBERS-4A',
+                label: 'Cena',
                 followsCenter: true,
                 enhance: {},
                 listUrl: function (center) {
@@ -405,7 +384,7 @@
                 layer: baseCbers2b,
                 template: c2.tile_url + ENHANCE_QUERY,
                 param: 'scene',
-                label: 'Cena CBERS-2B (câmera HRC)',
+                label: 'Cena (câmera HRC)',
                 emptyText: 'Nenhuma cena CBERS-2B HRC (' + c2.years[0] + '–' + c2.years[1] + ') cobre este ponto.',
                 followsCenter: true,
                 enhance: {},
@@ -496,7 +475,7 @@
                 layer: baseLandsatLegacy,
                 template: ll.tile_url + ENHANCE_QUERY,
                 param: 'scene',
-                label: 'Cena (ano · data · satélite · nuvens)',
+                label: 'Cena',
                 followsCenter: true,
                 // Com realce o servidor interpola até o zoom 17 (sem ele, o
                 // navegador amplia o pixel de 30 m a partir do 15).
@@ -565,9 +544,82 @@
         return {
             layers: layers,
             defaultLayer: baseEsriSat,
-            pickers: pickers
+            pickers: pickers,
+            families: imageryFamilies(layers, imagery),
+            references: [
+                { layer: layers['MapBiomas – uso do solo'], label: 'Uso do solo', name: 'MapBiomas' },
+                { layer: baseOSM, label: 'Ruas', name: 'OpenStreetMap' },
+                { layer: baseCartoLight, label: 'Claro', name: 'Carto Light' },
+                { layer: baseTopo, label: 'Topográfico', name: 'OpenTopoMap' }
+            ].filter(function (r) { return r.layer; })
         };
     }
+
+    /**
+     * Imagens de satélite agrupadas por satélite (a "família"): o mesmo
+     * satélite vindo de servidores ou épocas diferentes vira uma entrada só,
+     * com as versões num seletor dentro dela. A 1ª versão é a mais recente e
+     * a que abre ao escolher a família.
+     *
+     * Cada versão: `layer`, `label` (botão), `sub` (linha miúda do botão),
+     * `name` (nome curto: arquivo baixado e detalhes) e `badge` (resolução,
+     * quando difere da família).
+     */
+    function imageryFamilies(layers, imagery) {
+        var c2 = imagery.cbers2b, ll = imagery.landsat_legacy;
+        var provider = function (key) {
+            var p = (imagery.providers || []).find(function (x) { return x.key === key; });
+            return p ? layers[p.base_name] : null;
+        };
+        var families = [
+            {
+                key: 'google', name: 'Google', meta: 'Alta resolução · atual', badge: 'Alta res.',
+                variants: [{ layer: layers['Satélite (Google)'], label: 'Atual', name: 'Google' }]
+            },
+            {
+                key: 'esri', name: 'Esri World Imagery', meta: 'Alta resolução · histórico desde 2014', badge: 'Alta res.',
+                variants: [
+                    { layer: layers['Satélite (Esri)'], label: 'Atual', sub: 'mosaico mais recente', name: 'Esri' },
+                    { layer: layers['Histórico (Esri Wayback)'], label: 'Histórico', sub: 'escolha a data', name: 'Esri Wayback' }
+                ]
+            },
+            {
+                key: 'planet', name: 'Planet', meta: 'Mosaicos da conta Planet', badge: '~5 m',
+                variants: [{ layer: provider('planet'), label: 'Mosaicos', name: 'Planet' }]
+            },
+            {
+                key: 'sentinel2', name: 'Sentinel-2', meta: 'ESA · mês a mês desde 2015', badge: '10 m',
+                variants: [
+                    { layer: layers['Sentinel-2 mês a mês (10 m)'], label: 'Mês a mês', sub: 'escolha mês e cena', name: 'Sentinel-2' },
+                    { layer: provider('copernicus'), label: 'Copernicus', sub: 'camadas da conta', name: 'Copernicus' }
+                ]
+            },
+            {
+                key: 'landsat', name: 'Landsat', meta: 'USGS/NASA · desde 1984', badge: '30 m',
+                variants: [
+                    { layer: layers['Landsat 8/9 (2013–hoje)'], label: '2013 – hoje', sub: 'Landsat 8/9', name: 'Landsat 8-9' },
+                    { layer: ll && layers['Landsat 5/7 (' + ll.years[0] + '–' + ll.years[1] + ')'],
+                      label: ll ? ll.years[0] + ' – ' + ll.years[1] : '', sub: 'Landsat 4/5/7', name: 'Landsat 4-5-7' }
+                ]
+            },
+            {
+                key: 'cbers', name: 'CBERS', meta: 'INPE · sino-brasileiro', badge: '2 m',
+                variants: [
+                    { layer: layers['CBERS-4A (2 m, INPE)'], label: 'CBERS-4A', sub: '2 m · recente', name: 'CBERS-4A', badge: '2 m' },
+                    { layer: c2 && layers['CBERS-2B (2,7 m, ' + c2.years[0] + '–' + c2.years[1] + ')'],
+                      label: 'CBERS-2B', sub: c2 ? '2,7 m · ' + c2.years[0] + '–' + c2.years[1] : '', name: 'CBERS-2B', badge: '2,7 m' }
+                ]
+            }
+        ];
+        return families.map(function (f) {
+            f.variants = f.variants.filter(function (v) { return v.layer; });
+            return f;
+        }).filter(function (f) { return f.variants.length; });
+    }
+
+    // Ícone de satélite (contorno) dos cartões da aba Imagem.
+    var SATELLITE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 7 9 3 5 7l4 4"/><path d="m17 11 4 4-4 4-4-4"/>' +
+        '<path d="m8 12 4 4 6-6-4-4Z"/><path d="m16 8 3-3"/><path d="M9 21a6 6 0 0 0-6-6"/></svg>';
 
     // Metros por pixel de um tile Web Mercator de 256 px no zoom e latitude dados.
     function metersPerPixel(zoom, lat) {
@@ -601,25 +653,6 @@
                 });
         }
         return attempt(first);
-    }
-
-    /**
-     * Cena do Sentinel-2 desenhada no ponto: o serviço monta o mosaico pelo
-     * campo `best` (menor primeiro), então a primeira por `best` é a visível.
-     */
-    function querySentinel2Scene(latlng) {
-        var params = pointQuery(latlng, {
-            where: 'category = 1',
-            outFields: 'acquisitiondate,cloudcover',
-            orderByFields: 'best',
-            resultRecordCount: '1'
-        });
-        return fetch(SENTINEL2_URL + '/query?' + params)
-            .then(function (r) { return r.json(); })
-            .then(function (json) {
-                var f = json.features && json.features[0];
-                return f ? f.attributes : null;
-            });
     }
 
     /**
@@ -784,51 +817,128 @@
     }
 
     /**
-     * Lista dos mapas base no painel, separada entre imagens de satélite (as
-     * camadas com `imageryInfo`) e mapas de referência. `onChange(camada,
-     * linha)` é chamado com o mapa base inicial e a cada troca.
+     * Escolha do mapa base no painel: um cartão por satélite (ver
+     * imageryFamilies) e, embaixo, os mapas de referência em botões.
+     * O cartão escolhido abre e mostra as versões daquele satélite (ex.:
+     * Landsat 2013–hoje | 1984–2012) e o espaço (`slot`) onde entram os
+     * seletores de data/cena e os detalhes da imagem.
+     *
+     * `onChange(camada, slot, nome)` é chamado com o mapa base inicial e a
+     * cada troca. `opts.initial`: camada inicial (padrão: a do mapa);
+     * `opts.swap(antiga, nova)`: troca as camadas no mapa (a comparação
+     * troca por conta própria); `opts.compareLabel`: sufixo do título que só
+     * aparece durante a comparação.
      */
-    function setupBaseList(map, baseLayersInfo, mount, onChange) {
-        var groups = [
-            { title: 'Imagens de satélite', test: function (l) { return !!l.imageryInfo; } },
-            { title: 'Mapas de referência', test: function (l) { return !l.imageryInfo; } }
-        ];
-        var active = baseLayersInfo.defaultLayer;
-        var rows = [];
+    function setupBaseList(map, baseLayersInfo, mount, onChange, opts) {
+        opts = opts || {};
+        var swap = opts.swap || function (from, to) {
+            if (from) map.removeLayer(from);
+            map.addLayer(to);
+        };
+        var active = opts.initial || baseLayersInfo.defaultLayer;
+        var cards = [], chips = [];
+        var root = L.DomUtil.create('div', 'imagery-chooser', mount);
 
-        groups.forEach(function (group) {
-            var names = Object.keys(baseLayersInfo.layers).filter(function (n) {
-                return group.test(baseLayersInfo.layers[n]);
-            });
-            if (!names.length) return;
-            L.DomUtil.create('div', 'map-panel-subheading', mount).textContent = group.title;
-            var list = L.DomUtil.create('div', 'base-list', mount);
-            names.forEach(function (name) {
-                var layer = baseLayersInfo.layers[name];
-                var row = L.DomUtil.create('label', 'base-option', list);
-                var radio = L.DomUtil.create('input', '', row);
-                radio.type = 'radio';
-                radio.name = 'map-base-layer';
-                radio.checked = layer === active;
-                L.DomUtil.create('span', '', row).textContent = name;
-                rows.push({ row: row, layer: layer });
-                radio.addEventListener('change', function () {
-                    if (!radio.checked || layer === active) return;
-                    map.removeLayer(active);
-                    active = layer;
-                    map.addLayer(layer);
-                    select(row);
-                });
-            });
-        });
-
-        function select(row) {
-            rows.forEach(function (r) { r.row.classList.toggle('is-active', r.layer === active); });
-            onChange(active, row);
+        var head = L.DomUtil.create('div', 'map-panel-heading', root);
+        head.textContent = 'Imagens de satélite';
+        if (opts.compareLabel) {
+            L.DomUtil.create('span', 'map-panel-compare-only', head).textContent = ' · ' + opts.compareLabel;
         }
 
-        var initial = rows.find(function (r) { return r.layer === active; });
-        if (initial) select(initial.row);
+        var list = L.DomUtil.create('div', 'sat-list', root);
+        (baseLayersInfo.families || []).forEach(function (fam) {
+            fam.current = fam.variants.find(function (v) { return v.layer === active; }) || fam.variants[0];
+            var card = L.DomUtil.create('div', 'sat-card sat-card--' + fam.key, list);
+            var btn = L.DomUtil.create('button', 'sat-card-head', card);
+            btn.type = 'button';
+            btn.innerHTML = '<span class="sat-card-icon">' + SATELLITE_ICON + '</span>' +
+                '<span class="sat-card-text"><span class="sat-card-name"></span><span class="sat-card-meta"></span></span>' +
+                '<span class="sat-card-badge"></span>';
+            btn.querySelector('.sat-card-name').textContent = fam.name;
+            btn.querySelector('.sat-card-meta').textContent = fam.meta;
+            var badge = btn.querySelector('.sat-card-badge');
+            btn.addEventListener('click', function () { choose(fam.current.layer); });
+
+            var body = L.DomUtil.create('div', 'sat-card-body', card);
+            var variantBtns = [];
+            if (fam.variants.length > 1) {
+                var group = L.DomUtil.create('div', 'sat-variants', body);
+                group.setAttribute('role', 'group');
+                group.setAttribute('aria-label', 'Versão da imagem ' + fam.name);
+                fam.variants.forEach(function (v) {
+                    var vb = L.DomUtil.create('button', 'sat-variant', group);
+                    vb.type = 'button';
+                    L.DomUtil.create('span', 'sat-variant-label', vb).textContent = v.label;
+                    if (v.sub) L.DomUtil.create('span', 'sat-variant-sub', vb).textContent = v.sub;
+                    vb.addEventListener('click', function () { choose(v.layer); });
+                    variantBtns.push({ el: vb, variant: v });
+                });
+            }
+            var slot = L.DomUtil.create('div', 'sat-card-slot', body);
+            cards.push({ family: fam, el: card, btn: btn, badge: badge, variants: variantBtns, slot: slot });
+        });
+
+        var refs = baseLayersInfo.references || [];
+        var refSlot = null;
+        if (refs.length) {
+            L.DomUtil.create('div', 'map-panel-heading map-panel-heading--spaced', root).textContent = 'Mapas';
+            var chipRow = L.DomUtil.create('div', 'ref-chips', root);
+            refs.forEach(function (r) {
+                var chip = L.DomUtil.create('button', 'ref-chip', chipRow);
+                chip.type = 'button';
+                chip.textContent = r.label;
+                chip.title = r.name;
+                chip.addEventListener('click', function () { choose(r.layer); });
+                chips.push({ el: chip, ref: r });
+            });
+            // Detalhes do MapBiomas (ano), quando é o escolhido.
+            refSlot = L.DomUtil.create('div', 'ref-slot', root);
+        }
+
+        function choose(layer) {
+            if (!layer || layer === active) return;
+            var previous = active;
+            active = layer;
+            swap(previous, layer);
+            render();
+        }
+
+        function render() {
+            var slot = null, name = '';
+            cards.forEach(function (c) {
+                var v = c.family.variants.find(function (x) { return x.layer === active; });
+                if (v) {
+                    c.family.current = v;
+                    slot = c.slot;
+                    name = v.name;
+                }
+                c.el.classList.toggle('is-active', !!v);
+                c.btn.setAttribute('aria-pressed', String(!!v));
+                // Fechado, o selo é o do satélite; aberto, o da versão escolhida.
+                c.badge.textContent = (v && v.badge) || c.family.badge;
+                c.variants.forEach(function (b) {
+                    var on = b.variant === c.family.current;
+                    b.el.classList.toggle('is-active', on);
+                    b.el.setAttribute('aria-pressed', String(on));
+                });
+            });
+            chips.forEach(function (c) {
+                var on = c.ref.layer === active;
+                c.el.classList.toggle('is-active', on);
+                c.el.setAttribute('aria-pressed', String(on));
+                if (on) {
+                    slot = refSlot;
+                    name = c.ref.name;
+                }
+            });
+            onChange(active, slot || refSlot || root, name);
+        }
+
+        render();
+        return {
+            element: root,
+            choose: choose
+        };
     }
 
     /**
@@ -839,9 +949,8 @@
      * ativação (ou ao abrir o mapa, nas fontes com `prefetch`).
      *
      * `opts.idSuffix` deixa os ids únicos quando há dois painéis
-     * (comparação); `opts.chooser` ({nome: camada}) e `opts.onChoose(camada)`
-     * põem no topo um seletor de qual imagem mostrar (lado direito da
-     * comparação).
+     * (comparação). Quem escolhe a imagem é setupBaseList, que põe este
+     * painel dentro do cartão do satélite escolhido.
      *
      * Devolve { element, activate(camada), destroy() }: quem troca o mapa
      * base avisa o painel por `activate`.
@@ -854,29 +963,13 @@
         var activeBase = opts.initial || baseLayersInfo.defaultLayer;
         var infoSeq = 0, infoTimer = null;
 
-        var container, chooserEl, labelEl, selectEl, subLabelEl, subSelectEl, enhanceEl, enhanceInput, statusEl, infoEl;
+        var container, labelEl, selectEl, subLabelEl, subSelectEl, enhanceEl, enhanceInput, statusEl, infoEl;
         var periodLabelEl, periodRowEl, periodSelectEl, periodPrevBtn, periodNextBtn, periodFilled = null;
         var previewEl, previewImg, previewCaption, prepareBtn, prepareHint;
         var current = null;
 
         (function build() {
             container = L.DomUtil.create('div', 'imagery-picker', opts.mount);
-            if (opts.chooser) {
-                var chooserLabel = L.DomUtil.create('label', 'imagery-picker-label imagery-picker-side', container);
-                chooserLabel.textContent = opts.chooserLabel || 'Imagem';
-                chooserEl = L.DomUtil.create('select', 'imagery-picker-select', container);
-                chooserEl.id = 'imagery-picker-chooser' + suffix;
-                chooserLabel.setAttribute('for', chooserEl.id);
-                Object.keys(opts.chooser).forEach(function (name) {
-                    var o = document.createElement('option');
-                    o.value = name;
-                    o.textContent = name;
-                    chooserEl.appendChild(o);
-                });
-                chooserEl.addEventListener('change', function () {
-                    opts.onChoose(opts.chooser[chooserEl.value]);
-                });
-            }
             // Período (mês do Sentinel-2), só nas fontes com `period`: vem
             // antes do seletor principal porque trocar refaz a lista dele.
             // As setas passam ao mês vizinho sem abrir a lista.
@@ -1136,7 +1229,7 @@
             if (!info) return;
             var seq = ++infoSeq;
 
-            if (info.kind === 'text') {
+            if (info.kind === 'google') {
                 setInfo([info.text, zoomLine()]);
                 return;
             }
@@ -1222,31 +1315,6 @@
                 return;
             }
 
-            if (info.kind === 'sentinel2') {
-                var rendering = selectedOption(current) || {};
-                var resLine = 'Resolução: ' + formatMeters(rendering.res) + (rendering.res > 10 ? ' (bandas SWIR)' : '');
-                setInfo([resLine, 'Consultando data da cena…', zoomLine(rendering.res)]);
-                querySentinel2Scene(map.getCenter())
-                    .then(function (a) {
-                        if (seq !== infoSeq) return;
-                        var lines = [resLine];
-                        if (a && a.acquisitiondate) {
-                            lines.push('Cena: ' + new Date(a.acquisitiondate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }));
-                            if (a.cloudcover !== null && a.cloudcover !== undefined) {
-                                lines.push('Nuvens na cena: ' + Math.round(a.cloudcover * 100) + '%');
-                            }
-                        } else {
-                            lines.push('Sem cena para este ponto.');
-                        }
-                        lines.push('Fonte: Sentinel-2 (Copernicus/ESA)');
-                        setInfo(lines.concat(zoomLine(rendering.res)));
-                    })
-                    .catch(function () {
-                        if (seq === infoSeq) setInfo([resLine, 'Data da cena indisponível.', zoomLine(rendering.res)]);
-                    });
-                return;
-            }
-
             if (info.kind === 'landsat') {
                 var landsat = current;
                 var comp = selectedOption(landsat) || {};
@@ -1311,8 +1379,9 @@
             scenes.forEach(function (s) { var y = sceneYear(s); counts[y] = (counts[y] || 0) + 1; });
             var selected = picker.secondary.selected;
             if (selected && !counts[selected]) counts[selected] = 0;
+            var minYear = picker.secondary.minYear || 0;
             picker.secondary.options = [{ value: '', text: 'Melhor cena recente' }].concat(
-                Object.keys(counts).sort().reverse().map(function (y) {
+                Object.keys(counts).filter(function (y) { return +y >= minYear; }).sort().reverse().map(function (y) {
                     return { value: y, text: y + ' (' + counts[y] + (counts[y] === 1 ? ' cena)' : ' cenas)') };
                 })
             );
@@ -1680,13 +1749,13 @@
             state.panel = setupImageryPanel(map, base, {
                 mount: slot,
                 idSuffix: '-direita',
-                initial: base.layers[initialName],
-                chooser: base.layers,
-                chooserLabel: 'Lado direito',
-                onChoose: choose
+                initial: base.layers[initialName]
             });
-            document.getElementById('imagery-picker-chooser-direita').value = initialName;
-            choose(base.layers[initialName]);
+            // Os mesmos cartões do painel principal; a troca de camada é a da comparação.
+            setupBaseList(map, base, slot, function (layer, mountSlot) {
+                mountSlot.appendChild(state.panel.element);
+                choose(layer);
+            }, { initial: base.layers[initialName], swap: function () {} });
 
             var dragging = false;
             function move(e) {
@@ -2051,7 +2120,7 @@
 
         function exportable(layer) {
             // Termos do Google não permitem baixar a imagem; mapas de referência não são imagem.
-            return !!(layer && layer.imageryInfo && layer.imageryInfo.name !== 'Satélite (Google)' && global.exportBaseImage);
+            return !!(layer && layer.imageryInfo && layer.imageryInfo.kind !== 'google' && global.exportBaseImage);
         }
 
         function areaBounds() {
@@ -2330,16 +2399,20 @@
 
             // Aba "Imagem": lista de mapas base, com os detalhes da imagem
             // logo abaixo da opção escolhida (na comparação, é o lado esquerdo).
+            // Ordem na aba: satélites e mapas, depois o cartão de download.
             var imagem = panel.section('imagem');
-            var baseHeading = L.DomUtil.create('div', 'map-panel-heading', imagem);
-            baseHeading.innerHTML = 'Mapa base<span class="map-panel-compare-only"> · lado esquerdo</span>';
+            var chooserMount = L.DomUtil.create('div', '', imagem);
             var imageryPanel = setupImageryPanel(map, baseLayersInfo, { mount: imagem });
             var imageDownload = setupImageDownload(map, data.layersByFonte, imageryPanel, panel, imagem, options.imagery);
-            setupBaseList(map, baseLayersInfo, imagem, function (layer, row) {
-                row.parentNode.insertBefore(imageryPanel.element, row.nextSibling);
+            setupBaseList(map, baseLayersInfo, chooserMount, function (layer, slot, name) {
+                slot.appendChild(imageryPanel.element);
                 imageryPanel.activate(layer);
-                imageDownload.setBase(layer, row.textContent);
-            });
+                imageDownload.setBase(layer, name);
+            }, { compareLabel: 'lado esquerdo', swap: function (from, to) {
+                // `from` pode já ter saído (ex.: trocado pelo 3D lado a lado).
+                if (from && map.hasLayer(from)) map.removeLayer(from);
+                map.addLayer(to);
+            } });
 
             // Camadas temáticas (MapBiomas, DETER, focos, relevo) num pane
             // entre o mapa base (200) e os polígonos da análise (400).

@@ -273,10 +273,17 @@
         el.legendBox.style.top = isSmall() ? '' : (el.bar.offsetTop + el.bar.offsetHeight + 12) + 'px';
     }
 
+    // Opções com `group` vão em <optgroup> (ex.: as versões de cada satélite).
     function fillSelect(select, options, selected) {
         select.innerHTML = '';
+        var parent = select, groupName = null;
         (options || []).forEach(function (opt) {
-            var o = create('option', '', select, opt.text);
+            if (opt.group !== groupName) {
+                groupName = opt.group;
+                parent = groupName ? create('optgroup', '', select) : select;
+                if (groupName) parent.label = groupName;
+            }
+            var o = create('option', '', parent, opt.text);
             o.value = opt.value;
         });
         select.hidden = !options || !options.length;
@@ -456,7 +463,9 @@
     }
 
     /**
-     * Fontes do seletor. Cada uma: `name`, `note` (subtítulo), `tiles(opção,
+     * Fontes do seletor, agrupadas por satélite como no 2D (maps.js,
+     * imageryFamilies): `group` é o satélite e `text` a versão dele no
+     * seletor. Cada uma: `name`, `note` (subtítulo), `tiles(opção,
      * composição)` (null = a Esri do estilo), `options` ou `load()` (lista de
      * datas/cenas/composições), `label`, `initial(opções)`, `secondary`
      * (segundo seletor), `period` (seletor do mês, que refaz a lista),
@@ -470,16 +479,17 @@
 
         if (im.google_tile_url) {
             list.push({
-                key: 'google', name: 'Google', note: 'Imagem do Google sobre o relevo',
+                key: 'google', name: 'Google', group: 'Google', text: 'Google · atual', note: 'Imagem do Google sobre o relevo',
                 maxzoom: GOOGLE_MAX_ZOOM, mapMaxZoom: GOOGLE_MAX_ZOOM + 0.5, attribution: 'Imagens &copy; Google',
                 tiles: function () { return [absoluteUrl(im.google_tile_url)]; }
             });
         }
-        list.push({ key: 'esri', name: 'Esri (atual)', note: 'Imagem da Esri sobre o relevo', tiles: null });
+        list.push({ key: 'esri', name: 'Esri', group: 'Esri World Imagery', text: 'Esri · atual', note: 'Imagem da Esri sobre o relevo', tiles: null });
 
         if (im.wayback_tile_url && im.wayback_releases_url) {
             list.push({
-                key: 'wayback', name: 'Histórico Esri (Wayback)', note: 'Imagem histórica da Esri',
+                key: 'wayback', name: 'Esri Wayback', group: 'Esri World Imagery', text: 'Esri · histórico (escolha a data)',
+                note: 'Imagem histórica da Esri',
                 label: 'Data da imagem', backdrop: true, maxzoom: ESRI_MAX_ZOOM,
                 attribution: 'Imagens &copy; Esri (World Imagery Wayback)',
                 load: function () {
@@ -493,10 +503,15 @@
             });
         }
 
-        // Planet, Copernicus...: só os configurados no servidor.
+        // Planet, Copernicus...: só os configurados no servidor. O
+        // Copernicus entra junto do Sentinel-2 (mais abaixo).
+        var providerSources = {};
         (im.providers || []).forEach(function (p) {
-            list.push({
+            var copernicus = p.key === 'copernicus';
+            providerSources[p.key] = {
                 key: 'prov-' + p.key, name: p.base_name, note: p.base_name, label: p.label,
+                group: copernicus ? 'Sentinel-2' : 'Planet',
+                text: copernicus ? 'Copernicus · camadas da conta' : 'Planet · mosaicos',
                 backdrop: true, attribution: p.attribution,
                 load: function () {
                     return getJson(absoluteUrl(p.layers_url)).then(function (j) {
@@ -507,35 +522,15 @@
                 },
                 maxzoom: function (o) { return o.maxZoom || 19; },
                 tiles: function (o) { return [absoluteUrl(p.tile_url.replace('{layer}', o.value))]; }
-            });
+            };
         });
-
-        if (defs) {
-            list.push({
-                key: 'sentinel2', name: 'Sentinel-2 (10 m)', label: 'Composição',
-                note: 'Sentinel-2 · imagem gerada na hora, pode levar alguns segundos',
-                backdrop: true, tileSize: IMAGE_SERVER_TILE, maxzoom: 16,
-                attribution: 'Sentinel-2 (Copernicus) &copy; Esri',
-                options: defs.SENTINEL2_RENDERINGS,
-                // Em 3D a cor natural é a leitura mais direta; as outras ficam no seletor.
-                initial: function () { return 'Natural Color with DRA'; },
-                tiles: function (o) { return imageServerTiles(defs.SENTINEL2_URL, { rasterFunction: o.value }); }
-            });
-            list.push({
-                key: 'landsat', name: 'Landsat 8/9 (30 m)', label: 'Composição',
-                note: 'Landsat 8/9 · melhor cena recente, gerada na hora',
-                backdrop: true, tileSize: IMAGE_SERVER_TILE, maxzoom: 14,
-                attribution: 'Landsat (USGS/NASA) &copy; Esri',
-                options: defs.LANDSAT_RENDERINGS,
-                tiles: function (o) { return imageServerTiles(defs.LANDSAT_URL, defs.landsatRenderingRule(o.value)); }
-            });
-        }
+        if (providerSources.planet) list.push(providerSources.planet);
 
         // Sentinel-2 mês a mês: o mês (`period`) e, dentro dele, a cena.
         if (im.sentinel2 && defs) {
             var s2 = im.sentinel2;
             var s2Source = {
-                key: 'sentinel2-scenes', name: 'Sentinel-2 mês a mês (10 m)',
+                key: 'sentinel2-scenes', name: 'Sentinel-2', group: 'Sentinel-2', text: 'Sentinel-2 · mês a mês (10 m)',
                 label: 'Cena (dia · satélite · nuvens)', centered: true,
                 note: 'Sentinel-2 · 10 m',
                 emptyText: 'Nenhuma cena Sentinel-2 deste mês cobre este ponto.',
@@ -570,27 +565,24 @@
             };
             list.push(s2Source);
         }
+        if (providerSources.copernicus) list.push(providerSources.copernicus);
 
-        if (im.cbers) {
+        if (defs) {
             list.push({
-                key: 'cbers', name: 'CBERS-4A (2 m, INPE)', label: 'Cena CBERS-4A', centered: true,
-                note: 'CBERS-4A · aparece de perto; ao fundo fica a Esri',
-                emptyText: 'Nenhuma cena CBERS-4A cobre este ponto.',
-                backdrop: true, minzoom: im.cbers.min_zoom, maxzoom: 18,
-                attribution: 'CBERS-4A &copy; INPE (Brazil Data Cube)',
-                load: function () {
-                    return getJson(centerQuery(absoluteUrl(im.cbers.scenes_url))).then(function (j) {
-                        return (j.scenes || []).map(function (s) { return { value: s.id, text: formatDateBR(s.date) }; });
-                    });
-                },
-                tiles: function (o) { return [absoluteUrl(im.cbers.tile_url.replace('{scene}', o.value))]; }
+                key: 'landsat', name: 'Landsat 8/9', group: 'Landsat', text: 'Landsat · 2013 – hoje (Landsat 8/9)', label: 'Composição',
+                note: 'Landsat 8/9 · melhor cena recente, gerada na hora',
+                backdrop: true, tileSize: IMAGE_SERVER_TILE, maxzoom: 14,
+                attribution: 'Landsat (USGS/NASA) &copy; Esri',
+                options: defs.LANDSAT_RENDERINGS,
+                tiles: function (o) { return imageServerTiles(defs.LANDSAT_URL, defs.landsatRenderingRule(o.value)); }
             });
         }
 
         if (im.landsat_legacy) {
             var ll = im.landsat_legacy;
             list.push({
-                key: 'landsat-legacy', name: 'Landsat 5/7 (' + ll.years[0] + '–' + ll.years[1] + ')',
+                key: 'landsat-legacy', name: 'Landsat 4/5/7', group: 'Landsat',
+                text: 'Landsat · ' + ll.years[0] + ' – ' + ll.years[1] + ' (Landsat 4/5/7)',
                 label: 'Cena (ano · data · satélite · nuvens)', centered: true,
                 note: 'Landsat 5/7 · 30 m',
                 emptyText: 'Nenhuma cena Landsat 5/7 cobre este ponto.',
@@ -620,12 +612,29 @@
                 }
             });
         }
+
+        // O CBERS-2B (preparado no servidor sob demanda) fica só no 2D.
+        if (im.cbers) {
+            list.push({
+                key: 'cbers', name: 'CBERS-4A', group: 'CBERS (INPE)', text: 'CBERS-4A · 2 m', label: 'Cena CBERS-4A', centered: true,
+                note: 'CBERS-4A · aparece de perto; ao fundo fica a Esri',
+                emptyText: 'Nenhuma cena CBERS-4A cobre este ponto.',
+                backdrop: true, minzoom: im.cbers.min_zoom, maxzoom: 18,
+                attribution: 'CBERS-4A &copy; INPE (Brazil Data Cube)',
+                load: function () {
+                    return getJson(centerQuery(absoluteUrl(im.cbers.scenes_url))).then(function (j) {
+                        return (j.scenes || []).map(function (s) { return { value: s.id, text: formatDateBR(s.date) }; });
+                    });
+                },
+                tiles: function (o) { return [absoluteUrl(im.cbers.tile_url.replace('{scene}', o.value))]; }
+            });
+        }
         return list;
     }
 
     function buildImagery() {
         state.catalog = imageryCatalog();
-        fillSelect(el.imgSelect, state.catalog.map(function (s) { return { value: s.key, text: s.name }; }),
+        fillSelect(el.imgSelect, state.catalog.map(function (s) { return { value: s.key, text: s.text || s.name, group: s.group }; }),
             state.catalog[0].key);
         el.imgSelect.hidden = state.catalog.length < 2;
     }
