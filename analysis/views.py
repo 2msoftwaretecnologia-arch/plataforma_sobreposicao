@@ -10,6 +10,7 @@ from dataclasses import asdict
 from types import SimpleNamespace
 
 # Django
+from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db.models import Q
@@ -1248,6 +1249,26 @@ def _base_name_short(nome: str) -> str:
 
 def termos(request):
     return render(request, 'analysis/termos_de_uso.html')
+
+
+def landing(request):
+    """Apresentação pública da plataforma: o que ela faz, sem precisar entrar."""
+    return render(request, 'analysis/landing.html')
+
+
+_workspace = login_required(UploadZipCarView.as_view())
+
+
+def home(request):
+    """`/`: quem não entrou vê a apresentação; quem entrou, a plataforma.
+
+    Sem login, o formulário de análise (POST) e os links `?interface=` seguem
+    para o login como antes e voltam para cá depois dele."""
+    if (not request.user.is_authenticated
+            and request.method in ('GET', 'HEAD')
+            and 'interface' not in request.GET):
+        return landing(request)
+    return _workspace(request)
 
 
 class BaseTileView(View):

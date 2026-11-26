@@ -3,8 +3,10 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    # Página inicial: mapa 3D do SICAR com o formulário de análise.
-    path('', login_required(views.UploadZipCarView.as_view()), name='upload_zip_car'),
+    # Página inicial: sem login, a apresentação pública da plataforma; com
+    # login, o mapa com o formulário de análise (ver `views.home`).
+    path('', views.home, name='upload_zip_car'),
+    path('conheca/', views.landing, name='landing'),
     path('report/print/', login_required(views.ReportPrintView.as_view()), name='report_print'),
     path('results/', login_required(views.ResultsPageView.as_view()), name='results'),
     path('localizacoes/', login_required(views.LocalizacoesKmzView.as_view()), name='localizacoes_kmz'),

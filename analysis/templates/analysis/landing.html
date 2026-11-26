@@ -1,0 +1,666 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+{% comment %}
+Apresentação pública da plataforma (sem login): é o que `/` mostra para quem
+não entrou (ver `home` em views.py) e fica também em `/conheca/`. Os mocks de
+mapa, relatório, lote e conversa são ilustrativos: a página não consulta nada
+no servidor, porque as rotas de dados exigem login.
+{% endcomment %}
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TerraView Tocantins | Análise geoambiental e fundiária de imóveis rurais</title>
+    <meta name="description" content="Cruze imóveis rurais do Tocantins com 26 bases ambientais e fundiárias, veja as sobreposições no mapa 2D e 3D sobre imagens de satélite de 1984 até hoje e baixe o relatório, o KML e o SHP.">
+    <link rel="icon" type="image/svg+xml" href="{% static 'analysis/images/icon_page.svg' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/landing_page.css' %}?v={{ static_version }}">
+    <link rel="stylesheet" type="text/css" href="{% static 'analysis/css/landing.css' %}?v={{ static_version }}">
+</head>
+
+<body class="lp">
+
+    <!-- ===== Ícones ===== -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <defs>
+            <symbol id="i-wheat" viewBox="0 0 24 24"><path d="M12 21V9"/><path d="M12 9c-2.8 0-4.5-1.8-4.5-4.5C10.2 4.5 12 6.2 12 9zM12 9c2.8 0 4.5-1.8 4.5-4.5C13.8 4.5 12 6.2 12 9zM12 14c-2.8 0-4.5-1.8-4.5-4.5 2.7 0 4.5 1.7 4.5 4.5zM12 14c2.8 0 4.5-1.8 4.5-4.5-2.7 0-4.5 1.7-4.5 4.5zM12 19c-2.8 0-4.5-1.8-4.5-4.5 2.7 0 4.5 1.7 4.5 4.5zM12 19c2.8 0 4.5-1.8 4.5-4.5-2.7 0-4.5 1.7-4.5 4.5z"/></symbol>
+            <symbol id="i-map" viewBox="0 0 24 24"><path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6z"/><path d="M9 4v14M15 6v14"/></symbol>
+            <symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 3H7a1.5 1.5 0 0 0-1.5 1.5v15A1.5 1.5 0 0 0 7 21h10a1.5 1.5 0 0 0 1.5-1.5V7.5z"/><path d="M14 3v4.5h4.5M9 12.5h6M9 16h6"/></symbol>
+            <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 5 5.8v5.4c0 4.4 3 8 7 9.8 4-1.8 7-5.4 7-9.8V5.8z"/><path d="m9.2 12 2 2 3.6-4"/></symbol>
+            <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15.5V5M8 9l4-4 4 4"/><path d="M4.5 15.5v3A1.5 1.5 0 0 0 6 20h12a1.5 1.5 0 0 0 1.5-1.5v-3"/></symbol>
+            <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4.5V15M8 11l4 4 4-4"/><path d="M4.5 15.5v3A1.5 1.5 0 0 0 6 20h12a1.5 1.5 0 0 0 1.5-1.5v-3"/></symbol>
+            <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3.5 8.5 4.5L12 12.5 3.5 8z"/><path d="m3.5 12.5 8.5 4.5 8.5-4.5M3.5 16.5 12 21l8.5-4.5"/></symbol>
+            <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.2 12.4 2.5 2.5 5-5.4"/></symbol>
+            <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4 2.8 19.6h18.4z"/><path d="M12 10v4.4M12 17.1v.1"/></symbol>
+            <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M5 19c0-8 4-13.5 14-14-.5 10-6 14-11.5 14"/><path d="M5 19c3-5 6.5-8.5 10-10.5"/></symbol>
+            <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+            <symbol id="i-satellite" viewBox="0 0 24 24"><path d="m10 7 7 7M13 4l3.5-2L21 6.5 19 10zM4 13l-2 3.5L6.5 21l3.5-2z"/><path d="M13.5 13.5a4 4 0 0 1-5-5"/></symbol>
+            <symbol id="i-fire" viewBox="0 0 24 24"><path d="M12 3c1 3-3.5 5-3.5 9a5.5 5.5 0 0 0 11 0c0-2.5-1.5-4.5-3-6-.2 1.4-.8 2.3-2 3C14.5 6.5 14 4.5 12 3z"/></symbol>
+            <symbol id="i-mountain" viewBox="0 0 24 24"><path d="m3 19 6-11 4 7 3-4.5L21 19z"/><path d="M12.5 8.5 15 4l2 3.5"/></symbol>
+            <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2.5"/></symbol>
+            <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4.5 12h15M14 6.5l5.5 5.5-5.5 5.5"/></symbol>
+            <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></symbol>
+            <symbol id="i-pen" viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></symbol>
+            <symbol id="i-cube" viewBox="0 0 24 24"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9"/></symbol>
+            <symbol id="i-chat" viewBox="0 0 24 24"><path d="M5 5h14a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 17h-8l-4.5 3.5V17H5a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 5 5z"/><path d="M8 10h8M8 13h5"/></symbol>
+            <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 19.5c.6-3.2 3-5 6-5s5.4 1.8 6 5"/><path d="M15.5 5.6a3.2 3.2 0 0 1 0 6M17.5 14.8c1.8.6 3.1 2.2 3.5 4.7"/></symbol>
+            <symbol id="i-history" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.5"/><path d="M4 4v4.5h4.5M12 8v4l3 2"/></symbol>
+            <symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="1.5"/><path d="M4 12h16M12 4v16"/></symbol>
+            <symbol id="i-bank" viewBox="0 0 24 24"><path d="M3.5 9 12 4l8.5 5z"/><path d="M5.5 9.5v7M10 9.5v7M14 9.5v7M18.5 9.5v7M3.5 19.5h17"/></symbol>
+            <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="m11 12 8.5-8.5M16 7l2.5 2.5M14 9l2 2"/></symbol>
+            <symbol id="i-water" viewBox="0 0 24 24"><path d="M12 3.5S6 10 6 14a6 6 0 0 0 12 0c0-4-6-10.5-6-10.5z"/><path d="M9.5 14.5a2.5 2.5 0 0 0 2.5 2.5"/></symbol>
+            <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 4c.8 4.2 3.8 7.2 8 8-4.2.8-7.2 3.8-8 8-.8-4.2-3.8-7.2-8-8 4.2-.8 7.2-3.8 8-8z"/></symbol>
+        </defs>
+    </svg>
+
+    <!-- ===== Navegação ===== -->
+    <div class="topbar">
+        <div class="container">
+            <nav class="nav lp-nav" aria-label="Principal">
+                <a href="#topo" class="brand">
+                    <div class="brand-mark"><svg class="ico"><use href="#i-wheat"/></svg></div>
+                    <div>
+                        <div class="brand-title">TerraView Tocantins</div>
+                        <div class="brand-subtitle">Geoanálise rural inteligente</div>
+                    </div>
+                </a>
+                <div class="nav-links">
+                    <a href="#funcionalidades">Funcionalidades</a>
+                    <a href="#bases">Bases</a>
+                    <a href="#imagens">Imagens</a>
+                    <a href="#relatorio">Relatório</a>
+                    <a href="#assistente">Assistente</a>
+                </div>
+                <div class="nav-actions">
+                    {% if user.is_authenticated %}
+                    <a href="{% url 'upload_zip_car' %}" class="btn btn-gold">Abrir a plataforma</a>
+                    {% else %}
+                    <a href="{% url 'authentication:login' %}" class="btn btn-outline-green">Entrar</a>
+                    <a href="{% url 'authentication:register' %}" class="btn btn-gold lp-nav-register">Criar conta</a>
+                    {% endif %}
+                </div>
+            </nav>
+        </div>
+    </div>
+
+    <!-- ===== Hero ===== -->
+    <header class="hero" id="topo">
+        <div class="container">
+            <div class="hero-grid">
+                <div class="reveal visible">
+                    <div class="hero-badge">
+                        <svg class="ico"><use href="#i-pin"/></svg>
+                        Imóveis rurais do Tocantins
+                    </div>
+                    <h1>Tudo o que pesa sobre um imóvel rural, <em>num só mapa</em>.</h1>
+                    <p class="hero-text">
+                        Informe o CAR, envie o shapefile ou desenhe a área. A plataforma cruza o imóvel com 26 bases ambientais e fundiárias, mostra cada sobreposição no mapa 2D e 3D, sobre imagens de satélite de 1984 até hoje, e entrega o relatório pronto para imprimir.
+                    </p>
+                    <div class="cta-area">
+                        {% if user.is_authenticated %}
+                        <a href="{% url 'upload_zip_car' %}" class="btn btn-gold btn-lg">
+                            Abrir a plataforma
+                            <svg class="ico" style="width:20px;height:20px"><use href="#i-arrow"/></svg>
+                        </a>
+                        {% else %}
+                        <a href="{% url 'authentication:register' %}" class="btn btn-gold btn-lg">
+                            Criar conta e analisar
+                            <svg class="ico" style="width:20px;height:20px"><use href="#i-arrow"/></svg>
+                        </a>
+                        <a href="{% url 'authentication:login' %}" class="btn btn-outline-light">Já tenho conta</a>
+                        {% endif %}
+                    </div>
+                    <div class="hero-footnote">
+                        <div class="footnote-item"><svg class="ico"><use href="#i-layers"/></svg> 26 bases cruzadas</div>
+                        <div class="footnote-item"><svg class="ico"><use href="#i-satellite"/></svg> Imagens de 1984 a hoje</div>
+                        <div class="footnote-item"><svg class="ico"><use href="#i-doc"/></svg> Relatório, KML e SHP</div>
+                    </div>
+                </div>
+
+                <!-- Mock do resultado (ilustrativo) -->
+                <div class="map-card reveal visible reveal-delay-2" aria-hidden="true">
+                    <div class="map-box">
+                        <div class="map-header">
+                            <div>
+                                <div class="map-title">Resultado da análise</div>
+                                <div class="map-subtitle">Imóvel de exemplo &bull; 412,6 ha</div>
+                            </div>
+                            <span class="online">26 bases</span>
+                        </div>
+                        <div class="mini-map lp-hero-map">
+                            <svg class="terrain" viewBox="0 0 500 420" preserveAspectRatio="xMidYMid slice">
+                                <g fill="none" stroke="rgba(58,122,75,0.2)" stroke-width="1.3">
+                                    <path d="M-20 70 C 90 40, 190 100, 300 75 S 480 40, 540 70"/>
+                                    <path d="M-20 125 C 90 95, 200 155, 310 130 S 480 95, 540 125"/>
+                                    <path d="M-20 180 C 90 150, 210 210, 320 185 S 480 150, 540 180"/>
+                                    <path d="M-20 235 C 90 205, 220 265, 330 240 S 480 205, 540 235"/>
+                                    <path d="M-20 290 C 90 260, 230 320, 340 295 S 480 260, 540 290"/>
+                                    <path d="M-20 345 C 90 315, 240 375, 350 350 S 480 315, 540 345"/>
+                                </g>
+                                <!-- vizinhos do CAR -->
+                                <g fill="none" stroke="rgba(117,105,79,0.35)" stroke-width="1.2" stroke-dasharray="3 4">
+                                    <path d="M40 120 L 170 110 L 150 215 L 30 230 Z"/>
+                                    <path d="M395 90 L 490 120 L 470 250 L 400 225 Z"/>
+                                    <path d="M210 330 L 345 315 L 360 410 L 220 420 Z"/>
+                                </g>
+                                <!-- rio e APP -->
+                                <path d="M120 -10 C 150 80, 230 120, 250 200 S 330 330, 300 430" fill="none" stroke="rgba(0,191,165,0.22)" stroke-width="26" stroke-linecap="round"/>
+                                <path d="M120 -10 C 150 80, 230 120, 250 200 S 330 330, 300 430" fill="none" stroke="#3b8fc4" stroke-width="2.4"/>
+                                <!-- imóvel -->
+                                <path class="plot" d="M175 125 L 335 100 L 390 195 L 345 290 L 205 305 L 145 220 Z"/>
+                                <!-- PRODES -->
+                                <defs>
+                                    <pattern id="lp-hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                                        <rect width="7" height="7" fill="rgba(185,98,47,0.16)"/>
+                                        <path d="M0 0v7" stroke="#b9622f" stroke-width="2.2" stroke-opacity="0.55"/>
+                                    </pattern>
+                                </defs>
+                                <path d="M196 140 L 262 128 L 282 178 L 240 205 L 188 188 Z" fill="url(#lp-hatch)" stroke="#b9622f" stroke-width="1.8"/>
+                            </svg>
+                            <div class="map-alert">
+                                <small><svg class="ico"><use href="#i-alert"/></svg> Ponto de atenção</small>
+                                <strong>PRODES após 2008</strong>
+                                <span class="lp-alert-ha">3,4 ha dentro do imóvel</span>
+                            </div>
+                            <div class="layers-box lp-checks">
+                                <div class="layers-title"><svg class="ico"><use href="#i-shield"/></svg> Verificações</div>
+                                <div class="lp-check"><span>Embargo do IBAMA</span><b class="lp-ok">Não</b></div>
+                                <div class="lp-check"><span>Terra indígena ou quilombola</span><b class="lp-ok">Não</b></div>
+                                <div class="lp-check"><span>Desmatamento (PRODES)</span><b class="lp-warn">3,4 ha</b></div>
+                                <div class="lp-check"><span>Área protegida</span><b class="lp-ok">Não</b></div>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="lp-mock-note">Exemplo ilustrativo</p>
+                </div>
+            </div>
+        </div>
+        <svg class="fence-divider" viewBox="0 0 1440 44" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M0 44 L0 30 Q 360 8 720 22 T 1440 18 L1440 44 Z" fill="#fbf8f0"/>
+        </svg>
+    </header>
+
+    <!-- ===== Funcionalidades ===== -->
+    <section id="funcionalidades" class="contour-bg lp-anchor">
+        <div class="container">
+            <p class="section-label reveal">O que a plataforma faz</p>
+            <h2 class="section-title reveal">Da busca do imóvel ao relatório final, sem trocar de ferramenta.</h2>
+            <p class="section-description reveal">Tudo o que um consultor costuma fazer em várias telas e programas, reunido num mapa só.</p>
+
+            <div class="cards-grid lp-features">
+                <a href="#entradas" class="feature-card reveal">
+                    <div class="icon-badge"><svg class="ico"><use href="#i-layers"/></svg></div>
+                    <h3>Análise de sobreposição</h3>
+                    <p>Cruza a área com 26 bases oficiais e calcula, item por item, quantos hectares de cada uma caem dentro do imóvel.</p>
+                    <span class="lp-card-link">Formas de entrada <svg class="ico"><use href="#i-arrow"/></svg></span>
+                </a>
+                <a href="#mapa" class="feature-card reveal reveal-delay-1">
+                    <div class="icon-badge"><svg class="ico"><use href="#i-cube"/></svg></div>
+                    <h3>Mapa 2D e 3D</h3>
+                    <p>Navegue livremente pelo Tocantins, veja a imagem de satélite sobre o relevo e compare o mapa e o 3D lado a lado.</p>
+                    <span class="lp-card-link">Ver o mapa <svg class="ico"><use href="#i-arrow"/></svg></span>
+                </a>
+                <a href="#mapa" class="feature-card reveal reveal-delay-2">
+                    <div class="icon-badge"><svg class="ico"><use href="#i-pen"/></svg></div>
+                    <h3>Busca e desenho</h3>
+                    <p>Vá direto a um município, a um CAR ou a uma coordenada. Desenhe polígonos, linhas e pontos e analise a área desenhada.</p>
+                    <span class="lp-card-link">Ver o mapa <svg class="ico"><use href="#i-arrow"/></svg></span>
+                </a>
+                <a href="#imagens" class="feature-card reveal">
+                    <div class="icon-badge"><svg class="ico"><use href="#i-satellite"/></svg></div>
+                    <h3>Imagens de 40 anos</h3>
+                    <p>Landsat desde 1984, Sentinel-2 mês a mês, CBERS de 2 m e o histórico da Esri: compare 2008 com hoje.</p>
+                    <span class="lp-card-link">Linha do tempo <svg class="ico"><use href="#i-arrow"/></svg></span>
+                </a>
+                <a href="#imagens" class="feature-card reveal reveal-delay-1">
+                    <div class="icon-badge"><svg class="ico"><use href="#i-fire"/></svg></div>
+                    <h3>Camadas temáticas</h3>
+                    <p>Uso do solo e área queimada do MapBiomas, alertas DETER, focos de calor do INPE, declividade e relevo sombreado.</p>
+                    <span class="lp-card-link">Linha do tempo <svg class="ico"><use href="#i-arrow"/></svg></span>
+                </a>
+                <a href="#relatorio" class="feature-card reveal reveal-delay-2">
+                    <div class="icon-badge"><svg class="ico"><use href="#i-doc"/></svg></div>
+                    <h3>Relatório da propriedade</h3>
+                    <p>Veredito em linguagem simples, as perguntas que importam, Reserva Legal, uso do solo 2008 × hoje e cada ocorrência explicada.</p>
+                    <span class="lp-card-link">Ver o relatório <svg class="ico"><use href="#i-arrow"/></svg></span>
+                </a>
+                <a href="#relatorio" class="feature-card reveal">
+                    <div class="icon-badge"><svg class="ico"><use href="#i-download"/></svg></div>
+                    <h3>Arquivos para baixar</h3>
+                    <p>KML e SHP do imóvel, de cada base e de todas as sobreposições, e a imagem de satélite em GeoTIFF recortada no contorno.</p>
+                    <span class="lp-card-link">Ver o relatório <svg class="ico"><use href="#i-arrow"/></svg></span>
+                </a>
+                <a href="#lote" class="feature-card reveal reveal-delay-1">
+                    <div class="icon-badge"><svg class="ico"><use href="#i-grid"/></svg></div>
+                    <h3>Análise em lote</h3>
+                    <p>Envie KMZ com dezenas de pontos, descubra em qual CAR ou parcela do SIGEF cada um está e cruze todos de uma vez.</p>
+                    <span class="lp-card-link">Como funciona <svg class="ico"><use href="#i-arrow"/></svg></span>
+                </a>
+                <a href="#assistente" class="feature-card reveal reveal-delay-2">
+                    <div class="icon-badge"><svg class="ico"><use href="#i-chat"/></svg></div>
+                    <h3>Assistente de IA</h3>
+                    <p>Peça análises, mapas e relatórios conversando com o Claude ou o ChatGPT, conectados à sua conta.</p>
+                    <span class="lp-card-link">Exemplos <svg class="ico"><use href="#i-arrow"/></svg></span>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== Entradas ===== -->
+    <section id="entradas" class="bases-section rows-bg lp-anchor">
+        <div class="container input-grid">
+            <div>
+                <p class="section-label reveal">Entrada de dados</p>
+                <h2 class="section-title reveal">Comece com o que você tiver em mãos.</h2>
+                <p class="lead-text reveal">
+                    Número do CAR, arquivo do topógrafo, PDF do cadastro ou só um ponto no mapa: a plataforma encontra a geometria do imóvel e mostra a área antes mesmo de analisar.
+                </p>
+                <div class="input-list">
+                    <div class="input-item reveal"><svg class="ico"><use href="#i-check"/></svg> Número do CAR</div>
+                    <div class="input-item reveal"><svg class="ico"><use href="#i-check"/></svg> Shapefile (.zip)</div>
+                    <div class="input-item reveal reveal-delay-1"><svg class="ico"><use href="#i-check"/></svg> KML ou KMZ</div>
+                    <div class="input-item reveal reveal-delay-1"><svg class="ico"><use href="#i-check"/></svg> Coordenadas</div>
+                    <div class="input-item reveal reveal-delay-2"><svg class="ico"><use href="#i-check"/></svg> Recibo do CAR (PDF)</div>
+                    <div class="input-item reveal reveal-delay-2"><svg class="ico"><use href="#i-check"/></svg> Demonstrativo do CAR (PDF)</div>
+                    <div class="input-item reveal reveal-delay-3"><svg class="ico"><use href="#i-check"/></svg> Área desenhada no mapa</div>
+                    <div class="input-item reveal reveal-delay-3"><svg class="ico"><use href="#i-check"/></svg> Parcela do SIGEF</div>
+                </div>
+            </div>
+
+            <!-- Mock do formulário (ilustrativo) -->
+            <div class="lp-entry reveal reveal-delay-1" aria-hidden="true">
+                <div class="lp-entry-head">
+                    <strong>Análise de propriedade</strong>
+                    <span>Cruza a área com as bases ambientais e fundiárias do Tocantins.</span>
+                </div>
+                <div class="lp-entry-label">Modo de análise</div>
+                <div class="lp-pills">
+                    <span>ZIP</span><span>KML</span><span>Coordenadas</span><span class="is-on">CAR</span><span>Demonstrativo</span><span>Recibo</span>
+                </div>
+                <div class="lp-entry-label">Número do CAR</div>
+                <div class="lp-field">TO-1721000-<span>████████████████████</span></div>
+                <div class="lp-entry-label">Coordenadas aceitas</div>
+                <div class="lp-coords">
+                    <code>-9.581852, -48.526588</code>
+                    <code>9°34'54.7"S 48°31'35.7"W</code>
+                    <code>UTM 22S · 771494 E · 8939843 N</code>
+                </div>
+                <div class="lp-entry-btn">Analisar <svg class="ico"><use href="#i-arrow"/></svg></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== Bases ===== -->
+    <section id="bases" class="contour-bg lp-anchor">
+        <div class="container">
+            <div class="bases-header">
+                <div>
+                    <p class="section-label reveal">Bases de dados</p>
+                    <h2 class="section-title reveal">26 bases cruzadas em cada análise.</h2>
+                    <p class="section-description reveal">Ambientais, fundiárias, de fiscalização e o que o próprio CAR declara. Cada ocorrência vem com a área em hectares, calculada em SIRGAS 2000 / UTM 22S, e o relatório informa quando cada base foi atualizada.</p>
+                </div>
+                <div class="soon-badge reveal"><svg class="ico"><use href="#i-sparkle"/></svg> Bases atualizadas pelo painel</div>
+            </div>
+
+            <div class="lp-base-groups">
+                <div class="lp-base-group reveal">
+                    <div class="lp-base-head"><span class="database-icon"><svg class="ico"><use href="#i-map"/></svg></span><h3>Fundiário e cadastro</h3></div>
+                    <ul class="lp-chips">
+                        <li>SICAR (CAR federal)</li><li>CAR Estadual (2023)</li><li>SIGEF</li><li>SNIC</li><li>Assentamentos rurais</li><li>Municípios</li>
+                    </ul>
+                </div>
+                <div class="lp-base-group reveal reveal-delay-1">
+                    <div class="lp-base-head"><span class="database-icon"><svg class="ico"><use href="#i-doc"/></svg></span><h3>Declarado no CAR</h3></div>
+                    <ul class="lp-chips">
+                        <li>APP</li><li>Reserva Legal</li><li>Vegetação nativa</li><li>Área consolidada</li><li>Uso restrito</li><li>Pousio</li><li>Servidão administrativa</li><li>Hidrografia</li>
+                    </ul>
+                </div>
+                <div class="lp-base-group reveal reveal-delay-2">
+                    <div class="lp-base-head"><span class="database-icon"><svg class="ico"><use href="#i-shield"/></svg></span><h3>Áreas protegidas e comunidades</h3></div>
+                    <ul class="lp-chips">
+                        <li>Unidades de Conservação</li><li>APAs</li><li>Terras Indígenas</li><li>Comunidades Quilombolas</li><li>Veredas</li>
+                    </ul>
+                </div>
+                <div class="lp-base-group reveal">
+                    <div class="lp-base-head"><span class="database-icon lp-icon-terra"><svg class="ico"><use href="#i-alert"/></svg></span><h3>Desmatamento e fiscalização</h3></div>
+                    <ul class="lp-chips">
+                        <li>PRODES</li><li>Alertas MapBiomas</li><li>Embargos do IBAMA</li>
+                    </ul>
+                </div>
+                <div class="lp-base-group reveal reveal-delay-1">
+                    <div class="lp-base-head"><span class="database-icon"><svg class="ico"><use href="#i-leaf"/></svg></span><h3>Ordenamento e infraestrutura</h3></div>
+                    <ul class="lp-chips">
+                        <li>Zoneamento</li><li>Fitoecologia</li><li>IPUCA</li><li>Rodovias</li>
+                    </ul>
+                </div>
+                <div class="lp-base-group lp-base-note reveal reveal-delay-2">
+                    <div class="lp-base-head"><span class="database-icon"><svg class="ico"><use href="#i-key"/></svg></span><h3>Para equipes</h3></div>
+                    <p>Bases internas podem ser restritas a grupos (Funcionários, Parceiros, Consultores). Cada conta cruza só as bases liberadas para ela, também em lotes, relatórios e no assistente.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== Imagens ===== -->
+    <section id="imagens" class="steps-section lp-anchor">
+        <div class="container">
+            <p class="section-label reveal">Imagens de satélite</p>
+            <h2 class="section-title reveal">Volte no tempo até 1984 e veja o que mudou no imóvel.</h2>
+            <p class="lp-dark-text reveal">Escolha o sensor, o ano ou o mês e a cena, com a data e a nuvem de cada passagem. O marco de 2008 do Código Florestal fica a um clique de distância.</p>
+
+            <div class="lp-timeline reveal" role="img" aria-label="Linha do tempo das imagens disponíveis, de 1984 até hoje">
+                <div class="lp-tl-axis">
+                    <span style="--y:1984">1984</span><span style="--y:1995">1995</span><span style="--y:2008" class="is-mark">2008</span><span style="--y:2015">2015</span><span style="--y:2026">hoje</span>
+                </div>
+                <div class="lp-tl-mark" style="--y:2008"><span>Código Florestal</span></div>
+                <div class="lp-tl-row"><span class="lp-tl-name">Landsat 4, 5 e 7 <small>30 m</small></span><span class="lp-tl-track"><i style="--a:1984;--b:2012"></i></span></div>
+                <div class="lp-tl-row"><span class="lp-tl-name">MapBiomas uso do solo <small>30 m</small></span><span class="lp-tl-track"><i class="is-gold" style="--a:1985;--b:2025"></i></span></div>
+                <div class="lp-tl-row"><span class="lp-tl-name">MapBiomas Fogo <small>30 m</small></span><span class="lp-tl-track"><i class="is-terra" style="--a:1985;--b:2025"></i></span></div>
+                <div class="lp-tl-row"><span class="lp-tl-name">Focos de calor INPE</span><span class="lp-tl-track"><i class="is-terra" style="--a:1998;--b:2026"></i></span></div>
+                <div class="lp-tl-row"><span class="lp-tl-name">CBERS-2B HRC <small>2,7 m</small></span><span class="lp-tl-track"><i style="--a:2007;--b:2010"></i></span></div>
+                <div class="lp-tl-row"><span class="lp-tl-name">Landsat 8 e 9 <small>30 m</small></span><span class="lp-tl-track"><i style="--a:2013;--b:2026"></i></span></div>
+                <div class="lp-tl-row"><span class="lp-tl-name">Esri Wayback <small>alta resolução</small></span><span class="lp-tl-track"><i style="--a:2014;--b:2026"></i></span></div>
+                <div class="lp-tl-row"><span class="lp-tl-name">Sentinel-2 mês a mês <small>10 m</small></span><span class="lp-tl-track"><i style="--a:2015.5;--b:2026"></i></span></div>
+                <div class="lp-tl-row"><span class="lp-tl-name">CBERS-4A <small>2 m</small></span><span class="lp-tl-track"><i style="--a:2020;--b:2026"></i></span></div>
+            </div>
+
+            <div class="steps-grid lp-img-grid">
+                <div class="step-card reveal">
+                    <div class="step-top"><div class="icon-badge"><svg class="ico"><use href="#i-sparkle"/></svg></div></div>
+                    <h3>Composições</h3>
+                    <p>Cor natural, falsa cor, agricultura, SWIR e NDVI para ler vegetação, solo exposto e água.</p>
+                </div>
+                <div class="step-card reveal reveal-delay-1">
+                    <div class="step-top"><div class="icon-badge"><svg class="ico"><use href="#i-satellite"/></svg></div></div>
+                    <h3>Cenas antigas corrigidas</h3>
+                    <p>As cenas CBERS-2B de 2007–2010 têm a posição corrigida pelo Landsat da mesma data, e “Melhorar imagem” dá mais contraste e nitidez.</p>
+                </div>
+                <div class="step-card reveal reveal-delay-2">
+                    <div class="step-top"><div class="icon-badge"><svg class="ico"><use href="#i-mountain"/></svg></div></div>
+                    <h3>Declividade e relevo</h3>
+                    <p>Declividade nas faixas do Código Florestal, relevo sombreado e alertas DETER do INPE por cima de qualquer imagem.</p>
+                </div>
+                <div class="step-card reveal reveal-delay-3">
+                    <div class="step-top"><div class="icon-badge"><svg class="ico"><use href="#i-download"/></svg></div></div>
+                    <h3>Baixe a imagem</h3>
+                    <p>GeoTIFF da imagem que está no mapa, no imóvel, na tela, num desenho ou num arquivo, recortado no contorno se quiser.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== Mapa 2D + 3D ===== -->
+    <section id="mapa" class="contour-bg lp-anchor">
+        <div class="container map-section-grid">
+            <div>
+                <p class="section-label reveal">Mapa interativo</p>
+                <h2 class="section-title reveal">Plano, relevo ou os dois lado a lado.</h2>
+                <p class="lead-text reveal">
+                    O mapa abre sem precisar analisar nada: explore a região, desenhe e mude de visão quando quiser. Os dois mapas andam juntos.
+                </p>
+                <ul class="lp-points">
+                    <li class="reveal"><svg class="ico"><use href="#i-check"/></svg><span><b>2D, 2D + 3D ou só 3D</b>, com a imagem de satélite sobre o relevo.</span></li>
+                    <li class="reveal"><svg class="ico"><use href="#i-check"/></svg><span><b>Comparação de imagens</b>: duas datas ou dois sensores, um de cada lado.</span></li>
+                    <li class="reveal"><svg class="ico"><use href="#i-check"/></svg><span><b>Busca</b> por município, número do CAR ou coordenada em grau decimal, GMS ou UTM.</span></li>
+                    <li class="reveal"><svg class="ico"><use href="#i-check"/></svg><span><b>Desenho</b> de polígono, linha e ponto, com “Analisar esta área” no polígono.</span></li>
+                    <li class="reveal"><svg class="ico"><use href="#i-check"/></svg><span><b>Tour 3D do SICAR</b> e mapa 2D do CAR para quem prefere outra entrada.</span></li>
+                </ul>
+            </div>
+
+            <!-- Mock 2D + 3D (ilustrativo) -->
+            <div class="map-card lp-split reveal reveal-delay-1" aria-hidden="true">
+                <div class="map-box">
+                    <div class="lp-split-bar">
+                        <span>2D</span><span class="is-on">2D + 3D</span><span>3D</span>
+                    </div>
+                    <div class="lp-split-stage">
+                        <svg viewBox="0 0 260 300" preserveAspectRatio="xMidYMid slice" class="lp-split-2d">
+                            <rect width="260" height="300" fill="#4e6b3a"/>
+                            <path d="M0 0h120l-30 90H0z" fill="#5d7d42"/>
+                            <path d="M120 0h140v70l-90 40-80-20z" fill="#7a8f4c"/>
+                            <path d="M0 90h90l40 80-50 70H0z" fill="#3f5c33"/>
+                            <path d="M170 110l90-40v120l-70 20z" fill="#a39060"/>
+                            <path d="M80 240l50-70 60 40 70-20v110H60z" fill="#55733f"/>
+                            <path d="M40 -10 C 70 80, 140 110, 150 180 S 200 260, 180 320" fill="none" stroke="#3b8fc4" stroke-width="3"/>
+                            <path class="plot lp-plot-light" d="M85 85 L 185 70 L 215 140 L 185 205 L 100 215 L 65 150 Z"/>
+                        </svg>
+                        <svg viewBox="0 0 260 300" preserveAspectRatio="xMidYMid slice" class="lp-split-3d">
+                            <defs>
+                                <linearGradient id="lp-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cfe0e6"/><stop offset="1" stop-color="#eef1e6"/></linearGradient>
+                            </defs>
+                            <rect width="260" height="300" fill="url(#lp-sky)"/>
+                            <path d="M0 130 L 40 95 L 70 112 L 120 60 L 160 100 L 200 78 L 260 120 V300 H0z" fill="#6c8550"/>
+                            <path d="M0 170 L 50 140 L 100 158 L 150 120 L 210 150 L 260 140 V300 H0z" fill="#56703f"/>
+                            <path d="M0 220 L 60 195 L 130 210 L 190 185 L 260 200 V300 H0z" fill="#4a6536"/>
+                            <path d="M90 300 C 110 250, 150 240, 160 200" fill="none" stroke="#3b8fc4" stroke-width="2.5"/>
+                            <path class="plot lp-plot-light" d="M70 220 L 165 200 L 205 222 L 180 262 L 80 270 L 50 245 Z"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== Relatório ===== -->
+    <section id="relatorio" class="report-section rows-bg lp-anchor">
+        <div class="container report-grid">
+            <div class="report-wrap">
+                <!-- Mock do relatório (ilustrativo) -->
+                <div class="report-card reveal" aria-hidden="true">
+                    <div class="report-inner">
+                        <div class="report-head">
+                            <div class="report-icon"><svg class="ico"><use href="#i-doc"/></svg></div>
+                            <div>
+                                <h3>Relatório da Propriedade Rural</h3>
+                                <small>Pronto para imprimir ou salvar em PDF</small>
+                            </div>
+                        </div>
+                        <div class="lp-verdict">
+                            <svg class="ico"><use href="#i-alert"/></svg>
+                            Encontramos 1 ponto que merece ser conferido
+                        </div>
+                        <div class="lp-q"><span>A área tem embargo do IBAMA?</span><b class="lp-ok">Não</b></div>
+                        <div class="lp-q"><span>O governo registrou desmatamento na área?</span><b class="lp-warn">Sim — 3,4 ha</b></div>
+                        <div class="lp-q"><span>A área invade terra indígena ou quilombola?</span><b class="lp-ok">Não</b></div>
+                        <div class="lp-q"><span>A Reserva Legal declarada é suficiente?</span><b class="lp-ok">Sim</b></div>
+                        <div class="lp-q"><span>Há margem de rio ou nascente (APP) a recuperar?</span><b class="lp-ok">Não</b></div>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <p class="section-label reveal">Relatório e arquivos</p>
+                <h2 class="section-title reveal">Um relatório que o cliente entende.</h2>
+                <p class="lead-text reveal">
+                    Começa pelo veredito e pelas perguntas que importam, com semáforo, e depois detalha cada base. Serve para crédito rural, compra de terra, regularização e licenciamento.
+                </p>
+                <ul class="lp-points">
+                    <li class="reveal"><svg class="ico"><use href="#i-check"/></svg><span>A propriedade em números, Reserva Legal e onde fica, com a coordenada central.</span></li>
+                    <li class="reveal"><svg class="ico"><use href="#i-check"/></svg><span>Uso do solo antes e agora: MapBiomas de 2008 comparado ao ano mais recente.</span></li>
+                    <li class="reveal"><svg class="ico"><use href="#i-check"/></svg><span>A propriedade em 3D, item por item do que foi encontrado e o que foi verificado sem ocorrência.</span></li>
+                    <li class="reveal"><svg class="ico"><use href="#i-check"/></svg><span>Anexo com os dados declarados no CAR e um glossário dos termos técnicos.</span></li>
+                    <li class="reveal"><svg class="ico"><use href="#i-download"/></svg><span>KML e SHP do imóvel e de cada base; KML de todas as sobreposições, uma pasta colorida por base.</span></li>
+                    <li class="reveal"><svg class="ico"><use href="#i-history"/></svg><span>Toda análise fica no seu histórico, para reabrir o resultado e o relatório quando quiser.</span></li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== Em lote ===== -->
+    <section id="lote" class="contour-bg lp-anchor">
+        <div class="container input-grid">
+            <div>
+                <p class="section-label reveal">Análise em lote</p>
+                <h2 class="section-title reveal">Dezenas de pontos, um relatório só.</h2>
+                <p class="lead-text reveal">
+                    Recebeu uma planilha de localizações em KMZ? Envie os arquivos, veja em qual imóvel do CAR ou parcela do SIGEF cada ponto cai e mande cruzar todos com as bases. O lote roda em segundo plano.
+                </p>
+                <ul class="lp-points">
+                    <li class="reveal"><svg class="ico"><use href="#i-check"/></svg><span>Vários KMZ/KML de uma vez; pontos sem geometria são recuperados pelo Plus Code do nome.</span></li>
+                    <li class="reveal"><svg class="ico"><use href="#i-check"/></svg><span>Lote por CAR (SICAR) ou por parcela (SIGEF), com o andamento na tela.</span></li>
+                    <li class="reveal"><svg class="ico"><use href="#i-check"/></svg><span>Relatório do lote: situação de cada imóvel e sobreposições por base, pronto para imprimir.</span></li>
+                </ul>
+            </div>
+
+            <!-- Mock do lote (ilustrativo) -->
+            <div class="lp-batch reveal reveal-delay-1" aria-hidden="true">
+                <div class="lp-batch-card">
+                    <div class="lp-batch-title">
+                        <span class="lp-batch-file">Vistorias Março 2026.kmz</span>
+                        <span class="lp-batch-tag">SICAR</span>
+                    </div>
+                    <div class="lp-batch-meta"><b>52</b> CARs &middot; Processando</div>
+                    <div class="lp-batch-bar"><span style="width:73%"></span></div>
+                    <div class="lp-batch-prog"><span>38 de 52</span><span>73%</span></div>
+                </div>
+                <div class="lp-batch-card lp-batch-sum">
+                    <div class="lp-batch-label">Sobreposições por base</div>
+                    <div class="lp-bar-row"><span>PRODES</span><i style="--w:62%"></i><b>14</b></div>
+                    <div class="lp-bar-row"><span>Reserva Legal</span><i style="--w:88%"></i><b>21</b></div>
+                    <div class="lp-bar-row"><span>Embargos IBAMA</span><i class="is-terra" style="--w:13%"></i><b>3</b></div>
+                    <div class="lp-bar-row"><span>Veredas</span><i style="--w:30%"></i><b>7</b></div>
+                </div>
+                <p class="lp-mock-note">Exemplo ilustrativo</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== Assistente ===== -->
+    <section id="assistente" class="steps-section lp-anchor">
+        <div class="container map-section-grid">
+            <div>
+                <p class="section-label reveal">Assistente de IA</p>
+                <h2 class="section-title reveal">Peça a análise conversando.</h2>
+                <p class="lp-dark-text reveal">
+                    Conecte a plataforma ao Claude ou ao ChatGPT. O assistente faz a análise, explica o resultado, monta o relatório, mostra o mapa e entrega os links de KML e SHP, tudo com a sua conta e as bases liberadas para ela.
+                </p>
+                <ul class="lp-points lp-points-dark">
+                    <li class="reveal"><svg class="ico"><use href="#i-check"/></svg><span>CAR, coordenadas, parcela do SIGEF ou arquivo anexado na conversa.</span></li>
+                    <li class="reveal"><svg class="ico"><use href="#i-check"/></svg><span>Imagem histórica de 2008 ao lado da atual e uso do solo do MapBiomas.</span></li>
+                    <li class="reveal"><svg class="ico"><use href="#i-check"/></svg><span>Roteiros prontos: parecer para crédito rural, due diligence de compra, checklist do Código Florestal e resumo para o cliente.</span></li>
+                    <li class="reveal"><svg class="ico"><use href="#i-check"/></svg><span>Cada análise do assistente entra no seu histórico, como as da tela.</span></li>
+                </ul>
+            </div>
+
+            <!-- Mock da conversa (ilustrativo) -->
+            <div class="lp-chat reveal reveal-delay-1" aria-hidden="true">
+                <div class="lp-msg lp-msg-user">Analisa o CAR TO-1721000-… e me diz se tem algum problema.</div>
+                <div class="lp-msg lp-msg-bot">
+                    Cruzei o imóvel com as bases. Não há embargo do IBAMA, terra indígena nem área protegida. O PRODES registra <b>3,4 ha</b> de desmatamento depois de 2008, que vale conferir.
+                    <div class="lp-chat-files">
+                        <span><svg class="ico"><use href="#i-doc"/></svg> Relatório (PDF)</span>
+                        <span><svg class="ico"><use href="#i-download"/></svg> KML das sobreposições</span>
+                        <span><svg class="ico"><use href="#i-map"/></svg> Mapa</span>
+                    </div>
+                </div>
+                <div class="lp-msg lp-msg-user">Faz um parecer para o banco, com a imagem de 2008.</div>
+                <div class="lp-typing"><i></i><i></i><i></i></div>
+                <p class="lp-mock-note">Exemplo ilustrativo</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== Para quem ===== -->
+    <section id="para-quem" class="lp-anchor">
+        <div class="container">
+            <p class="section-label reveal">Para quem é</p>
+            <h2 class="section-title reveal">Feita para quem decide sobre terra no Tocantins.</h2>
+            <div class="cards-grid lp-audience">
+                <div class="feature-card reveal">
+                    <div class="icon-badge"><svg class="ico"><use href="#i-leaf"/></svg></div>
+                    <h3>Consultores e engenheiros</h3>
+                    <p>Diagnóstico ambiental e fundiário antes da vistoria, do CAR ou do licenciamento.</p>
+                </div>
+                <div class="feature-card reveal reveal-delay-1">
+                    <div class="icon-badge"><svg class="ico"><use href="#i-search"/></svg></div>
+                    <h3>Compra e venda</h3>
+                    <p>Due diligence rápida: embargos, desmatamento e sobreposições antes de fechar negócio.</p>
+                </div>
+                <div class="feature-card reveal reveal-delay-2">
+                    <div class="icon-badge"><svg class="ico"><use href="#i-bank"/></svg></div>
+                    <h3>Crédito rural</h3>
+                    <p>Parecer objetivo sobre o imóvel, com o mapa e as fontes de cada informação.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== Como começar ===== -->
+    <section id="como-funciona" class="bases-section lp-anchor lp-steps-light">
+        <div class="container">
+            <p class="section-label reveal">Como começar</p>
+            <h2 class="section-title reveal">Em quatro passos.</h2>
+            <div class="steps-grid">
+                <div class="lp-step reveal">
+                    <span class="lp-step-n">01</span>
+                    <h3>Crie sua conta</h3>
+                    <p>Cadastro rápido e algumas perguntas sobre o seu uso.</p>
+                </div>
+                <div class="lp-step reveal reveal-delay-1">
+                    <span class="lp-step-n">02</span>
+                    <h3>Informe a área</h3>
+                    <p>CAR, arquivo, PDF, coordenadas ou um desenho no mapa.</p>
+                </div>
+                <div class="lp-step reveal reveal-delay-2">
+                    <span class="lp-step-n">03</span>
+                    <h3>Veja no mapa</h3>
+                    <p>Cada sobreposição com área, atributos e as imagens de satélite.</p>
+                </div>
+                <div class="lp-step reveal reveal-delay-3">
+                    <span class="lp-step-n">04</span>
+                    <h3>Leve o resultado</h3>
+                    <p>Relatório para imprimir, KML, SHP e a imagem em GeoTIFF.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== Aviso legal ===== -->
+    <section class="legal-section">
+        <div class="container">
+            <div class="legal-box reveal">
+                <div class="legal-icon"><svg class="ico"><use href="#i-alert"/></svg></div>
+                <div>
+                    <h2>Aviso legal</h2>
+                    <p>
+                        As análises valem para imóveis localizados no estado do Tocantins. Os resultados têm caráter técnico-informativo e devem ser interpretados por profissional habilitado quando usados em processos administrativos, ambientais, fundiários ou jurídicos.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== CTA final ===== -->
+    <section class="footer-cta">
+        <div class="container">
+            <h2>Pronto para analisar o primeiro imóvel?</h2>
+            <p>Crie sua conta para usar o mapa, as análises e os relatórios. Se já tem conta, é só entrar.</p>
+            <div class="cta-area lp-cta-center">
+                {% if user.is_authenticated %}
+                <a href="{% url 'upload_zip_car' %}" class="btn btn-gold btn-lg">
+                    Abrir a plataforma
+                    <svg class="ico" style="width:20px;height:20px"><use href="#i-arrow"/></svg>
+                </a>
+                {% else %}
+                <a href="{% url 'authentication:register' %}" class="btn btn-gold btn-lg">
+                    Criar conta
+                    <svg class="ico" style="width:20px;height:20px"><use href="#i-arrow"/></svg>
+                </a>
+                <a href="{% url 'authentication:login' %}" class="btn btn-outline-light">Entrar</a>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+
+    <footer class="site-footer">
+        <div class="container">TerraView Tocantins &copy; {% now "Y" %} &mdash; Análise geoambiental e fundiária para imóveis rurais no Tocantins.</div>
+    </footer>
+
+    <script src="{% static 'analysis/js/landing_page.js' %}?v={{ static_version }}"></script>
+</body>
+
+</html>
